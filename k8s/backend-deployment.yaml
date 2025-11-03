@@ -1,0 +1,227 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: deployment-platform
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deployment-config
+  namespace: deployment-platform
+data:
+  NODE_ENV: production
+  API_URL: https://api.example.com
+  CLIENT_URL: https://example.com
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: deployment-secrets
+  namespace: deployment-platform
+type: Opaque
+stringData:
+  MONGODB_URI: mongodb+srv://user:password@cluster.mongodb.net/deployment
+  JWT_SECRET: your-super-secret-key
+  STRIPE_SECRET_KEY: sk_live_xxxxx
+  STRIPE_WEBHOOK_SECRET: whsec_xxxxx
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-backend
+  namespace: deployment-platform
+  labels:
+    app: deployment-backend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: deployment-backend
+  template:
+    metadata:
+      labels:
+        app: deployment-backend
+    spec:
+      serviceAccountName: deployment-backend
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: backend
+        image: your-registry/deployment-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+        - containerPort: 9090
+          name: metrics
+        envFrom:
+        - configMapRef:
+            name: deployment-config
+        - secretRef:
+            name: deployment-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deployment-backend
+  namespace: deployment-platform
+  labels:
+    app: deployment-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5000
+    targetPort: 5000
+    name: http
+  - port: 9090
+    targetPort: 9090
+    name: metrics
+  selector:
+    app: deployment-backend
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: deployment-backend-hpa
+  namespace: deployment-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: deployment-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: deployment-backend-pdb
+  namespace: deployment-platform
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: deployment-backend
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployment-backend
+  namespace: deployment-platform
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployment-backend
+  namespace: deployment-platform
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/logs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deployment-backend
+  namespace: deployment-platform
+subjects:
+- kind: ServiceAccount
+  name: deployment-backend
+  namespace: deployment-platform
+roleRef:
+  kind: Role
+  name: deployment-backend
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deployment-backend-netpol
+  namespace: deployment-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: deployment-backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: deployment-frontend
+    - podSelector:
+        matchLabels:
+          app: deployment-nginx-ingress
+    ports:
+    - protocol: TCP
+      port: 5000
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 27017

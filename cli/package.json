@@ -1,0 +1,31 @@
+{
+  "name": "deployment-cli",
+  "version": "1.0.0",
+  "description": "Official CLI for the Deployment Platform",
+  "main": "index.js",
+  "bin": {
+    "deployment": "./bin/deployment.js"
+  },
+  "scripts": {
+    "start": "node bin/deployment.js",
+    "test": "jest"
+  },
+  "keywords": ["deployment", "cli", "devops"],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.3",
+    "commander": "^9.4.1",
+    "eventsource": "^2.0.2",
+    "inquirer": "^8.2.5",
+    "ora": "^5.4.1"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

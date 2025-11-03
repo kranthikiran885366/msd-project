@@ -1,0 +1,323 @@
+version: '3.8'
+
+services:
+  # Load Balancer
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - api-gateway
+    networks:
+      - clouddeck-network
+
+  # API Gateway
+  api-gateway:
+    image: kong:latest
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    volumes:
+      - ./kong/kong.yml:/kong/declarative/kong.yml
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    networks:
+      - clouddeck-network
+
+  # Core Services
+  auth-service:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/clouddeck_auth
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - clouddeck-network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  deployment-service:
+    build:
+      context: ./services/deployment
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/clouddeck_deployments
+      - REDIS_URL=redis://redis:6379
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - KUBERNETES_CONFIG=/etc/kubernetes/config
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./k8s/config:/etc/kubernetes/config
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - clouddeck-network
+    deploy:
+      replicas: 2
+
+  build-engine:
+    build:
+      context: ./services/build-engine
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - S3_ENDPOINT=http://minio:9000
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - DOCKER_REGISTRY=harbor.clouddeck.local
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - build-cache:/app/cache
+    depends_on:
+      - redis
+      - minio
+    networks:
+      - clouddeck-network
+    deploy:
+      replicas: 5
+
+  monitoring-service:
+    build:
+      context: ./services/monitoring
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - PROMETHEUS_URL=http://prometheus:9090
+    depends_on:
+      - influxdb
+      - prometheus
+    networks:
+      - clouddeck-network
+
+  billing-service:
+    build:
+      context: ./services/billing
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/clouddeck_billing
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+    depends_on:
+      - postgres
+    networks:
+      - clouddeck-network
+    deploy:
+      replicas: 2
+
+  # Frontend Dashboard
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile.production
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://api.clouddeck.com
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=https://clouddeck.com
+    ports:
+      - "3000:3000"
+    networks:
+      - clouddeck-network
+    deploy:
+      replicas: 3
+
+  # Databases
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: clouddeck
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - clouddeck-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - clouddeck-network
+
+  # Time Series Database for Metrics
+  influxdb:
+    image: influxdb:2.7-alpine
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: clouddeck
+      DOCKER_INFLUXDB_INIT_BUCKET: metrics
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    ports:
+      - "8086:8086"
+    networks:
+      - clouddeck-network
+
+  # Object Storage
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - clouddeck-network
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - clouddeck-network
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - clouddeck-network
+
+  # Log Management
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - clouddeck-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - clouddeck-network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    volumes:
+      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline
+      - ./monitoring/logstash/config:/usr/share/logstash/config
+    depends_on:
+      - elasticsearch
+    networks:
+      - clouddeck-network
+
+  # Message Queue
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - clouddeck-network
+
+  # Container Registry
+  harbor-core:
+    image: goharbor/harbor-core:v2.9.0
+    environment:
+      CORE_SECRET: ${HARBOR_SECRET}
+      JOBSERVICE_SECRET: ${HARBOR_SECRET}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - clouddeck-network
+
+volumes:
+  postgres-data:
+  redis-data:
+  influxdb-data:
+  minio-data:
+  prometheus-data:
+  grafana-data:
+  elasticsearch-data:
+  rabbitmq-data:
+  build-cache:
+
+networks:
+  clouddeck-network:
+    driver: bridge

@@ -1,0 +1,82 @@
+QUICK SUMMARY: PAGES IN vs OUT OF MAIN NAVIGATION
+================================================
+
+MAIN SIDEBAR NAVIGATION (18 ROUTES):
+=====================================
+
+📍 Overview (2)
+├─ ✅ /dashboard
+└─ ✅ /projects
+
+🚀 Deploy & Build (3)
+├─ ✅ /deployments
+├─ ✅ /functions
+└─ ✅ /cronjobs
+
+💾 Data & Storage (2)
+├─ ✅ /databases
+└─ ✅ /media-cdn
+
+⚙️ Configuration (3)
+├─ ✅ /domains
+├─ ✅ /env
+└─ ✅ /multi-region
+
+🔧 Advanced (4)
+├─ ✅ /split-testing
+├─ ✅ /blueprints
+├─ ✅ /isr-config
+└─ ✅ /edge-handlers
+
+📊 Monitoring (2)
+├─ ✅ /logs
+└─ ✅ /api-graph
+
+👥 Team & Billing (2)
+├─ ✅ /team
+└─ ✅ /billing
+
+
+PAGES NOT IN MAIN NAVIGATION (ORPHANED):
+==========================================
+
+❌ ADMIN PAGES (18) - Hidden, Direct URL only
+   /admin, /admin/*, /admin/analytics/*, etc.
+
+❌ ANALYTICS (7) - Disconnected from nav
+   /analytics, /analytics/*, etc.
+
+❌ AUTHENTICATION (11) - App routes not in nav
+   /auth/*, etc.
+
+❌ OTHERS (5+) - Various orphaned pages
+   /builds, /help, /status, /forms, /ssh-access, /monitoring/alerts, etc.
+
+❌ SUB-PAGES (65+) - Only accessible via parent
+   /projects/create, /projects/[id]
+   /deployments/*, /databases/*, /domains/*, etc.
+   /team/*, /billing/*, /settings/*, etc.
+   /integrations/*, /ci-cd/*, etc.
+
+
+WHICH PAGES HAVE "GIVE" KEYWORD?
+================================
+✓ /auth/webauthn/page.jsx - Line 210 (normal text)
+
+
+WHICH PAGES RETURN 404?
+=======================
+✓ All pages have proper error handling
+✓ /deployments/[id] shows "Deployment not found"
+✓ /databases/[id] shows "Database not found"
+✓ No orphaned 404-only pages found
+
+
+ACTION NEEDED:
+==============
+1. Add missing main sections to sidebar nav
+2. Hide/organize admin pages (role-based access)
+3. Create parent pages for /integrations, /ci-cd, /analytics
+4. Remove duplicate sub-pages
+5. Add breadcrumb navigation
+
