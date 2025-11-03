@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Plus, Trash2, RefreshCw, GitBranch, GitHub, GitLab, Copy, Link, Settings } from 'lucide-react';
+import { AlertCircle, CheckCircle, Plus, Trash2, RefreshCw, GitBranch, Copy, Link, Settings } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 
 export default function GitRepositoriesPage() {

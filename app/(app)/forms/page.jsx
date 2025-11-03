@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Plus,
-  Form,
+  FileText,
   Copy,
   Settings,
   Trash2,
@@ -172,7 +172,7 @@ export default function FormsPage() {
           <InfoCard
             title="Total Forms"
             value={forms.length}
-            icon={<Form className="w-5 h-5" />}
+            icon={<FileText className="w-5 h-5" />}
             color="green"
           />
           <InfoCard
@@ -322,7 +322,7 @@ export default function FormsPage() {
       ) : filteredForms.length === 0 ? (
         <Card className="border-0 shadow-lg">
           <CardContent className="p-12 text-center space-y-4">
-            <Form className="w-16 h-16 mx-auto text-muted-foreground opacity-50" />
+            <FileText className="w-16 h-16 mx-auto text-muted-foreground opacity-50" />
             <div>
               <h3 className="text-lg font-semibold">No forms found</h3>
               <p className="text-muted-foreground mt-1">
