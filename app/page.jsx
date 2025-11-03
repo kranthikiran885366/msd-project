@@ -91,7 +91,7 @@ export default function LandingPage() {
                 </Link>
               </Button>
               <Button asChild variant="ghost" size="lg" className="hover:bg-primary/10">
-                <a href="https://github.com" target="_blank" rel="noreferrer">
+                <a href="https://github.com/kranthikiran885366/msd-project" target="_blank" rel="noreferrer">
                   <Github className="size-5 mr-2" /> GitHub
                 </a>
               </Button>
