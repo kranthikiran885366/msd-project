@@ -29,98 +29,30 @@ export default function IncidentsManagementPage() {
     component: ''
   });
 
-  // Removed mock data - using backend integration
-    {
-      id: 1,
-      title: 'Database Connection Pool Exhaustion',
-      description: 'Connection pool reached maximum capacity causing request timeouts',
-      status: 'resolved',
-      severity: 'critical',
-      component: 'Database',
-      assignee: 'john.doe@company.com',
-      createdAt: '2024-12-20T08:15:00Z',
-      resolvedAt: '2024-12-20T09:30:00Z',
-      detectedBy: 'alert_rule_003',
-      resolution: 'Scaled database connections from 100 to 200. Issue resolved.',
-      timeline: [
-        { time: '08:15:00', event: 'Incident created', detail: 'Alert triggered by connection pool monitoring' },
-        { time: '08:18:00', event: 'Acknowledged', detail: 'john.doe acknowledged the incident' },
-        { time: '08:45:00', event: 'In Progress', detail: 'Started investigating connection patterns' },
-        { time: '09:15:00', event: 'Action Taken', detail: 'Scaled database connections to 200' },
-        { time: '09:30:00', event: 'Resolved', detail: 'Incident resolved and verified' }
-      ]
-    },
-    {
-      id: 2,
-      title: 'High Memory Usage on API Server',
-      description: 'Memory utilization exceeded 85% threshold for 10 minutes',
-      status: 'in-progress',
-      severity: 'warning',
-      component: 'API Server',
-      assignee: 'jane.smith@company.com',
-      createdAt: '2024-12-20T12:45:00Z',
-      resolvedAt: null,
-      detectedBy: 'alert_rule_001',
-      resolution: null,
-      timeline: [
-        { time: '12:45:00', event: 'Incident created', detail: 'Alert triggered by memory monitoring' },
-        { time: '12:47:00', event: 'Acknowledged', detail: 'jane.smith acknowledged the incident' },
-        { time: '12:50:00', event: 'In Progress', detail: 'Analyzing memory dump and process logs' }
-      ]
-    },
-    {
-      id: 3,
-      title: 'Deployment Failed - Service Restart',
-      description: 'Deployment to production failed during service restart',
-      status: 'resolved',
-      severity: 'critical',
-      component: 'Deployment Service',
-      assignee: 'mike.johnson@company.com',
-      createdAt: '2024-12-20T14:20:00Z',
-      resolvedAt: '2024-12-20T14:55:00Z',
-      detectedBy: 'deployment_monitor',
-      resolution: 'Rolled back to previous stable version. Re-deployment successful.',
-      timeline: [
-        { time: '14:20:00', event: 'Incident created', detail: 'Deployment failed during restart' },
-        { time: '14:22:00', event: 'Acknowledged', detail: 'mike.johnson acknowledged the incident' },
-        { time: '14:35:00', event: 'Action Taken', detail: 'Rolled back to previous stable deployment' },
-        { time: '14:55:00', event: 'Resolved', detail: 'Re-deployment successful' }
-      ]
-    },
-    {
-      id: 4,
-      title: 'Cache Invalidation Issue',
-      description: 'Redis cache not invalidating properly causing stale data',
-      status: 'acknowledged',
-      severity: 'warning',
-      component: 'Cache Layer',
-      assignee: 'sarah.lee@company.com',
-      createdAt: '2024-12-20T16:10:00Z',
-      resolvedAt: null,
-      detectedBy: 'alert_rule_005',
-      resolution: null,
-      timeline: [
-        { time: '16:10:00', event: 'Incident created', detail: 'Stale cache data detected' },
-        { time: '16:12:00', event: 'Acknowledged', detail: 'sarah.lee acknowledged the incident' }
-      ]
-    },
-    {
-      id: 5,
-      title: 'SSL Certificate Expiration Warning',
-      description: 'SSL certificate expiring in 7 days - requires renewal',
-      status: 'pending',
-      severity: 'info',
-      component: 'Security',
-      assignee: null,
-      createdAt: '2024-12-20T10:00:00Z',
-      resolvedAt: null,
-      detectedBy: 'certificate_monitor',
-      resolution: null,
-      timeline: [
-        { time: '10:00:00', event: 'Incident created', detail: 'Certificate expiration warning triggered' }
-      ]
+  // Backend integration for incidents
+  const fetchIncidents = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+      
+      if (!projectId) {
+        setError('Please select a project first');
+        return;
+      }
+
+      const res = await apiClient.getIncidents?.(projectId) || { data: [] };
+      setIncidents(Array.isArray(res) ? res : res.data || []);
+    } catch (error) {
+      console.error('Failed to fetch incidents:', error);
+      setError('Failed to load incidents');
+      setIncidents([]);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchIncidents();
+  }, []);
 
   const statusColorMap = {
     'pending': 'bg-gray-100 text-gray-800',
@@ -151,25 +83,6 @@ export default function IncidentsManagementPage() {
   useEffect(() => {
     fetchDeployments();
   }, []);
-
-  const fetchIncidents = useCallback(async () => {
-    if (!selectedDeployment) return;
-    
-    try {
-      setError('');
-      setLoading(true);
-      const incidentsData = await apiClient.getIncidents(selectedDeployment);
-      setIncidents(incidentsData || []);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch incidents');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedDeployment]);
-
-  useEffect(() => {
-    fetchIncidents();
-  }, [fetchIncidents]);
 
   const handleInputChange = (field, value) => {
     setFormData({...formData, [field]: value});

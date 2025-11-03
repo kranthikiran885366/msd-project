@@ -17,118 +17,42 @@ export default function UptimeDashboardPage() {
   const [error, setError] = useState('');
   const [timeRange, setTimeRange] = useState('30d'); // 7d, 30d, 90d
 
-  // Removed mock data - using backend integration
-    uptime24h: 99.98,
-    uptime7d: 99.92,
-    uptime30d: 99.89,
-    uptime90d: 99.76,
-    averageResponseTime: 145,
-    lastIncident: '2024-12-20T14:20:00Z',
-    totalDowntime30d: 158, // minutes
-    incidents30d: 3
-  };
-
-  const mockSlaStatus = {
-    targetUptime: 99.95,
-    currentUptime: 99.89,
-    slaCompliant: false,
-    remainingBuffer: -0.06,
-    creditAmount: 850 // USD
-  };
-
-  const mockUptimeHistory = [
-    { date: 'Dec 15', uptime24h: 100, uptime7d: 99.95, uptime30d: 99.82 },
-    { date: 'Dec 16', uptime24h: 99.95, uptime7d: 99.93, uptime30d: 99.81 },
-    { date: 'Dec 17', uptime24h: 99.92, uptime7d: 99.91, uptime30d: 99.80 },
-    { date: 'Dec 18', uptime24h: 99.88, uptime7d: 99.89, uptime30d: 99.78 },
-    { date: 'Dec 19', uptime24h: 99.90, uptime7d: 99.90, uptime30d: 99.78 },
-    { date: 'Dec 20', uptime24h: 99.98, uptime7d: 99.92, uptime30d: 99.89 }
-  ];
-
-  const mockDowntimeBreakdown = [
-    { name: 'Scheduled Maintenance', value: 85, minutes: 85 },
-    { name: 'Infrastructure Issues', value: 45, minutes: 45 },
-    { name: 'Deployment Issues', value: 28, minutes: 28 }
-  ];
-
-  const mockIncidentHistory = [
-    {
-      date: '2024-12-20',
-      incident: 'Deployment Failed - Service Restart',
-      duration: '35 minutes',
-      severity: 'critical',
-      status: 'resolved'
-    },
-    {
-      date: '2024-12-18',
-      incident: 'Database Connection Pool Exhaustion',
-      duration: '12 minutes',
-      severity: 'critical',
-      status: 'resolved'
-    },
-    {
-      date: '2024-12-15',
-      incident: 'Scheduled Maintenance',
-      duration: '85 minutes',
-      severity: 'info',
-      status: 'resolved'
-    },
-    {
-      date: '2024-12-12',
-      incident: 'Network Latency Issues',
-      duration: '8 minutes',
-      severity: 'warning',
-      status: 'resolved'
-    }
-  ];
-
-  const mockMonthlyData = [
-    { month: 'October', uptime: 99.82, downtime: 26 },
-    { month: 'November', uptime: 99.88, downtime: 17 },
-    { month: 'December', uptime: 99.89, downtime: 16 }
-  ];
-
-  const colors = ['#ef4444', '#f59e0b', '#3b82f6'];
-
-  const fetchDeployments = useCallback(async () => {
+  // Backend integration for uptime data
+  const fetchUptimeData = async () => {
     try {
-      setError('');
-      const projects = await apiClient.getProjects();
-      setDeployments(projects || []);
-      if (projects?.length > 0 && !selectedDeployment) {
-        setSelectedDeployment(projects[0]._id);
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+      
+      if (!projectId) {
+        setError('Please select a project first');
+        return;
       }
-    } catch (err) {
-      setError(err.message || 'An error occurred');
-    }
-  }, [selectedDeployment]);
 
-  useEffect(() => {
-    fetchDeployments();
-  }, []);
-
-  const fetchUptimeData = useCallback(async () => {
-    if (!selectedDeployment) return;
-    
-    try {
-      setError('');
-      setLoading(true);
-      const [uptimeStats, slaData] = await Promise.all([
-        apiClient.getUptimeMetrics(selectedDeployment),
-        apiClient.getSLAStatus(selectedDeployment)
+      const [uptimeRes, slaRes, historyRes, breakdownRes, incidentsRes] = await Promise.all([
+        apiClient.getUptimeMetrics?.(projectId) || {},
+        apiClient.getSlaStatus?.(projectId) || {},
+        apiClient.getUptimeHistory?.(projectId, timeRange) || { data: [] },
+        apiClient.getDowntimeBreakdown?.(projectId) || { data: [] },
+        apiClient.getIncidentHistory?.(projectId) || { data: [] }
       ]);
-      setUptimeMetrics(uptimeStats || {});
-      setSlaStatus(slaData || {});
-    } catch (err) {
-      setError(err.message || 'Failed to fetch uptime data');
+
+      setUptimeMetrics(uptimeRes || {});
+      setSlaStatus(slaRes || {});
+      setUptimeHistory(uptimeRes.data || []);
+      setDowntimeBreakdown(breakdownRes.data || []);
+      setIncidentHistory(incidentsRes.data || []);
+    } catch (error) {
+      console.error('Failed to fetch uptime data:', error);
+      setError('Failed to load uptime data');
     } finally {
       setLoading(false);
     }
-  }, [selectedDeployment]);
+  };
 
   useEffect(() => {
     fetchUptimeData();
-  }, [fetchUptimeData]);
+  }, [timeRange]);
 
   const getUptimeColor = (uptime) => {
     if (uptime >= 99.9) return 'text-green-600';

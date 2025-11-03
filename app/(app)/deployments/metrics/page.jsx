@@ -30,159 +30,30 @@ export default function CustomMetricsPage() {
     enabled: true
   });
 
-  // Removed mock data - using backend integration
-    {
-      id: 1,
-      name: 'Request Queue Length',
-      description: 'Number of requests pending in queue',
-      type: 'gauge',
-      unit: 'requests',
-      aggregation: 'average',
-      enabled: true,
-      createdAt: '2024-10-15T10:00:00Z',
-      lastValue: 234,
-      average: 156,
-      maximum: 892,
-      minimum: 12,
-      lastUpdated: '2024-12-20T15:32:00Z',
-      data: [
-        { time: '12:00', value: 120 },
-        { time: '12:15', value: 145 },
-        { time: '12:30', value: 180 },
-        { time: '12:45', value: 210 },
-        { time: '13:00', value: 245 },
-        { time: '13:15', value: 234 }
-      ]
-    },
-    {
-      id: 2,
-      name: 'Cache Hit Ratio',
-      description: 'Percentage of cache hits vs total requests',
-      type: 'percentage',
-      unit: '%',
-      aggregation: 'average',
-      enabled: true,
-      createdAt: '2024-10-16T12:30:00Z',
-      lastValue: 87.5,
-      average: 85.2,
-      maximum: 94.3,
-      minimum: 72.1,
-      lastUpdated: '2024-12-20T15:30:00Z',
-      data: [
-        { time: '12:00', value: 80 },
-        { time: '12:15', value: 82 },
-        { time: '12:30', value: 84 },
-        { time: '12:45', value: 86 },
-        { time: '13:00', value: 87 },
-        { time: '13:15', value: 87.5 }
-      ]
-    },
-    {
-      id: 3,
-      name: 'Database Query Duration',
-      description: 'Average time spent in database queries',
-      type: 'duration',
-      unit: 'ms',
-      aggregation: 'average',
-      enabled: true,
-      createdAt: '2024-10-18T09:20:00Z',
-      lastValue: 156,
-      average: 142,
-      maximum: 245,
-      minimum: 45,
-      lastUpdated: '2024-12-20T15:32:00Z',
-      data: [
-        { time: '12:00', value: 120 },
-        { time: '12:15', value: 135 },
-        { time: '12:30', value: 145 },
-        { time: '12:45', value: 150 },
-        { time: '13:00', value: 155 },
-        { time: '13:15', value: 156 }
-      ]
-    },
-    {
-      id: 4,
-      name: 'User Session Duration',
-      description: 'Average length of user sessions',
-      type: 'duration',
-      unit: 'seconds',
-      aggregation: 'average',
-      enabled: true,
-      createdAt: '2024-11-01T14:50:00Z',
-      lastValue: 1245,
-      average: 1156,
-      maximum: 2345,
-      minimum: 234,
-      lastUpdated: '2024-12-20T15:30:00Z',
-      data: [
-        { time: '12:00', value: 1000 },
-        { time: '12:15', value: 1050 },
-        { time: '12:30', value: 1100 },
-        { time: '12:45', value: 1180 },
-        { time: '13:00', value: 1220 },
-        { time: '13:15', value: 1245 }
-      ]
-    },
-    {
-      id: 5,
-      name: 'Failed Transaction Count',
-      description: 'Number of failed transactions per minute',
-      type: 'counter',
-      unit: 'transactions/min',
-      aggregation: 'sum',
-      enabled: true,
-      createdAt: '2024-11-05T11:25:00Z',
-      lastValue: 3,
-      average: 5,
-      maximum: 12,
-      minimum: 0,
-      lastUpdated: '2024-12-20T15:32:00Z',
-      data: [
-        { time: '12:00', value: 0 },
-        { time: '12:15', value: 2 },
-        { time: '12:30', value: 4 },
-        { time: '12:45', value: 8 },
-        { time: '13:00', value: 6 },
-        { time: '13:15', value: 3 }
-      ]
-    }
-  ];
-
-  const fetchDeployments = useCallback(async () => {
+  // Backend integration for metrics
+  const fetchMetrics = async () => {
     try {
-      setError('');
-      const projects = await apiClient.getProjects();
-      setDeployments(projects || []);
-      if (projects?.length > 0 && !selectedDeployment) {
-        setSelectedDeployment(projects[0]._id);
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+      
+      if (!projectId) {
+        setError('Please select a project first');
+        return;
       }
-    } catch (err) {
-      setError(err.message || 'An error occurred');
-    }
-  }, [selectedDeployment]);
 
-  useEffect(() => {
-    fetchDeployments();
-  }, []);
-
-  const fetchMetrics = useCallback(async () => {
-    if (!selectedDeployment) return;
-    
-    try {
-      setError('');
-      setLoading(true);
-      const metricsData = await apiClient.getCustomMetrics(selectedDeployment);
-      setMetrics(metricsData || []);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch metrics');
-    } finally {
-      setLoading(false);
+      const res = await apiClient.getMetrics?.(projectId) || { data: [] };
+      setMetrics(Array.isArray(res) ? res : res.data || []);
+    } catch (error) {
+      console.error('Failed to fetch metrics:', error);
+      setError('Failed to load metrics');
+      setMetrics([]);
     }
-  }, [selectedDeployment]);
+  };
 
   useEffect(() => {
     fetchMetrics();
-  }, [fetchMetrics]);
+  }, []);
 
   const handleInputChange = (field, value) => {
     setFormData({...formData, [field]: value});

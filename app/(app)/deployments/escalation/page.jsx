@@ -31,128 +31,30 @@ export default function EscalationPoliciesPage() {
 
   const [selectedPolicy, setSelectedPolicy] = useState(null);
 
-  // Removed mock data - using backend integration
-    {
-      id: 1,
-      name: 'Critical Incident Escalation',
-      description: 'Immediate escalation for critical infrastructure issues',
-      severity: 'critical',
-      enabled: true,
-      createdAt: '2024-10-15T10:00:00Z',
-      escalationRules: [
-        {
-          id: 1,
-          delayMinutes: 0,
-          level: 1,
-          assignedTo: 'on-call',
-          team: 'Platform Team',
-          contact: 'john.doe@company.com',
-          notificationMethods: ['call', 'sms', 'email']
-        },
-        {
-          id: 2,
-          delayMinutes: 5,
-          level: 2,
-          assignedTo: 'manager',
-          team: 'Platform Team',
-          contact: 'Sarah Lee (Manager)',
-          notificationMethods: ['call', 'email']
-        },
-        {
-          id: 3,
-          delayMinutes: 15,
-          level: 3,
-          assignedTo: 'director',
-          team: 'Engineering',
-          contact: 'Mike Johnson (Director)',
-          notificationMethods: ['call']
-        }
-      ]
-    },
-    {
-      id: 2,
-      name: 'Warning Level Escalation',
-      description: 'Standard escalation for warning-level alerts',
-      severity: 'warning',
-      enabled: true,
-      createdAt: '2024-10-16T12:30:00Z',
-      escalationRules: [
-        {
-          id: 1,
-          delayMinutes: 0,
-          level: 1,
-          assignedTo: 'on-call',
-          team: 'Support Team',
-          contact: 'jane.smith@company.com',
-          notificationMethods: ['email', 'sms']
-        },
-        {
-          id: 2,
-          delayMinutes: 30,
-          level: 2,
-          assignedTo: 'manager',
-          team: 'Support Team',
-          contact: 'Tom Williams (Manager)',
-          notificationMethods: ['email']
-        }
-      ]
-    },
-    {
-      id: 3,
-      name: 'Deployment Failure Escalation',
-      description: 'Escalation for failed deployments',
-      severity: 'warning',
-      enabled: true,
-      createdAt: '2024-10-18T09:20:00Z',
-      escalationRules: [
-        {
-          id: 1,
-          delayMinutes: 0,
-          level: 1,
-          assignedTo: 'on-call',
-          team: 'DevOps Team',
-          contact: 'alex.kumar@company.com',
-          notificationMethods: ['email', 'slack']
-        },
-        {
-          id: 2,
-          delayMinutes: 10,
-          level: 2,
-          assignedTo: 'manager',
-          team: 'DevOps Team',
-          contact: 'Emily Davis (Manager)',
-          notificationMethods: ['call', 'email']
-        }
-      ]
-    },
-    {
-      id: 4,
-      name: 'Database Performance Escalation',
-      description: 'Escalation for database performance issues',
-      severity: 'info',
-      enabled: false,
-      createdAt: '2024-11-01T14:50:00Z',
-      escalationRules: [
-        {
-          id: 1,
-          delayMinutes: 0,
-          level: 1,
-          assignedTo: 'on-call',
-          team: 'Database Team',
-          contact: 'robert.brown@company.com',
-          notificationMethods: ['email']
-        }
-      ]
-    }
-  ];
+  // Backend integration for escalation policies
+  const fetchPolicies = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+      
+      if (!projectId) {
+        setError('Please select a project first');
+        return;
+      }
 
-  // Mock teams
-  const mockTeams = [
-    { id: 'team-1', name: 'Platform Team', members: 5 },
-    { id: 'team-2', name: 'Support Team', members: 8 },
-    { id: 'team-3', name: 'DevOps Team', members: 4 },
-    { id: 'team-4', name: 'Database Team', members: 3 }
-  ];
+      const res = await apiClient.getEscalationPolicies?.(projectId) || { data: [] };
+      setPolicies(Array.isArray(res) ? res : res.data || []);
+    } catch (error) {
+      console.error('Failed to fetch policies:', error);
+      setError('Failed to load escalation policies');
+      setPolicies([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchPolicies();
+  }, []);
 
   const severityColors = {
     critical: 'bg-red-100 text-red-800',

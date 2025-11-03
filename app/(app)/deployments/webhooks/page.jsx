@@ -30,114 +30,30 @@ export default function WebhooksManagementPage() {
     timeout: 30
   });
 
-  // Removed mock data - using backend integration
-    {
-      id: 1,
-      url: 'https://api.example.com/webhooks/deployment',
-      events: ['deployment.success', 'deployment.failed'],
-      active: true,
-      retryAttempts: 3,
-      timeout: 30,
-      createdAt: '2024-10-15T10:00:00Z',
-      lastTriggered: '2024-12-20T14:32:00Z',
-      totalDeliveries: 456,
-      failedDeliveries: 12,
-      successRate: 97.4
-    },
-    {
-      id: 2,
-      url: 'https://slack.com/api/webhooks/alerts',
-      events: ['alert.triggered'],
-      active: true,
-      retryAttempts: 5,
-      timeout: 30,
-      createdAt: '2024-10-16T12:30:00Z',
-      lastTriggered: '2024-12-20T15:10:00Z',
-      totalDeliveries: 234,
-      failedDeliveries: 2,
-      successRate: 99.1
-    },
-    {
-      id: 3,
-      url: 'https://monitoring.example.com/incidents',
-      events: ['incident.created', 'incident.resolved'],
-      active: true,
-      retryAttempts: 3,
-      timeout: 30,
-      createdAt: '2024-10-18T09:20:00Z',
-      lastTriggered: '2024-12-20T13:45:00Z',
-      totalDeliveries: 89,
-      failedDeliveries: 3,
-      successRate: 96.6
-    },
-    {
-      id: 4,
-      url: 'https://logging.example.com/events',
-      events: ['deployment.success', 'deployment.failed', 'alert.triggered'],
-      active: false,
-      retryAttempts: 3,
-      timeout: 30,
-      createdAt: '2024-11-01T14:50:00Z',
-      lastTriggered: '2024-12-10T10:15:00Z',
-      totalDeliveries: 1200,
-      failedDeliveries: 45,
-      successRate: 96.2
-    }
-  ];
+  // Backend integration for webhooks
+  const fetchWebhooks = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+      
+      if (!projectId) {
+        setError('Please select a project first');
+        return;
+      }
 
-  // Mock delivery logs
-  const mockDeliveryLogs = [
-    {
-      id: 1,
-      event: 'deployment.success',
-      timestamp: '2024-12-20T14:32:00Z',
-      status: 'success',
-      statusCode: 200,
-      duration: 145,
-      attempts: 1,
-      payload: { deploymentId: 'deploy-123', status: 'success' }
-    },
-    {
-      id: 2,
-      event: 'alert.triggered',
-      timestamp: '2024-12-20T15:10:00Z',
-      status: 'success',
-      statusCode: 200,
-      duration: 89,
-      attempts: 1,
-      payload: { alertId: 'alert-456', severity: 'critical' }
-    },
-    {
-      id: 3,
-      event: 'incident.created',
-      timestamp: '2024-12-20T13:45:00Z',
-      status: 'success',
-      statusCode: 201,
-      duration: 234,
-      attempts: 2,
-      payload: { incidentId: 'inc-789', title: 'High CPU Usage' }
-    },
-    {
-      id: 4,
-      event: 'deployment.failed',
-      timestamp: '2024-12-20T12:30:00Z',
-      status: 'failed',
-      statusCode: 500,
-      duration: 30000,
-      attempts: 3,
-      payload: { deploymentId: 'deploy-124', error: 'Build failed' }
-    },
-    {
-      id: 5,
-      event: 'alert.triggered',
-      timestamp: '2024-12-20T11:20:00Z',
-      status: 'success',
-      statusCode: 200,
-      duration: 112,
-      attempts: 1,
-      payload: { alertId: 'alert-457', severity: 'warning' }
+      const res = await apiClient.getWebhooks?.(projectId) || { data: [] };
+      setWebhooks(Array.isArray(res) ? res : res.data || []);
+    } catch (error) {
+      console.error('Failed to fetch webhooks:', error);
+      setError('Failed to load webhooks');
+      setWebhooks([]);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchWebhooks();
+  }, []);
 
   const eventOptions = [
     { id: 'deployment.success', name: 'Deployment Success' },
@@ -148,50 +64,6 @@ export default function WebhooksManagementPage() {
     { id: 'scaling.event', name: 'Scaling Event' },
     { id: 'backup.completed', name: 'Backup Completed' }
   ];
-
-  const fetchDeployments = useCallback(async () => {
-    try {
-      setError('');
-      const projects = await apiClient.getProjects();
-      setDeployments(projects || []);
-      if (projects?.length > 0 && !selectedDeployment) {
-        setSelectedDeployment(projects[0]._id);
-      }
-    } catch (err) {
-      setError(err.message || 'An error occurred');
-    }
-  }, [selectedDeployment]);
-
-  useEffect(() => {
-    fetchDeployments();
-  }, []);
-
-  const fetchWebhooks = useCallback(async () => {
-    if (!selectedDeployment) return;
-    
-    try {
-      setError('');
-      setLoading(true);
-      const [webhooksData, logsData] = await Promise.all([
-        apiClient.getWebhooks(selectedDeployment),
-        apiClient.getWebhookDeliveries(selectedDeployment)
-      ]);
-      setWebhooks(webhooksData || []);
-      setDeliveryLogs(logsData || []);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch webhooks');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedDeployment]);
-
-  useEffect(() => {
-    fetchWebhooks();
-  }, [fetchWebhooks]);
-
-  const handleInputChange = (field, value) => {
-    setFormData({...formData, [field]: value});
-  };
 
   const handleEventToggle = (eventId) => {
     setFormData(prev => ({
