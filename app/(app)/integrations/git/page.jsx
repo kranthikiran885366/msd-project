@@ -202,8 +202,8 @@ export default function GitRepositoriesPage() {
   const deployOnPushCount = repos.filter(r => r.deployOnPush).length;
 
   const providerIcons = {
-    github: <GitHub className="w-5 h-5" />,
-    gitlab: <GitLab className="w-5 h-5" />
+    github: <GitBranch className="w-5 h-5" />,
+    gitlab: <GitBranch className="w-5 h-5" />
   };
 
   return (
