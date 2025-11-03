@@ -819,9 +819,3 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 3. **[Deploy your first application](DEPLOYMENT.md)**
 
 **Have questions?** Check out our [Architecture Guide](ARCHITECTURE_ENTERPRISE.md) or [join our Discord community](https://discord.gg/deployer).
-
-#   d e p l o y e r 
- 
- " #   d e p l o y e r "   
- 
- 
