@@ -1,19 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 const BASE_URL = process.env.API_URL || 'http://localhost:5000';
 
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const response = await fetch(`${BASE_URL}/api/settings/user/profile`, {
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: authHeader,
       },
     });
 
@@ -33,8 +31,8 @@ export async function GET(req) {
 
 export async function PATCH(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -42,7 +40,7 @@ export async function PATCH(req) {
     const response = await fetch(`${BASE_URL}/api/settings/user/profile`, {
       method: 'PATCH',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': authHeader,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
