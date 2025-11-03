@@ -33,21 +33,27 @@ export default function CustomMetricsPage() {
   // Backend integration for metrics
   const fetchMetrics = async () => {
     try {
+      setLoading(true);
       const userStr = localStorage.getItem('user');
       const user = userStr ? JSON.parse(userStr) : null;
       const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
       
       if (!projectId) {
         setError('Please select a project first');
+        setMetrics([]);
+        setLoading(false);
         return;
       }
 
       const res = await apiClient.getMetrics?.(projectId) || { data: [] };
       setMetrics(Array.isArray(res) ? res : res.data || []);
+      setError('');
     } catch (error) {
       console.error('Failed to fetch metrics:', error);
       setError('Failed to load metrics');
       setMetrics([]);
+    } finally {
+      setLoading(false);
     }
   };
 

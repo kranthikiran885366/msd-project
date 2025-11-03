@@ -56,10 +56,10 @@ export default function FunctionsPage() {
     }
   }
 
-  const handleCreateFunction = async () {
-    if (!name.trim() || !path.trim() || !selectedProject) return
+  const handleCreateFunction = async () => {
+    if (!name.trim() || !path.trim() || !selectedProject) return;
     
-    setCreating(true)
+    setCreating(true);
     try {
       setError('')
       const functionData = {
