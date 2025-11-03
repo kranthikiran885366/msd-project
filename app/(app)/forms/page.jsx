@@ -31,7 +31,6 @@ import {
   Download,
   Edit,
   Mail,
-  FileText,
   BarChart3,
   Shield,
   Zap,
