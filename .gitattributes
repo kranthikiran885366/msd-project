@@ -1,0 +1,213 @@
+# Git Attributes - File Lock Configuration
+# This file controls how Git handles different file types and prevents accidental modifications
+
+# === CRITICAL SYSTEM FILES - MUST NOT MODIFY ===
+server/index.js merge=union
+server/config/passport.js merge=union
+app/layout.jsx merge=union
+app/page.jsx merge=union
+server/controllers/authController.js merge=union
+app/login/auth-callback/page.jsx merge=union
+
+# === CONFIGURATION FILES - PROTECTED ===
+package.json merge=union
+server/package.json merge=union
+tsconfig.json merge=union
+next.config.mjs merge=union
+tailwind.config.js merge=union
+postcss.config.mjs merge=union
+components.json merge=union
+
+# === LOCK FILES - DO NOT MODIFY ===
+pnpm-lock.yaml merge=union diff=binary
+server/pnpm-lock.yaml merge=union diff=binary
+package-lock.json merge=union diff=binary
+server/package-lock.json merge=union diff=binary
+
+# === DOCKER FILES - PROTECTED ===
+Dockerfile merge=union
+docker-compose.yml merge=union
+docker-compose.production.yml merge=union
+
+# === ENVIRONMENT FILES - PROTECTED ===
+.env.production merge=union
+server/.env.production merge=union
+.env.example merge=union
+server/.env.example merge=union
+
+# === GITHUB FILES - PROTECTED ===
+.github/** merge=union
+.gitignore merge=union
+.gitattributes merge=union
+
+# === DOCUMENTATION - PROTECTED ===
+README.md merge=union
+CODE_OF_CONDUCT.md merge=union
+CONTRIBUTING.md merge=union
+SECURITY.md merge=union
+LICENSE merge=union
+ARCHITECTURE_ENTERPRISE.md merge=union
+DEVELOPER_GUIDE.md merge=union
+ENTERPRISE_BUILD_SUMMARY.md merge=union
+API_ROUTES.md merge=union
+SERVICES_GUIDE.md merge=union
+FILES_LOCK_INVENTORY.md merge=union
+
+# === DATABASE FILES - PROTECTED ===
+server/db/** merge=union
+
+# === KUBERNETES/TERRAFORM - PROTECTED ===
+k8s/** merge=union
+terraform/** merge=union
+
+# === SCRIPTS - PROTECTED ===
+start-dev.bat merge=union
+start-dev.ps1 merge=union
+
+# === STANDARD GIT SETTINGS ===
+
+# Auto detect text files and normalize line endings to LF
+* text=auto
+
+# Code files
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.xml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+
+# Shell scripts
+*.bash text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=lf
+*.bat text eol=lf
+
+# Documentation
+*.md text eol=lf diff=markdown
+*.txt text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+
+# Archive files
+*.zip binary
+*.tar binary
+*.gz binary
+*.rar binary
+*.7z binary
+
+# Executable files
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Media files
+*.mp4 binary
+*.webm binary
+*.mov binary
+*.mp3 binary
+*.wav binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Node modules - not tracked in git
+node_modules/** -diff -text
+
+# === EXPORT IGNORE ===
+# Files to exclude from exports/archives
+
+.gitignore export-ignore
+.gitattributes export-ignore
+.github export-ignore
+*.env.local export-ignore
+*.env.*.local export-ignore
+node_modules export-ignore
+.DS_Store export-ignore
+Thumbs.db export-ignore
+*.swp export-ignore
+*.swo export-ignore
+*~.nib export-ignore
+.DS_Store export-ignore
+
+# === MERGE CONFLICT RESOLUTION ===
+# Use union strategy for configuration files to prevent conflicts
+
+# Lock files always use union merge
+**/*lock.yaml merge=union
+**/*lock.json merge=union
+**/.lock merge=union
+
+# Configuration files use union merge
+**/*.config.js merge=union
+**/*.config.mjs merge=union
+**/tsconfig.json merge=union
+
+# === CUSTOM MERGE DRIVER FOR PACKAGE.JSON ===
+# This prevents package.json conflicts during merges
+package.json merge=union
+server/package.json merge=union
+
+# === DIFF SETTINGS ===
+
+# Show diff for configuration files
+.env text diff
+.env.* text diff
+*.json text diff
+*.yaml text diff
+*.yml text diff
+
+# === LINE ENDING CONSISTENCY ===
+
+# Enforce LF line endings for all code
+app/** text eol=lf
+components/** text eol=lf
+hooks/** text eol=lf
+lib/** text eol=lf
+server/** text eol=lf
+store/** text eol=lf
+styles/** text eol=lf
+scripts/** text eol=lf
+k8s/** text eol=lf
+terraform/** text eol=lf
+
+# === PROTECTION MARKERS ===
+# Use these patterns to identify files that should not be modified
+
+# Critical server files
+server/index.js export-ignore merge=union
+server/controllers/** export-ignore merge=union
+server/routes/** export-ignore merge=union
+server/config/** export-ignore merge=union
+
+# Critical frontend files
+app/layout.jsx export-ignore merge=union
+app/page.jsx export-ignore merge=union
+app/(app)/** export-ignore merge=union
+
+# === NOTES ===
+# Files marked with merge=union will resolve conflicts by keeping both versions
+# Files marked with export-ignore won't be included in archives
+# All code files use LF line endings for consistency
+# Critical files are protected from accidental modifications
