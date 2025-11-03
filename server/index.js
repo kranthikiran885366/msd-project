@@ -82,6 +82,19 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })
 })
 
+// Debug endpoint to check configuration
+app.get("/config/check", (req, res) => {
+  res.json({
+    api_url: process.env.API_URL || 'not set',
+    client_url: process.env.CLIENT_URL || 'not set',
+    node_env: process.env.NODE_ENV || 'not set',
+    github_client_id: process.env.GITHUB_CLIENT_ID ? 'set' : 'not set',
+    github_client_secret: process.env.GITHUB_CLIENT_SECRET ? 'set' : 'not set',
+    google_client_id: process.env.GOOGLE_CLIENT_ID ? 'set' : 'not set',
+    google_client_secret: process.env.GOOGLE_CLIENT_SECRET ? 'set' : 'not set'
+  })
+})
+
 // Authentication Routes
 app.use("/auth", authRoutes)
 

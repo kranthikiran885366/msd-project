@@ -20,6 +20,16 @@ router.get("/me", authMiddleware, authController.me)
 router.put("/profile", authMiddleware, authController.updateProfile)
 router.post("/change-password", authMiddleware, authController.changePassword)
 
+// Error handling for OAuth
+router.get("/error", (req, res) => {
+  const error = req.query.message || "Authentication failed"
+  res.status(401).json({ 
+    error: "Authentication Failed",
+    message: error,
+    code: "AUTH_FAILED"
+  })
+})
+
 // Google OAuth
 router.get(
   "/google",
@@ -28,7 +38,10 @@ router.get(
 
 router.get(
   "/google/callback",
-  passport.authenticate("google", { session: false }),
+  passport.authenticate("google", { 
+    session: false,
+    failureRedirect: "/auth/error"
+  }),
   authController.googleCallback
 )
 
@@ -40,7 +53,10 @@ router.get(
 
 router.get(
   "/github/callback",
-  passport.authenticate("github", { session: false }),
+  passport.authenticate("github", { 
+    session: false,
+    failureRedirect: "/auth/error"
+  }),
   authController.githubCallback
 )
 
