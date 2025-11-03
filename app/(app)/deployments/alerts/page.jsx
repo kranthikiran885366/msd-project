@@ -311,10 +311,10 @@ export default function AlertConfigurationPage() {
                   onChange={(e) => handleInputChange('operator', e.target.value)}
                   className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value=">">Greater than (>)</option>
-                  <option value="<">Less than (<)</option>
-                  <option value=">=">Greater or equal (>=)</option>
-                  <option value="<=">Less or equal (<=)</option>
+                  <option value={">"}>{`Greater than (>)`}</option>
+                  <option value={"<"}>{`Less than (<)`}</option>
+                  <option value={">="}>Greater or equal ({">"}=)</option>
+                  <option value={"<="}>Less or equal ({"<"}=)</option>
                   <option value="equals">Equals</option>
                   <option value="not_equals">Not equals</option>
                 </select>
