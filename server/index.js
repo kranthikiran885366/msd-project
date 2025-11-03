@@ -37,6 +37,7 @@ const escalationRoutes = require("./routes/escalation")
 const uptimeRoutes = require("./routes/uptime")
 const reportsRoutes = require("./routes/reports")
 const githubProviderRoutes = require("./routes/github-provider")
+const billingRoutes = require("./routes/billing")
 
 const app = express()
 
@@ -125,6 +126,7 @@ app.use("/api/escalation", escalationRoutes)
 app.use("/api/uptime", uptimeRoutes)
 app.use("/api/reports", reportsRoutes)
 app.use("/api/github-provider", githubProviderRoutes)
+app.use("/api/billing", billingRoutes)
 
 // Error handling
 app.use(errorHandler)
