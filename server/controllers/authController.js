@@ -246,7 +246,7 @@ exports.googleCallback = async (req, res) => {
 
     // Redirect to frontend with tokens in URL
     const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
-    const redirectUrl = new URL(`${clientUrl}/auth/callback`)
+    const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
     redirectUrl.searchParams.append("token", token)
     redirectUrl.searchParams.append("refreshToken", refreshToken)
     redirectUrl.searchParams.append("userId", user._id)
@@ -320,7 +320,7 @@ exports.githubCallback = async (req, res) => {
 
     // Redirect to frontend with tokens in URL
     const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
-    const redirectUrl = new URL(`${clientUrl}/auth/callback`)
+    const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
     redirectUrl.searchParams.append("token", token)
     redirectUrl.searchParams.append("refreshToken", refreshToken)
     redirectUrl.searchParams.append("userId", user._id)
