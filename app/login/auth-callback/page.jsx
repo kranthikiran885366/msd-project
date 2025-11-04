@@ -23,7 +23,7 @@ export default function AuthCallbackPage() {
 
       // Check if we have the required params
       if (!token || !refreshToken) {
-        router.push("/auth/error?message=Missing authentication tokens")
+        router.push("/login/error?message=Missing authentication tokens")
         return
       }
 
@@ -52,7 +52,7 @@ export default function AuthCallbackPage() {
       router.push("/dashboard")
     } catch (error) {
       console.error("Auth callback error:", error)
-      router.push(`/auth/error?message=${encodeURIComponent(error.message)}`)
+      router.push(`/login/error?message=${encodeURIComponent(error.message)}`)
     }
   }, [searchParams, router, setUser, setIsAuthenticated])
 

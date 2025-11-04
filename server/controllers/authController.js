@@ -281,7 +281,7 @@ exports.googleCallback = async (req, res) => {
     res.redirect(redirectUrl.toString())
   } catch (error) {
     const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
-    res.redirect(`${clientUrl}/auth/error?message=${encodeURIComponent(error.message)}`)
+    res.redirect(`${clientUrl}/login/error?message=${encodeURIComponent(error.message)}`)
   }
 }
 
@@ -382,7 +382,7 @@ exports.githubCallback = async (req, res) => {
     res.redirect(redirectUrl.toString())
   } catch (error) {
     const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
-    res.redirect(`${clientUrl}/auth/error?message=${encodeURIComponent(error.message)}`)
+    res.redirect(`${clientUrl}/login/error?message=${encodeURIComponent(error.message)}`)
   }
 }
 
