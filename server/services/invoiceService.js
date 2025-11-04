@@ -2,7 +2,7 @@ const Invoice = require('../models/Invoice');
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
 const { generatePDF } = require('../utils/pdfGenerator');
-const { sendEmail } = require('../utils/emailService');
+const emailService = require('../utils/emailService');
 
 class InvoiceService {
   async getInvoicesForUser(userId, options = {}) {
@@ -93,15 +93,10 @@ class InvoiceService {
     }
 
     // Send email with invoice
-    await sendEmail({
+    await emailService.sendEmail({
       to: user.email,
       subject: `Invoice ${invoice.invoiceNumber}`,
-      template: 'invoice',
-      data: {
-        user: user.name,
-        invoice,
-        downloadUrl: await this.generateDownloadUrl(invoiceId, userId)
-      }
+      html: `<p>Invoice #${invoice.invoiceNumber} for $${(invoice.total / 100).toFixed(2)} is ready.</p>`,
     });
 
     return true;
