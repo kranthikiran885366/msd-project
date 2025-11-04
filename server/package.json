@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "jest"
+    "test": "jest",
+    "check-db": "node check-mongodb.js"
   },
   "dependencies": {
     "@types/multer": "^2.0.0",
