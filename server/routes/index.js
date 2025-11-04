@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
-const { rateLimiter } = require('../middleware/rateLimiter');
 
 // Import all feature routers - Existing features
 const splitTestingRoutes = require('./split-testing');
