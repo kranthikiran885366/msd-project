@@ -199,30 +199,52 @@ exports.googleCallback = async (req, res) => {
     let isNewUser = false
 
     if (!user) {
-      // Create new user
-      isNewUser = true
-      user = new User({
-        email: emails[0].value,
-        name: displayName,
-        avatar: photos[0].value,
-        emailVerified: true,
-        oauth: {
-          google: {
-            id,
-            email: emails[0].value,
-            picture: photos[0].value,
+      // Check if user exists by email
+      user = await User.findOne({ email: emails[0].value })
+      
+      if (!user) {
+        // Create new user if doesn't exist
+        isNewUser = true
+        user = new User({
+          email: emails[0].value,
+          name: displayName,
+          avatar: photos[0].value,
+          emailVerified: true,
+          oauth: {
+            google: {
+              id,
+              email: emails[0].value,
+              picture: photos[0].value,
+            },
           },
-        },
-      })
-      await user.save()
+        })
+        await user.save()
 
-      await AuditLog.create({
-        userId: user._id,
-        action: "USER_SIGNED_UP_GOOGLE",
-        resourceType: "User",
-        resourceId: user._id,
-        metadata: { email: emails[0].value, name: displayName },
-      })
+        await AuditLog.create({
+          userId: user._id,
+          action: "USER_SIGNED_UP_GOOGLE",
+          resourceType: "User",
+          resourceId: user._id,
+          metadata: { email: emails[0].value, name: displayName },
+        })
+      } else {
+        // Connect Google to existing user
+        user.oauth.google = {
+          id,
+          email: emails[0].value,
+          picture: photos[0].value,
+        }
+        user.lastLogin = new Date()
+        await user.save()
+
+        await AuditLog.create({
+          userId: user._id,
+          action: "USER_LOGGED_IN_GOOGLE",
+          resourceType: "User",
+          resourceId: user._id,
+          metadata: { email: emails[0].value },
+        })
+      }
     } else {
       // Update existing user
       user.oauth.google = {
@@ -273,30 +295,56 @@ exports.githubCallback = async (req, res) => {
     let isNewUser = false
 
     if (!user) {
-      // Create new user
-      isNewUser = true
-      user = new User({
-        email: emails?.[0]?.value || `${username}@github.local`,
-        name: displayName || username,
-        avatar: photos?.[0]?.value,
-        emailVerified: !!emails?.[0]?.value,
-        oauth: {
-          github: {
-            id,
-            login: username,
-            avatar_url: photos?.[0]?.value,
+      const githubEmail = emails?.[0]?.value
+      
+      // Check if user exists by email (if GitHub provided one)
+      if (githubEmail) {
+        user = await User.findOne({ email: githubEmail })
+      }
+      
+      if (!user) {
+        // Create new user
+        isNewUser = true
+        user = new User({
+          email: emails?.[0]?.value || `${username}@github.local`,
+          name: displayName || username,
+          avatar: photos?.[0]?.value,
+          emailVerified: !!emails?.[0]?.value,
+          oauth: {
+            github: {
+              id,
+              login: username,
+              avatar_url: photos?.[0]?.value,
+            },
           },
-        },
-      })
-      await user.save()
+        })
+        await user.save()
 
-      await AuditLog.create({
-        userId: user._id,
-        action: "USER_SIGNED_UP_GITHUB",
-        resourceType: "User",
-        resourceId: user._id,
-        metadata: { username, name: displayName },
-      })
+        await AuditLog.create({
+          userId: user._id,
+          action: "USER_SIGNED_UP_GITHUB",
+          resourceType: "User",
+          resourceId: user._id,
+          metadata: { username, name: displayName },
+        })
+      } else {
+        // Connect GitHub to existing user
+        user.oauth.github = {
+          id,
+          login: username,
+          avatar_url: photos?.[0]?.value,
+        }
+        user.lastLogin = new Date()
+        await user.save()
+
+        await AuditLog.create({
+          userId: user._id,
+          action: "USER_LOGGED_IN_GITHUB",
+          resourceType: "User",
+          resourceId: user._id,
+          metadata: { username },
+        })
+      }
     } else {
       // Update existing user
       user.oauth.github = {
