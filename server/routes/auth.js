@@ -1,63 +1,27 @@
 const express = require("express")
+const router = express.Router()
 const authController = require("../controllers/authController")
-const authMiddleware = require("../middleware/auth")
+const { authenticate } = require("../middleware/auth")
 const passport = require("passport")
 
-const router = express.Router()
-
-// Local Authentication
+// Public routes (no auth required)
 router.post("/signup", authController.signup)
 router.post("/login", authController.login)
-router.post("/logout", authMiddleware, authController.logout)
-router.post("/refresh", authController.refreshToken)
-
-// Password Management
 router.post("/forgot-password", authController.forgotPassword)
 router.post("/reset-password", authController.resetPassword)
+router.get("/refresh-token", authController.refreshToken)
 
-// Profile Management
-router.get("/me", authMiddleware, authController.me)
-router.put("/profile", authMiddleware, authController.updateProfile)
-router.post("/change-password", authMiddleware, authController.changePassword)
+// Protected routes (auth required)
+router.post("/logout", authenticate, authController.logout)
+router.get("/profile", authenticate, authController.me)
+router.put("/profile", authenticate, authController.updateProfile)
+router.post("/change-password", authenticate, authController.changePassword)
 
-// Error handling for OAuth
-router.get("/error", (req, res) => {
-  const error = req.query.message || "Authentication failed"
-  res.status(401).json({ 
-    error: "Authentication Failed",
-    message: error,
-    code: "AUTH_FAILED"
-  })
-})
+// OAuth routes (Passport strategies)
+router.get("/github", passport.authenticate("github", { scope: ["user:email"] }))
+router.get("/github/callback", passport.authenticate("github", { failureRedirect: "/login" }), authController.githubCallback)
 
-// Google OAuth
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-)
-
-router.get(
-  "/google/callback",
-  passport.authenticate("google", { 
-    session: false,
-    failureRedirect: "/auth/error"
-  }),
-  authController.googleCallback
-)
-
-// GitHub OAuth
-router.get(
-  "/github",
-  passport.authenticate("github", { scope: ["user:email"] })
-)
-
-router.get(
-  "/github/callback",
-  passport.authenticate("github", { 
-    session: false,
-    failureRedirect: "/auth/error"
-  }),
-  authController.githubCallback
-)
+router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }))
+router.get("/google/callback", passport.authenticate("google", { failureRedirect: "/login" }), authController.googleCallback)
 
 module.exports = router
