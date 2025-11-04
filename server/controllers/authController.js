@@ -366,6 +366,10 @@ exports.githubCallback = async (req, res) => {
 
     // Save GitHub integration with access token for repository access
     const GitHubIntegration = require("../models/GitHubIntegration")
+    console.log('GitHub OAuth Callback - Saving integration for user:', user._id)
+    console.log('GitHub username:', username)
+    console.log('Access token present:', !!accessToken)
+    
     await GitHubIntegration.findOneAndUpdate(
       { userId: user._id },
       {
@@ -376,6 +380,8 @@ exports.githubCallback = async (req, res) => {
       },
       { upsert: true, new: true }
     )
+    
+    console.log('GitHub integration saved successfully')
 
     const token = generateToken(user._id)
     const refreshToken = generateRefreshToken(user._id)

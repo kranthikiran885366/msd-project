@@ -8,12 +8,19 @@ class GitHubProviderController {
   static async getRepositories(req, res) {
     try {
       const userId = req.user._id;
+      console.log('Fetching repositories for user:', userId);
+      
       const integration = await GitHubIntegration.findOne({ userId });
-
+      console.log('GitHub integration found:', !!integration);
+      
       if (!integration) {
+        console.error('No GitHub integration found for user:', userId);
         return res.status(404).json({ error: 'GitHub integration not connected' });
       }
 
+      console.log('GitHub username:', integration.githubUsername);
+      console.log('Access token length:', integration.accessToken?.length);
+      
       const response = await axios.get(`${GITHUB_API_BASE}/user/repos`, {
         headers: {
           Authorization: `Bearer ${integration.accessToken}`,
@@ -25,6 +32,8 @@ class GitHubProviderController {
         },
       });
 
+      console.log('GitHub API response - repos count:', response.data.length);
+      
       const repos = response.data.map(repo => ({
         id: repo.id,
         name: repo.name,
@@ -41,7 +50,11 @@ class GitHubProviderController {
 
       res.json(repos);
     } catch (error) {
-      console.error('Failed to fetch repositories:', error.response?.data || error.message);
+      console.error('Failed to fetch repositories:');
+      console.error('Status:', error.response?.status);
+      console.error('Message:', error.response?.data?.message || error.message);
+      console.error('GitHub error:', error.response?.data);
+      
       res.status(error.response?.status || 500).json({
         error: error.response?.data?.message || 'Failed to fetch repositories',
       });
@@ -243,11 +256,18 @@ class GitHubProviderController {
   static async getConnectionStatus(req, res) {
     try {
       const userId = req.user._id;
+      console.log('Checking GitHub connection status for user:', userId);
+      
       const integration = await GitHubIntegration.findOne({ userId });
+      console.log('GitHub integration record found:', !!integration);
 
       if (!integration) {
+        console.log('No integration found, returning connected: false');
         return res.json({ connected: false });
       }
+
+      console.log('Integration exists - username:', integration.githubUsername);
+      console.log('Access token present:', !!integration.accessToken);
 
       // Verify token is still valid
       try {
@@ -258,6 +278,8 @@ class GitHubProviderController {
           },
         });
 
+        console.log('Token validation successful - user:', userResponse.data.login);
+        
         res.json({
           connected: true,
           username: userResponse.data.login,
@@ -265,6 +287,7 @@ class GitHubProviderController {
           connectedAt: integration.connectedAt,
         });
       } catch (error) {
+        console.error('Token validation failed:', error.response?.status, error.response?.data?.message);
         // Token is invalid, disconnect
         await GitHubIntegration.deleteOne({ userId });
         res.json({ connected: false });
