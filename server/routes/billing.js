@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const billingController = require('../controllers/billingController');
 const { authenticate } = require('../middleware/auth');
-const { rateLimiter } = require('../middleware/rateLimiter');
+const { apiLimiter } = require('../middleware/rateLimiter');
 const { validatePlan } = require('../middleware/planValidation');
 
 // Public routes (no auth required)
-router.get('/plans', rateLimiter(), billingController.getPlans);
+router.get('/plans', apiLimiter, billingController.getPlans);
 
 // Protected routes
 router.use(authenticate);
