@@ -1,7 +1,21 @@
 const billingService = require('../services/billingService');
 const invoiceService = require('../services/invoiceService');
 const paymentService = require('../services/paymentService');
-const costOptimizationService = require('../services/costOptimizationService');
+
+// Safely require costOptimizationService with fallback
+let costOptimizationService;
+try {
+  costOptimizationService = require('../services/costOptimizationService');
+} catch (error) {
+  console.warn('Warning: costOptimizationService not available, using mock implementation');
+  // Provide a mock implementation
+  costOptimizationService = {
+    getRecommendations: async () => [],
+    getCostBreakdown: async () => null,
+    getCostProjections: async () => null,
+    applyRecommendation: async () => ({ message: 'Not implemented', status: 'pending' }),
+  };
+}
 
 class BillingController {
   // ==================== Plans ====================
