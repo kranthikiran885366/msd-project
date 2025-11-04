@@ -8,18 +8,21 @@ class GitHubProviderController {
   static async getRepositories(req, res) {
     try {
       const userId = req.user._id;
-      console.log('Fetching repositories for user:', userId);
+      console.log('=== FETCH REPOSITORIES ===');
+      console.log('User ID:', userId);
       
       const integration = await GitHubIntegration.findOne({ userId });
       console.log('GitHub integration found:', !!integration);
       
       if (!integration) {
         console.error('No GitHub integration found for user:', userId);
+        console.log('Available integrations in DB:', await GitHubIntegration.countDocuments());
         return res.status(404).json({ error: 'GitHub integration not connected' });
       }
 
       console.log('GitHub username:', integration.githubUsername);
       console.log('Access token length:', integration.accessToken?.length);
+      console.log('Token starts with:', integration.accessToken?.substring(0, 10));
       
       const response = await axios.get(`${GITHUB_API_BASE}/user/repos`, {
         headers: {
@@ -33,6 +36,7 @@ class GitHubProviderController {
       });
 
       console.log('GitHub API response - repos count:', response.data.length);
+      console.log('First repo:', response.data[0]?.name);
       
       const repos = response.data.map(repo => ({
         id: repo.id,
@@ -48,15 +52,17 @@ class GitHubProviderController {
         defaultBranch: repo.default_branch,
       }));
 
+      console.log('Returning', repos.length, 'repositories');
       res.json(repos);
     } catch (error) {
-      console.error('Failed to fetch repositories:');
+      console.error('=== FETCH REPOSITORIES ERROR ===');
       console.error('Status:', error.response?.status);
-      console.error('Message:', error.response?.data?.message || error.message);
-      console.error('GitHub error:', error.response?.data);
+      console.error('GitHub Error:', error.response?.data);
+      console.error('Message:', error.message);
       
       res.status(error.response?.status || 500).json({
         error: error.response?.data?.message || 'Failed to fetch repositories',
+        details: error.response?.data,
       });
     }
   }

@@ -30,8 +30,22 @@ export default function GitHubImportDialog({ open, onOpenChange, onRepositorySel
   useEffect(() => {
     if (open) {
       checkConnection();
+      
       // Check if user just returned from OAuth
       if (typeof window !== 'undefined') {
+        // Check URL params for github-connected flag
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('github-connected') === 'true') {
+          console.log('GitHub connected! Refreshing repositories...');
+          // Clear the URL param
+          window.history.replaceState({}, document.title, window.location.pathname);
+          // Wait a moment then refresh
+          setTimeout(() => {
+            checkConnection();
+          }, 500);
+        }
+        
+        // Check sessionStorage fallback
         const isPending = sessionStorage.getItem('github-import-pending');
         if (isPending) {
           sessionStorage.removeItem('github-import-pending');
@@ -127,8 +141,15 @@ export default function GitHubImportDialog({ open, onOpenChange, onRepositorySel
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('github-import-pending', 'true');
       sessionStorage.setItem('github-import-redirect', window.location.href);
-      // Redirect to OAuth flow
-      window.location.href = '/auth/github';
+      
+      // Add state parameter to OAuth redirect for tracking
+      const state = btoa(JSON.stringify({
+        returnUrl: window.location.href,
+        timestamp: Date.now()
+      }));
+      
+      // Redirect to OAuth flow with state parameter
+      window.location.href = `/auth/github?state=${encodeURIComponent(state)}`;
     }
   };
 

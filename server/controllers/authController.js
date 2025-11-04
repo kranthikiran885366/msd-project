@@ -386,7 +386,29 @@ exports.githubCallback = async (req, res) => {
     const token = generateToken(user._id)
     const refreshToken = generateRefreshToken(user._id)
 
-    // Redirect to frontend with tokens in URL
+    // Check if this is from GitHub import dialog
+    const state = req.query.state;
+    let returnUrl = null;
+    
+    if (state) {
+      try {
+        const stateData = JSON.parse(Buffer.from(decodeURIComponent(state), 'base64').toString());
+        returnUrl = stateData.returnUrl;
+      } catch (e) {
+        console.log('Could not parse state parameter');
+      }
+    }
+
+    // If we have a return URL from deployment dialog, redirect there with token
+    if (returnUrl) {
+      const redirectUrl = new URL(returnUrl);
+      redirectUrl.searchParams.append('token', token);
+      redirectUrl.searchParams.append('refreshToken', refreshToken);
+      redirectUrl.searchParams.append('github-connected', 'true');
+      return res.redirect(redirectUrl.toString());
+    }
+
+    // Otherwise, redirect to login/auth-callback (normal OAuth flow)
     const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
     const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
     redirectUrl.searchParams.append("token", token)
