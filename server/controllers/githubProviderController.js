@@ -24,21 +24,47 @@ class GitHubProviderController {
       console.log('Access token length:', integration.accessToken?.length);
       console.log('Token starts with:', integration.accessToken?.substring(0, 10));
       
-      const response = await axios.get(`${GITHUB_API_BASE}/user/repos`, {
-        headers: {
-          Authorization: `Bearer ${integration.accessToken}`,
-          Accept: 'application/vnd.github.v3+json',
-        },
-        params: {
-          sort: 'updated',
-          per_page: 100,
-        },
-      });
+      // Fetch repositories with affiliation parameter to get:
+      // - owner: repositories owned by the user
+      // - collaborator: repositories the user is a collaborator on
+      // - organization_member: repositories of organizations the user is a member of
+      const allRepos = [];
+      let page = 1;
+      let hasMore = true;
 
-      console.log('GitHub API response - repos count:', response.data.length);
-      console.log('First repo:', response.data[0]?.name);
+      while (hasMore) {
+        const response = await axios.get(`${GITHUB_API_BASE}/user/repos`, {
+          headers: {
+            Authorization: `Bearer ${integration.accessToken}`,
+            Accept: 'application/vnd.github.v3+json',
+          },
+          params: {
+            affiliation: 'owner,collaborator,organization_member',
+            sort: 'updated',
+            per_page: 100,
+            page: page,
+          },
+        });
+
+        console.log(`GitHub API response - page ${page}, repos count:`, response.data.length);
+        
+        if (response.data.length === 0) {
+          hasMore = false;
+        } else {
+          allRepos.push(...response.data);
+          page++;
+          
+          // GitHub API returns max 100 items per page, if less than 100, no more pages
+          if (response.data.length < 100) {
+            hasMore = false;
+          }
+        }
+      }
+
+      console.log('Total repositories fetched:', allRepos.length);
+      console.log('First repo:', allRepos[0]?.name);
       
-      const repos = response.data.map(repo => ({
+      const repos = allRepos.map(repo => ({
         id: repo.id,
         name: repo.name,
         fullName: repo.full_name,
