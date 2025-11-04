@@ -20,6 +20,7 @@ export default function AuthCallbackPage() {
       const avatar = searchParams.get("avatar")
       const isNew = searchParams.get("isNew") === "true"
       const provider = searchParams.get("provider") || "google"
+      const githubConnected = searchParams.get("github-connected") === "true"
 
       // Check if we have the required params
       if (!token || !refreshToken) {
@@ -46,6 +47,15 @@ export default function AuthCallbackPage() {
         console.log(`Welcome ${name}! Your account has been created.`)
       } else {
         console.log(`Welcome back ${name}!`)
+      }
+
+      // If GitHub was connected, redirect back to deployments page to show the dialog with repos
+      if (githubConnected) {
+        console.log('GitHub connected successfully, redirecting to deployments with GitHub import dialog')
+        // Signal that we should re-open the GitHub import dialog
+        sessionStorage.setItem('github-import-pending', 'true')
+        router.push("/deployments")
+        return
       }
 
       // Redirect to dashboard

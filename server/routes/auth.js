@@ -18,7 +18,15 @@ router.put("/profile", authenticate, authController.updateProfile)
 router.post("/change-password", authenticate, authController.changePassword)
 
 // OAuth routes (Passport strategies)
-router.get("/github", passport.authenticate("github", { scope: ["user:email", "repo", "read:user"] }))
+router.get("/github", (req, res, next) => {
+  // Store return URL in session for post-auth redirect
+  const returnUrl = req.query.returnUrl || req.get('referer');
+  if (returnUrl) {
+    req.session.githubReturnUrl = returnUrl;
+  }
+  passport.authenticate("github", { scope: ["user:email", "repo", "read:user"] })(req, res, next);
+})
+
 router.get("/github/callback", passport.authenticate("github", { failureRedirect: "/login" }), authController.githubCallback)
 
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }))

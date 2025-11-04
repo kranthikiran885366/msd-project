@@ -386,29 +386,51 @@ exports.githubCallback = async (req, res) => {
     const token = generateToken(user._id)
     const refreshToken = generateRefreshToken(user._id)
 
-    // Check if this is from GitHub import dialog
-    const state = req.query.state;
+    console.log('Generated new tokens for user:', user._id)
+
+    // Try to get return URL from multiple sources
     let returnUrl = null;
     
-    if (state) {
+    // Check 1: URL query parameter (state)
+    if (req.query.state) {
       try {
-        const stateData = JSON.parse(Buffer.from(decodeURIComponent(state), 'base64').toString());
+        const stateData = JSON.parse(Buffer.from(decodeURIComponent(req.query.state), 'base64').toString());
         returnUrl = stateData.returnUrl;
+        console.log('Got returnUrl from state parameter:', returnUrl);
       } catch (e) {
-        console.log('Could not parse state parameter');
+        console.log('Could not parse state parameter:', e.message);
       }
     }
 
-    // If we have a return URL from deployment dialog, redirect there with token
-    if (returnUrl) {
-      const redirectUrl = new URL(returnUrl);
-      redirectUrl.searchParams.append('token', token);
-      redirectUrl.searchParams.append('refreshToken', refreshToken);
-      redirectUrl.searchParams.append('github-connected', 'true');
-      return res.redirect(redirectUrl.toString());
+    // Check 2: Session variable
+    if (!returnUrl && req.session?.githubReturnUrl) {
+      returnUrl = req.session.githubReturnUrl;
+      console.log('Got returnUrl from session:', returnUrl);
+      delete req.session.githubReturnUrl;
     }
 
-    // Otherwise, redirect to login/auth-callback (normal OAuth flow)
+    // Check 3: Referer header
+    if (!returnUrl && req.get('referer')) {
+      returnUrl = req.get('referer');
+      console.log('Got returnUrl from referer:', returnUrl);
+    }
+
+    // If we have a return URL, redirect there with tokens
+    if (returnUrl && (returnUrl.includes('localhost') || returnUrl.includes('http'))) {
+      try {
+        console.log('Redirecting to returnUrl with tokens');
+        const redirectUrl = new URL(returnUrl);
+        redirectUrl.searchParams.append('token', token);
+        redirectUrl.searchParams.append('refreshToken', refreshToken);
+        redirectUrl.searchParams.append('github-connected', 'true');
+        return res.redirect(redirectUrl.toString());
+      } catch (e) {
+        console.error('Invalid return URL:', e.message);
+      }
+    }
+
+    // Fallback: redirect to standard auth-callback
+    console.log('Using standard auth-callback redirect');
     const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
     const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
     redirectUrl.searchParams.append("token", token)

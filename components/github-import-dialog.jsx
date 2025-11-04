@@ -137,19 +137,26 @@ export default function GitHubImportDialog({ open, onOpenChange, onRepositorySel
   };
 
   const handleConnectGitHub = () => {
-    // Store the current dialog state in sessionStorage so we can return to it
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem('github-import-pending', 'true');
-      sessionStorage.setItem('github-import-redirect', window.location.href);
+      // Get the current page URL (where we want to return to)
+      const currentPageUrl = window.location.href;
+      console.log('GitHub Connect: Current page URL:', currentPageUrl);
       
-      // Add state parameter to OAuth redirect for tracking
+      // Create state object with return URL
       const state = btoa(JSON.stringify({
-        returnUrl: window.location.href,
-        timestamp: Date.now()
+        returnUrl: currentPageUrl,
+        timestamp: Date.now(),
+        source: 'github-import-dialog'
       }));
       
-      // Redirect to OAuth flow with state parameter
-      window.location.href = `/auth/github?state=${encodeURIComponent(state)}`;
+      // Store in sessionStorage as backup
+      sessionStorage.setItem('github-import-pending', 'true');
+      sessionStorage.setItem('github-import-return-url', currentPageUrl);
+      
+      console.log('GitHub Connect: Redirecting to OAuth with state parameter');
+      
+      // Redirect to OAuth flow with state and returnUrl parameters
+      window.location.href = `/auth/github?state=${encodeURIComponent(state)}&returnUrl=${encodeURIComponent(currentPageUrl)}`;
     }
   };
 

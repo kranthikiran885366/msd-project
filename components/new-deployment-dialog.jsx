@@ -31,6 +31,17 @@ export default function NewDeploymentDialog({ open, onOpenChange, onDeploymentCr
   useEffect(() => {
     if (open) {
       fetchProjects();
+      
+      // Check if we're returning from GitHub OAuth and should auto-open the import dialog
+      if (typeof window !== 'undefined') {
+        const isPending = sessionStorage.getItem('github-import-pending');
+        if (isPending) {
+          console.log('Auto-opening GitHub import dialog after OAuth return...');
+          sessionStorage.removeItem('github-import-pending');
+          setShowGitHubImport(true);
+          setDeploymentSource('github');
+        }
+      }
     }
   }, [open]);
 

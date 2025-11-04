@@ -17,6 +17,16 @@ export default function DeploymentsPage() {
 
   useEffect(() => {
     fetchDeployments();
+    
+    // Check if we're returning from GitHub OAuth
+    if (typeof window !== 'undefined') {
+      const isPending = sessionStorage.getItem('github-import-pending');
+      if (isPending) {
+        console.log('GitHub OAuth completed, opening deployment dialog...');
+        sessionStorage.removeItem('github-import-pending');
+        setShowNewDeploymentDialog(true);
+      }
+    }
   }, []);
 
   const fetchDeployments = async () => {
