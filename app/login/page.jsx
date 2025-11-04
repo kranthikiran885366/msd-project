@@ -155,7 +155,7 @@ export default function LoginPage() {
                   <input type="checkbox" className="rounded" disabled={isLoading} />
                   <span>Remember me</span>
                 </label>
-                <Link href="/forgot-password" className="text-primary hover:underline">
+                <Link href="/auth/forgot-password" className="text-primary hover:underline">
                   Forgot password?
                 </Link>
               </div>
