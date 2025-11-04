@@ -9,6 +9,10 @@ const errorHandler = require("./middleware/errorHandler")
 const config = require("./config/env")
 require("./config/passport")
 
+// Initialize version info
+const VERSION = '1.0.0';
+const BUILD_DATE = new Date().toISOString();
+
 // Routes
 const authRoutes = require("./routes/auth")
 const deploymentRoutes = require("./routes/deployments")
@@ -81,6 +85,15 @@ app.use(passport.session())
 // Health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })
+})
+
+// Version endpoint
+app.get("/version", (req, res) => {
+  res.json({ 
+    version: VERSION,
+    buildDate: BUILD_DATE,
+    timestamp: new Date().toISOString()
+  })
 })
 
 // Debug endpoint to check configuration
