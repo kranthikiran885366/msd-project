@@ -288,7 +288,7 @@ exports.googleCallback = async (req, res) => {
 // GitHub OAuth Callback
 exports.githubCallback = async (req, res) => {
   try {
-    const { profile } = req.user
+    const { profile, accessToken } = req.user
     const { id, displayName, username, photos, emails } = profile
 
     let user = await User.findOne({ "oauth.github.id": id })
@@ -363,6 +363,19 @@ exports.githubCallback = async (req, res) => {
         metadata: { username },
       })
     }
+
+    // Save GitHub integration with access token for repository access
+    const GitHubIntegration = require("../models/GitHubIntegration")
+    await GitHubIntegration.findOneAndUpdate(
+      { userId: user._id },
+      {
+        userId: user._id,
+        githubUsername: username,
+        accessToken: accessToken,
+        connectedAt: new Date(),
+      },
+      { upsert: true, new: true }
+    )
 
     const token = generateToken(user._id)
     const refreshToken = generateRefreshToken(user._id)

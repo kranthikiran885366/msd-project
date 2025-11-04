@@ -30,6 +30,17 @@ export default function GitHubImportDialog({ open, onOpenChange, onRepositorySel
   useEffect(() => {
     if (open) {
       checkConnection();
+      // Check if user just returned from OAuth
+      if (typeof window !== 'undefined') {
+        const isPending = sessionStorage.getItem('github-import-pending');
+        if (isPending) {
+          sessionStorage.removeItem('github-import-pending');
+          // Give it a moment for the connection to be established
+          setTimeout(() => {
+            checkConnection();
+          }, 1000);
+        }
+      }
     }
   }, [open]);
 
@@ -112,8 +123,11 @@ export default function GitHubImportDialog({ open, onOpenChange, onRepositorySel
   };
 
   const handleConnectGitHub = () => {
-    // Redirect to OAuth flow
+    // Store the current dialog state in sessionStorage so we can return to it
     if (typeof window !== 'undefined') {
+      sessionStorage.setItem('github-import-pending', 'true');
+      sessionStorage.setItem('github-import-redirect', window.location.href);
+      // Redirect to OAuth flow
       window.location.href = '/auth/github';
     }
   };

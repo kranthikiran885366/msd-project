@@ -110,7 +110,8 @@ passport.use(
           await user.save()
         }
 
-        return done(null, { user, profile })
+        // Pass accessToken through done callback for use in githubCallback controller
+        return done(null, { user, profile, accessToken })
       } catch (error) {
         return done(error)
       }
