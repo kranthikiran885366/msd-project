@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: msd-project
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./Dockerfile
+    
+    # Port configuration - CRITICAL for Render
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: NODE_ENV
+        value: production
+      - key: API_URL
+        fromService:
+          type: web
+          name: msd-project
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: CLIENT_URL
+        value: https://kranthi-project-deployer.vercel.app
+    
+    # Health check
+    healthCheckPath: /health
+    
+    # Auto-deploy on push
+    autoDeploy: true

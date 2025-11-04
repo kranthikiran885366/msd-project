@@ -40,14 +40,19 @@ RUN chown -R nodejs:nodejs /app
 
 USER nodejs
 
+# Set environment variables for production
+ENV PORT=5000 \
+    NODE_ENV=production \
+    NEXT_PUBLIC_API_URL=${API_URL}
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:5000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-EXPOSE 3000 5000
+EXPOSE 5000
 
 # Use dumb-init to handle signals
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start both frontend and backend
-CMD ["sh", "-c", "node /app/server/index.js & npm run dev --prefix /app"]
+# Start backend server (primary service)
+CMD ["node", "/app/server/index.js"]
