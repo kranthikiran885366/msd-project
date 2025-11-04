@@ -27,6 +27,19 @@ class EmailService {
       });
     }
 
+    // Check if using SendGrid (via SMTP)
+    if (process.env.SENDGRID_API_KEY) {
+      return nodemailer.createTransport({
+        host: 'smtp.sendgrid.net',
+        port: 587,
+        secure: false,
+        auth: {
+          user: 'apikey',
+          pass: process.env.SENDGRID_API_KEY,
+        },
+      });
+    }
+
     // Check if using custom SMTP
     if (process.env.SMTP_HOST) {
       return nodemailer.createTransport({
@@ -38,16 +51,6 @@ class EmailService {
           pass: process.env.SMTP_PASSWORD,
         } : undefined,
       });
-    }
-
-    // Check if using SendGrid
-    if (process.env.SENDGRID_API_KEY) {
-      const sgTransport = require('nodemailer-sendgrid-transport');
-      return nodemailer.createTransport(sgTransport({
-        auth: {
-          api_key: process.env.SENDGRID_API_KEY,
-        },
-      }));
     }
 
     // Return mock transporter for development
