@@ -3,7 +3,7 @@ const router = express.Router();
 const billingController = require('../controllers/billingController');
 const { authenticate } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
-const { validatePlan } = require('../middleware/planValidation');
+const planValidation = require('../middleware/planValidation');
 
 // Public routes (no auth required)
 router.get('/plans', apiLimiter, billingController.getPlans);
@@ -13,8 +13,8 @@ router.use(authenticate);
 
 // Subscription management
 router.get('/subscription', billingController.getCurrentSubscription);
-router.post('/subscription', validatePlan, billingController.createSubscription);
-router.put('/subscription/:id', validatePlan, billingController.updateSubscription);
+router.post('/subscription', billingController.createSubscription);
+router.put('/subscription/:id', planValidation.validatePlanChange, billingController.updateSubscription);
 router.delete('/subscription/:id', billingController.cancelSubscription);
 
 // Usage and analytics
