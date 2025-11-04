@@ -219,7 +219,7 @@ export default function DashboardPage() {
               value={`${projectStats?.uptime || 99.9}%`}
               subtitle="Uptime (30 days)"
               icon={<Shield className="w-5 h-5" />}
-              href="/logs"
+              href="/monitoring/logs"
               gradient="from-orange-500 to-red-500"
               trend="+0.1%"
               trendPositive={true}

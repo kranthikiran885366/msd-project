@@ -225,7 +225,7 @@ export default function LandingPage() {
               icon={<BarChart3 className="size-6" />}
               title="Logs & Analytics"
               desc="Real-time logs, performance metrics, and detailed analytics dashboard."
-              link="/logs"
+              link="/monitoring/logs"
               gradient="from-purple-500 to-violet-600"
             />
             <Feature

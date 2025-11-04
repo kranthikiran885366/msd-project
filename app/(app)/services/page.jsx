@@ -48,7 +48,7 @@ const SERVICES = [
     status: 'active',
     pricing: 'Pay as you go',
     features: ['Edge caching', 'Image optimization', 'Automatic compression', 'DDoS protection'],
-    link: '/cdn',
+    link: '/media-cdn',
     usage: 2534,
     limit: 5000,
   },
