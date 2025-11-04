@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken")
 const User = require("../models/User")
 const AuditLog = require("../models/AuditLog")
 const crypto = require("crypto")
+const emailService = require("../utils/emailService")
 
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "7d" })
@@ -462,11 +463,16 @@ exports.forgotPassword = async (req, res) => {
       metadata: { email },
     })
 
-    // In production, send email with reset link
-    // For now, return the token for testing
+    // Send password reset email
+    try {
+      await emailService.sendPasswordResetEmail(user, resetToken)
+    } catch (emailError) {
+      console.error("Failed to send password reset email:", emailError)
+      return res.status(500).json({ error: "Failed to send reset link. Please try again." })
+    }
+
     res.json({
       message: "Password reset link sent to email",
-      resetToken, // For testing only
     })
   } catch (error) {
     res.status(500).json({ error: error.message })
