@@ -65,8 +65,8 @@ export default function SignupPage() {
       })
       setIsAuthenticated(true)
       
-      // Redirect to dashboard
-      router.push("/dashboard")
+      // Redirect to login page after signup
+      router.push("/login")
     } catch (err) {
       setError(err.message || "Signup failed. Please try again.")
       setIsLoading(false)
