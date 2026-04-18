@@ -33,91 +33,94 @@ passport.use(
   )
 )
 
-// Google OAuth Strategy
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      callbackURL: `${process.env.API_URL || 'http://localhost:5000'}/auth/google/callback`,
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        let user = await User.findOne({ "oauth.google.id": profile.id })
+// Google OAuth Strategy (only register if credentials are configured)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: `${process.env.API_URL || 'http://localhost:3001'}/auth/google/callback`,
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          let user = await User.findOne({ "oauth.google.id": profile.id })
 
-        if (!user) {
-          user = new User({
-            email: profile.emails[0].value,
-            name: profile.displayName,
-            avatar: profile.photos[0].value,
-            emailVerified: true,
-            oauth: {
-              google: {
-                id: profile.id,
-                email: profile.emails[0].value,
-                picture: profile.photos[0].value,
-                refreshToken: refreshToken,
+          if (!user) {
+            user = new User({
+              email: profile.emails[0].value,
+              name: profile.displayName,
+              avatar: profile.photos[0].value,
+              emailVerified: true,
+              oauth: {
+                google: {
+                  id: profile.id,
+                  email: profile.emails[0].value,
+                  picture: profile.photos[0].value,
+                  refreshToken: refreshToken,
+                },
               },
-            },
-          })
-          await user.save()
-        } else {
-          user.oauth.google.refreshToken = refreshToken
-          user.lastLogin = new Date()
-          await user.save()
+            })
+            await user.save()
+          } else {
+            user.oauth.google.refreshToken = refreshToken
+            user.lastLogin = new Date()
+            await user.save()
+          }
+
+          return done(null, { user, profile })
+        } catch (error) {
+          return done(error)
         }
-
-        return done(null, { user, profile })
-      } catch (error) {
-        return done(error)
       }
-    }
+    )
   )
-)
+}
 
-// GitHub OAuth Strategy
-passport.use(
-  new GitHubStrategy(
-    {
-      clientID: process.env.GITHUB_CLIENT_ID || "",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
-      callbackURL: `${process.env.API_URL || 'http://localhost:5000'}/auth/github/callback`,
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        let user = await User.findOne({ "oauth.github.id": profile.id })
+// GitHub OAuth Strategy (only register if credentials are configured)
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  passport.use(
+    new GitHubStrategy(
+      {
+        clientID: process.env.GITHUB_CLIENT_ID,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET,
+        callbackURL: `${process.env.API_URL || 'http://localhost:3001'}/auth/github/callback`,
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          let user = await User.findOne({ "oauth.github.id": profile.id })
 
-        if (!user) {
-          const email = profile.emails?.[0]?.value || `${profile.username}@github.local`
-          user = new User({
-            email,
-            name: profile.displayName || profile.username,
-            avatar: profile.photos?.[0]?.value,
-            emailVerified: !!profile.emails?.[0]?.value,
-            oauth: {
-              github: {
-                id: profile.id,
-                login: profile.username,
-                avatar_url: profile.photos?.[0]?.value,
-                accessToken,
+          if (!user) {
+            const email = profile.emails?.[0]?.value || `${profile.username}@github.local`
+            user = new User({
+              email,
+              name: profile.displayName || profile.username,
+              avatar: profile.photos?.[0]?.value,
+              emailVerified: !!profile.emails?.[0]?.value,
+              oauth: {
+                github: {
+                  id: profile.id,
+                  login: profile.username,
+                  avatar_url: profile.photos?.[0]?.value,
+                  accessToken,
+                },
               },
-            },
-          })
-          await user.save()
-        } else {
-          user.oauth.github.accessToken = accessToken
-          user.lastLogin = new Date()
-          await user.save()
-        }
+            })
+            await user.save()
+          } else {
+            user.oauth.github.accessToken = accessToken
+            user.lastLogin = new Date()
+            await user.save()
+          }
 
-        // Pass accessToken through done callback for use in githubCallback controller
-        return done(null, { user, profile, accessToken })
-      } catch (error) {
-        return done(error)
+          return done(null, { user, profile, accessToken })
+        } catch (error) {
+          return done(error)
+        }
       }
-    }
+    )
   )
-)
+}
 
 // Serialize user
 passport.serializeUser((obj, done) => {

@@ -46,8 +46,8 @@ const billingRoutes = require("./routes/billing")
 const app = express()
 
 // Middleware
-// Configure CORS. During local development allow the frontend dev server(s).
-const allowedOrigins = [config.clientUrl, 'http://localhost:3001', 'http://127.0.0.1:3001', 'http://192.168.0.1:3001']
+// Configure CORS. Allow the Next.js frontend (port 5000) and any Replit proxy origins.
+const allowedOrigins = [config.clientUrl, 'http://localhost:5000', 'http://127.0.0.1:5000']
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -56,8 +56,12 @@ app.use(
       if (allowedOrigins.indexOf(origin) !== -1) {
         return callback(null, true)
       }
-      // In development, be permissive and allow any localhost origins
-      if (config.nodeEnv !== 'production' && /localhost|127\.0\.0\.1/.test(origin)) {
+      // Allow any localhost/127.0.0.1 origin in development
+      if (/localhost|127\.0\.0\.1/.test(origin)) {
+        return callback(null, true)
+      }
+      // Allow Replit proxy domains (*.replit.dev, *.repl.co, *.replit.app)
+      if (/\.replit\.dev$|\.repl\.co$|\.replit\.app$/.test(origin)) {
         return callback(null, true)
       }
       callback(new Error('Not allowed by CORS'))

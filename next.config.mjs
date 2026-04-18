@@ -10,14 +10,13 @@ const nextConfig = {
     unoptimized: true,
   },
   async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://deployer-6mfg.onrender.com/api'
-    // Remove /api suffix if present to get base backend URL
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
     const baseBackendUrl = backendUrl.replace(/\/api$/, '')
     return {
       beforeFiles: [
         {
           source: '/api/:path*',
-          destination: `${backendUrl}/:path*`,
+          destination: `${baseBackendUrl}/api/:path*`,
         },
         {
           source: '/auth/:path*',

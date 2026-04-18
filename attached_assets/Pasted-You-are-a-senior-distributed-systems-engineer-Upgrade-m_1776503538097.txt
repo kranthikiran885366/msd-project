@@ -1,0 +1,206 @@
+You are a senior distributed systems engineer. Upgrade my existing project (GitHub deployment platform) into a complete cloud deployment system similar to Render/Netlify with real execution infrastructure using Google Cloud Platform.
+
+## 🎯 Goal
+
+Build a full Platform-as-a-Service (PaaS) system where:
+
+* Users connect GitHub
+* Click deploy
+* App is built, containerized, deployed
+* Live public URL is generated
+
+---
+
+## 🏗️ System Architecture
+
+Design and implement:
+
+### 1. Control Plane (Backend)
+
+* Node.js + Express backend
+* MongoDB database
+* REST APIs:
+
+  * POST /deploy (trigger deployment)
+  * GET /deployments (list)
+  * GET /logs/:id
+  * POST /github/webhook
+  * POST /nodes/register
+  * GET /nodes
+* Job Queue system (BullMQ or custom queue)
+* Scheduler to assign jobs to available nodes
+
+---
+
+### 2. GitHub Integration (MANDATORY)
+
+* Implement OAuth using GitHub API
+* Allow user to:
+
+  * Login via GitHub
+  * Select repositories
+  * Auto-fetch repo details
+* Webhook support:
+
+  * Auto deploy on push
+* Clone repo securely using token
+
+---
+
+### 3. Execution Layer (CRITICAL)
+
+Create distributed runner system:
+
+#### Runner Agent:
+
+* Node.js service running on each VM
+* Polls backend for jobs
+* Executes:
+
+  * git clone repo
+  * detect framework (Node, React, etc.)
+  * generate Dockerfile dynamically
+  * docker build
+  * docker run with port mapping
+* Sends logs + status to backend
+
+---
+
+### 4. Containerization
+
+Use Docker:
+
+* Auto-generate Dockerfile based on project type
+* Support:
+
+  * Node.js apps
+  * Static sites
+* Add resource limits:
+
+  * CPU, RAM constraints
+
+---
+
+### 5. Networking & URL System
+
+* Assign unique port per deployment
+* Setup reverse proxy using Nginx
+* Map:
+
+  * http://<VM-IP>:PORT
+* OPTIONAL:
+
+  * Subdomain routing
+
+---
+
+### 6. Google Cloud Setup (MANDATORY)
+
+Use Google Cloud Platform:
+
+#### Infrastructure:
+
+* 1 VM → Backend (master node)
+* 1+ VM → Worker nodes
+* Use Ubuntu OS
+
+#### Setup steps:
+
+* Install Docker on all VMs
+* Open firewall ports (3000–4000)
+* Assign static IP (optional)
+
+---
+
+### 7. Deployment Flow
+
+User Flow:
+
+1. Login with GitHub
+2. Select repo
+3. Click Deploy
+4. Backend:
+
+   * creates job
+   * assigns worker node
+5. Worker:
+
+   * clones repo
+   * builds Docker image
+   * runs container
+6. Backend:
+
+   * returns live URL
+   * stores logs/status
+
+---
+
+### 8. Logs & Monitoring
+
+* Capture container logs
+* Stream logs to frontend
+* Store deployment history
+
+---
+
+### 9. Frontend Upgrade
+
+* Dashboard:
+
+  * List deployments
+  * Show status (building, running, failed)
+  * Show logs (live)
+* Deploy button per repo
+* GitHub repo selector UI
+
+---
+
+### 10. Security
+
+* Use Docker isolation
+* No root execution
+* Limit resources per container
+* Validate repos before execution
+
+---
+
+### 11. Scaling (Basic)
+
+* Support multiple worker nodes
+* Load balancing via scheduler
+* Track node health
+
+---
+
+## ⚙️ Tech Stack
+
+* Backend: Node.js, Express
+* DB: MongoDB
+* Queue: BullMQ (optional)
+* Container: Docker
+* Proxy: Nginx
+* Cloud: Google Cloud Platform
+
+---
+
+## 📦 Deliverables
+
+* Full backend code
+* Runner agent code
+* Dockerfile generator logic
+* GCP setup instructions
+* API documentation
+* Deployment flow working end-to-end
+
+---
+
+## 🎯 Final Result
+
+A working cloud deployment platform where:
+
+* User logs in via GitHub
+* Clicks deploy
+* App is live on public URL
+* System uses GCP VMs as servers
+
+Ensure everything is fully working, production-style, and modular.
