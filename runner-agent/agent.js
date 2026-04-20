@@ -1,222 +1,161 @@
+'use strict';
+require('dotenv').config();
 const { v4: uuidv4 } = require('uuid');
-const axios = require('axios');
-const NodeRegistry = require('./nodeRegistry');
-const JobExecutor = require('./jobExecutor');
-const { execSync } = require('child_process');
-const os = require('os');
+const axios          = require('axios');
+const NodeRegistry   = require('./nodeRegistry');
+const JobExecutor    = require('./jobExecutor');
+const os             = require('os');
 
 class Agent {
     constructor() {
-        this.nodeId = process.env.NODE_ID || uuidv4();
-        this.backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+        this.nodeId     = process.env.NODE_ID     || uuidv4();
+        this.backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+
+        // AWS EC2 addresses resolved by start-worker.sh
+        this.privateIp  = process.env.NODE_PRIVATE_IP || process.env.NODE_IP || '';
+        this.publicIp   = process.env.NODE_PUBLIC_IP  || '';
+        this.region     = process.env.REGION          || 'us-east-1';
+        this.az         = process.env.AVAILABILITY_ZONE || '';
+
         this.nodeRegistry = new NodeRegistry(this.nodeId, this.backendUrl);
-        this.jobExecutor = new JobExecutor(this.nodeId, this.backendUrl);
-        this.isRunning = false;
-        this.heartbeatInterval = null;
-        this.jobPollInterval = null;
-        this.maxConcurrentJobs = parseInt(process.env.MAX_CONCURRENT_JOBS || '2');
-        this.activeJobs = new Map();
+        this.jobExecutor  = new JobExecutor(this.nodeId, this.backendUrl);
+
+        this.isRunning          = false;
+        this.heartbeatInterval  = null;
+        this.jobPollInterval    = null;
+        this.maxConcurrentJobs  = parseInt(process.env.MAX_CONCURRENT_JOBS || '2', 10);
+        this.activeJobs         = new Map();
     }
 
-    /**
-     * Start the agent
-     */
     async start() {
-        console.log(`[v0] Starting MSD Agent (ID: ${this.nodeId})`);
-        
-        try {
-            // Register node with backend
-            await this.nodeRegistry.register({
-                hostname: os.hostname(),
-                region: process.env.REGION || 'us-east-1',
-                totalCapacity: {
-                    cpu: os.cpus().length,
-                    memory: Math.floor(os.totalmem() / 1024 / 1024), // Convert to MB
-                    storage: 10240 // Default 10GB
-                }
-            });
+        console.log(`[agent] Starting — ID: ${this.nodeId} | private: ${this.privateIp} | public: ${this.publicIp}`);
 
-            this.isRunning = true;
+        await this.nodeRegistry.register({
+            hostname:         os.hostname(),
+            privateIp:        this.privateIp,
+            publicIp:         this.publicIp,
+            region:           this.region,
+            availabilityZone: this.az,
+            totalCapacity: {
+                cpu:     os.cpus().length,
+                memory:  Math.floor(os.totalmem() / 1024 / 1024),
+                storage: 10240
+            }
+        });
 
-            // Start heartbeat
-            this.startHeartbeat();
-
-            // Start job polling
-            this.startJobPolling();
-
-            // Start monitoring
-            this.startMonitoring();
-
-            console.log('[v0] Agent started successfully');
-        } catch (error) {
-            console.error('[v0] Error starting agent:', error.message);
-            throw error;
-        }
+        this.isRunning = true;
+        this.startHeartbeat();
+        this.startJobPolling();
+        this.startMonitoring();
+        console.log('[agent] Started successfully');
     }
 
-    /**
-     * Start heartbeat to backend
-     */
     startHeartbeat(interval = 10000) {
         this.heartbeatInterval = setInterval(async () => {
             try {
-                const metrics = this.getSystemMetrics();
-                await this.nodeRegistry.sendHeartbeat(metrics);
-            } catch (error) {
-                console.error('[v0] Heartbeat error:', error.message);
+                await this.nodeRegistry.sendHeartbeat(this._getMetrics());
+            } catch (err) {
+                console.error('[agent] Heartbeat error:', err.message);
             }
         }, interval);
-
-        console.log('[v0] Heartbeat started');
+        console.log('[agent] Heartbeat started');
     }
 
-    /**
-     * Start polling for jobs
-     */
     startJobPolling(interval = 5000) {
         this.jobPollInterval = setInterval(async () => {
             try {
-                // Only poll if we have capacity
                 if (this.activeJobs.size < this.maxConcurrentJobs) {
-                    await this.pollJobs();
+                    await this._pollJobs();
                 }
-            } catch (error) {
-                console.error('[v0] Job polling error:', error.message);
+            } catch (err) {
+                console.error('[agent] Job poll error:', err.message);
             }
         }, interval);
-
-        console.log('[v0] Job polling started');
+        console.log('[agent] Job polling started');
     }
 
-    /**
-     * Poll for available jobs
-     */
-    async pollJobs() {
+    async _pollJobs() {
         try {
             const response = await axios.get(`${this.backendUrl}/api/jobs/pull`, {
-                params: { nodeId: this.nodeId }
+                params:  { nodeId: this.nodeId },
+                headers: this.nodeRegistry.authHeaders(),
+                timeout: 8000
             });
 
             const jobs = response.data?.jobs || [];
-            
             for (const job of jobs) {
                 if (this.activeJobs.size >= this.maxConcurrentJobs) break;
-
-                // Execute job asynchronously
-                this.executeJobAsync(job);
+                this._executeJobAsync(job);
             }
-        } catch (error) {
-            if (error.response?.status === 404) {
-                // No jobs available
-                return;
-            }
-            console.error('[v0] Error polling for jobs:', error.message);
+        } catch (err) {
+            if (err.response?.status === 404) return; // no jobs — normal
+            console.error('[agent] Poll error:', err.message);
         }
     }
 
-    /**
-     * Execute a job asynchronously
-     */
-    executeJobAsync(job) {
+    _executeJobAsync(job) {
         const jobId = job.id || job.deploymentId;
-        
-        // Prevent duplicate execution
-        if (this.activeJobs.has(jobId)) {
-            console.warn(`[v0] Job ${jobId} already executing`);
-            return;
-        }
+        if (this.activeJobs.has(jobId)) return;
 
-        // Mark as active
-        this.activeJobs.set(jobId, {
-            startTime: Date.now(),
-            job
-        });
+        this.activeJobs.set(jobId, { startTime: Date.now(), job });
+        console.log(`[agent] Executing job: ${jobId}`);
 
-        console.log(`[v0] Starting job execution: ${jobId}`);
-
-        // Execute without awaiting
         this.jobExecutor.executeJob(job)
-            .then((result) => {
-                console.log(`[v0] Job ${jobId} completed successfully`);
+            .then(() => {
+                console.log(`[agent] Job ${jobId} done`);
                 this.activeJobs.delete(jobId);
             })
-            .catch((error) => {
-                console.error(`[v0] Job ${jobId} failed:`, error.message);
+            .catch(err => {
+                console.error(`[agent] Job ${jobId} failed:`, err.message);
                 this.activeJobs.delete(jobId);
             });
     }
 
-    /**
-     * Get current system metrics
-     */
-    getSystemMetrics() {
-        const cpus = os.cpus();
+    _getMetrics() {
+        const cpus     = os.cpus();
         const totalMem = os.totalmem();
-        const freeMem = os.freemem();
-        const usedMem = totalMem - freeMem;
-
-        // Calculate average CPU usage
-        let avgCpuUsage = 0;
-        const cpuUsages = cpus.map(cpu => {
-            const total = Object.values(cpu.times).reduce((a, b) => a + b, 0);
-            const idle = cpu.times.idle;
-            return (1 - idle / total) * 100;
-        });
-        avgCpuUsage = cpuUsages.reduce((a, b) => a + b, 0) / cpuUsages.length;
+        const freeMem  = os.freemem();
+        const cpuUsage = cpus.map(c => {
+            const total = Object.values(c.times).reduce((a, b) => a + b, 0);
+            return (1 - c.times.idle / total) * 100;
+        }).reduce((a, b) => a + b, 0) / cpus.length;
 
         return {
-            cpuUsage: Math.round(avgCpuUsage),
-            memoryUsage: Math.round((usedMem / totalMem) * 100),
-            diskUsage: 0, // Would need du command to calculate
+            cpuUsage:         Math.round(cpuUsage),
+            memoryUsage:      Math.round(((totalMem - freeMem) / totalMem) * 100),
+            diskUsage:        0,
             activeContainers: this.activeJobs.size,
-            timestamp: new Date()
+            timestamp:        new Date()
         };
     }
 
-    /**
-     * Start system monitoring
-     */
     startMonitoring() {
-        // Monitor active jobs for timeouts
         setInterval(() => {
-            const now = Date.now();
-            const jobTimeout = 600000; // 10 minutes
-
-            for (const [jobId, jobData] of this.activeJobs) {
-                const elapsed = now - jobData.startTime;
-                if (elapsed > jobTimeout) {
-                    console.warn(`[v0] Job ${jobId} exceeded timeout (${elapsed}ms)`);
-                    // Job executor should handle this, but we can track it
+            const now        = Date.now();
+            const jobTimeout = 600000;
+            for (const [jobId, data] of this.activeJobs) {
+                if (now - data.startTime > jobTimeout) {
+                    console.warn(`[agent] Job ${jobId} exceeded timeout`);
                 }
             }
-        }, 60000); // Check every minute
+        }, 60000);
     }
 
-    /**
-     * Shutdown the agent gracefully
-     */
     async shutdown() {
-        console.log('[v0] Shutting down agent...');
+        console.log('[agent] Shutting down...');
         this.isRunning = false;
-
-        // Stop intervals
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
-        if (this.jobPollInterval) clearInterval(this.jobPollInterval);
+        if (this.jobPollInterval)   clearInterval(this.jobPollInterval);
 
-        // Wait for active jobs to complete (with timeout)
-        const timeout = 30000; // 30 seconds
-        const startTime = Date.now();
-
-        while (this.activeJobs.size > 0 && Date.now() - startTime < timeout) {
-            console.log(`[v0] Waiting for ${this.activeJobs.size} active jobs to complete...`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+        const deadline = Date.now() + 30000;
+        while (this.activeJobs.size > 0 && Date.now() < deadline) {
+            console.log(`[agent] Waiting for ${this.activeJobs.size} active job(s)...`);
+            await new Promise(r => setTimeout(r, 1000));
         }
-
         if (this.activeJobs.size > 0) {
-            console.warn(`[v0] ${this.activeJobs.size} jobs still running, forcing shutdown`);
+            console.warn(`[agent] Forcing shutdown with ${this.activeJobs.size} job(s) still running`);
         }
-
-        console.log('[v0] Agent shutdown complete');
+        console.log('[agent] Shutdown complete');
     }
 }
 

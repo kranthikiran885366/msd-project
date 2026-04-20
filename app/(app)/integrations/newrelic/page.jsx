@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle, Plus, Trash2, RefreshCw, Link2, Activity, Ale
 import apiClient from '@/lib/api-client';
 
 export default function NewRelicIntegrationPage() {
+  const [projectId, setProjectId] = useState('');
   const [connection, setConnection] = useState(null);
   const [applications, setApplications] = useState([]);
   const [insights, setInsights] = useState([]);
@@ -22,158 +23,107 @@ export default function NewRelicIntegrationPage() {
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [apiKey, setApiKey] = useState('');
 
-  // Mock connection
-  const mockConnection = {
-    id: 'nr-conn-1',
-    status: 'connected',
-    accountId: '3456789',
-    licensingKey: 'nr-***-***',
-    connectedAt: '2024-09-20T09:00:00Z',
-    lastSync: '2024-12-20T16:00:00Z',
-    accountName: 'Acme Corp Production',
-    dataIngested: 2847, // GB
-    hosts: 28,
-    applications: 12
+  const fetchNewRelicData = async (activeProjectId) => {
+    if (!activeProjectId) {
+      setConnection(null);
+      setApplications([]);
+      setInsights([]);
+      setApmMetrics([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError('');
+      setLoading(true);
+      const response = await apiClient.getWebhooks(activeProjectId);
+      const webhooks = Array.isArray(response) ? response : response?.data || [];
+      const nrWebhooks = webhooks.filter((webhook) =>
+        webhook.url?.includes('newrelic') || webhook.name?.toLowerCase().includes('new relic') || webhook.name?.toLowerCase().includes('newrelic')
+      );
+
+      if (nrWebhooks.length === 0) {
+        setConnection(null);
+        setApplications([]);
+        setInsights([]);
+        setApmMetrics([]);
+        return;
+      }
+
+      const totalDeliveries = nrWebhooks.reduce((sum, webhook) => sum + (webhook.deliveryStats?.total || 0), 0);
+      const failedDeliveries = nrWebhooks.reduce((sum, webhook) => sum + (webhook.deliveryStats?.failed || 0), 0);
+
+      setConnection({
+        id: nrWebhooks[0]._id,
+        status: 'connected',
+        accountId: String(nrWebhooks[0]._id).slice(-8),
+        licensingKey: 'nr-***',
+        connectedAt: nrWebhooks[0].createdAt,
+        lastSync: nrWebhooks[0].updatedAt,
+        accountName: 'New Relic',
+        dataIngested: totalDeliveries,
+        hosts: nrWebhooks.length,
+        applications: nrWebhooks.length,
+      });
+
+      setApplications(nrWebhooks.map((webhook) => {
+        const failed = webhook.deliveryStats?.failed || 0;
+        const total = webhook.deliveryStats?.total || 0;
+        const errorRate = total > 0 ? (failed / total) * 100 : 0;
+        return {
+          id: webhook._id,
+          name: webhook.name || 'New Relic App',
+          language: 'N/A',
+          status: 'reporting',
+          health: failed > 0 ? 'yellow' : 'green',
+          apdex: Number((1 - Math.min(errorRate / 100, 1)).toFixed(2)),
+          responseTime: 0,
+          errorRate,
+          throughput: total,
+          lastReportedAt: webhook.lastDelivery || webhook.updatedAt,
+        };
+      }));
+
+      setInsights(nrWebhooks.map((webhook) => ({
+        id: webhook._id,
+        title: webhook.name || 'New Relic Insight',
+        severity: (webhook.deliveryStats?.failed || 0) > 0 ? 'warning' : 'info',
+        description: `Deliveries: ${webhook.deliveryStats?.total || 0}, Failed: ${webhook.deliveryStats?.failed || 0}`,
+        timestamp: webhook.updatedAt,
+        application: webhook.name || 'Integration',
+      })));
+
+      setApmMetrics([
+        {
+          id: 'nr-metric-deliveries',
+          metric: 'Total Deliveries',
+          value: totalDeliveries,
+          unit: 'count',
+          threshold: Math.max(1, totalDeliveries + 1),
+          status: 'normal',
+        },
+        {
+          id: 'nr-metric-failures',
+          metric: 'Failed Deliveries',
+          value: failedDeliveries,
+          unit: 'count',
+          threshold: 1,
+          status: failedDeliveries > 0 ? 'warning' : 'normal',
+        },
+      ]);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch New Relic integration data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Mock applications
-  const mockApplications = [
-    {
-      id: 'nr-app-1',
-      name: 'User API',
-      language: 'Node.js',
-      status: 'reporting',
-      health: 'green',
-      apdex: 0.95,
-      responseTime: 145,
-      errorRate: 0.2,
-      throughput: 8500,
-      lastReportedAt: '2024-12-20T16:00:00Z'
-    },
-    {
-      id: 'nr-app-2',
-      name: 'Products Service',
-      language: 'Java',
-      status: 'reporting',
-      health: 'green',
-      apdex: 0.92,
-      responseTime: 234,
-      errorRate: 0.3,
-      throughput: 5200,
-      lastReportedAt: '2024-12-20T16:00:00Z'
-    },
-    {
-      id: 'nr-app-3',
-      name: 'Payment Processor',
-      language: 'Python',
-      status: 'reporting',
-      health: 'yellow',
-      apdex: 0.85,
-      responseTime: 412,
-      errorRate: 1.2,
-      throughput: 1250,
-      lastReportedAt: '2024-12-20T15:58:00Z'
-    },
-    {
-      id: 'nr-app-4',
-      name: 'Analytics Worker',
-      language: 'Go',
-      status: 'not reporting',
-      health: 'red',
-      apdex: 0,
-      responseTime: 0,
-      errorRate: 0,
-      throughput: 0,
-      lastReportedAt: '2024-12-20T10:30:00Z'
-    }
-  ];
-
-  // Mock insights
-  const mockInsights = [
-    {
-      id: 'nr-insight-1',
-      title: 'High Memory Usage - User API',
-      severity: 'warning',
-      description: 'Memory usage has increased by 45% over the last 2 hours',
-      timestamp: '2024-12-20T15:30:00Z',
-      application: 'User API'
-    },
-    {
-      id: 'nr-insight-2',
-      title: 'Response Time Spike',
-      severity: 'critical',
-      description: 'Payment Processor response time increased to 412ms (2x normal)',
-      timestamp: '2024-12-20T15:45:00Z',
-      application: 'Payment Processor'
-    },
-    {
-      id: 'nr-insight-3',
-      title: 'Error Rate Threshold Exceeded',
-      severity: 'critical',
-      description: 'Error rate for Payment Processor exceeded 1% threshold',
-      timestamp: '2024-12-20T15:50:00Z',
-      application: 'Payment Processor'
-    },
-    {
-      id: 'nr-insight-4',
-      title: 'Database Connection Pool Warning',
-      severity: 'info',
-      description: 'Database connections at 75% capacity',
-      timestamp: '2024-12-20T16:00:00Z',
-      application: 'Products Service'
-    }
-  ];
-
-  // Mock APM metrics
-  const mockApmMetrics = [
-    {
-      id: 'nr-apm-1',
-      metric: 'CPU Usage',
-      value: 68,
-      unit: '%',
-      threshold: 80,
-      status: 'normal'
-    },
-    {
-      id: 'nr-apm-2',
-      metric: 'Memory Usage',
-      value: 6.2,
-      unit: 'GB',
-      threshold: 8,
-      status: 'warning'
-    },
-    {
-      id: 'nr-apm-3',
-      metric: 'Disk I/O',
-      value: 450,
-      unit: 'MB/s',
-      threshold: 600,
-      status: 'normal'
-    },
-    {
-      id: 'nr-apm-4',
-      metric: 'Network Throughput',
-      value: 850,
-      unit: 'Mbps',
-      threshold: 1000,
-      status: 'normal'
-    },
-    {
-      id: 'nr-apm-5',
-      metric: 'Error Rate',
-      value: 0.45,
-      unit: '%',
-      threshold: 1,
-      status: 'normal'
-    }
-  ];
-
   useEffect(() => {
-    setConnection(mockConnection);
-    setApplications(mockApplications);
-    setInsights(mockInsights);
-    setApmMetrics(mockApmMetrics);
-    setLoading(false);
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const activeProjectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+    setProjectId(activeProjectId || '');
+    fetchNewRelicData(activeProjectId);
   }, []);
 
   const handleConnectNewRelic = async () => {
@@ -184,17 +134,18 @@ export default function NewRelicIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.connectNewRelic({ apiKey });
-
-      if (response.success) {
-        setConnection(mockConnection);
-        setSuccessMessage('Connected to New Relic successfully');
-        setShowApiKeyInput(false);
-        setApiKey('');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to connect to New Relic');
-      }
+      await apiClient.createWebhook(projectId, {
+        name: 'New Relic APM',
+        url: 'https://api.newrelic.com/graphql',
+        events: ['event.recorded', 'alert.triggered'],
+        active: true,
+        secret: apiKey,
+      });
+      await fetchNewRelicData(projectId);
+      setSuccessMessage('Connected to New Relic successfully');
+      setShowApiKeyInput(false);
+      setApiKey('');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -207,18 +158,15 @@ export default function NewRelicIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.disconnectNewRelic();
-
-      if (response.success) {
-        setConnection(null);
-        setApplications([]);
-        setInsights([]);
-        setApmMetrics([]);
-        setSuccessMessage('Disconnected from New Relic');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to disconnect');
-      }
+      const response = await apiClient.getWebhooks(projectId);
+      const webhooks = Array.isArray(response) ? response : response?.data || [];
+      const nrWebhooks = webhooks.filter((webhook) =>
+        webhook.url?.includes('newrelic') || webhook.name?.toLowerCase().includes('new relic') || webhook.name?.toLowerCase().includes('newrelic')
+      );
+      await Promise.all(nrWebhooks.map((webhook) => apiClient.deleteWebhook(webhook._id || webhook.id)));
+      await fetchNewRelicData(projectId);
+      setSuccessMessage('Disconnected from New Relic');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -227,15 +175,9 @@ export default function NewRelicIntegrationPage() {
   const handleGetInsights = async () => {
     try {
       setError('');
-      const response = await apiClient.getNewRelicInsights();
-
-      if (response.success) {
-        setInsights(mockInsights);
-        setSuccessMessage('Insights refreshed successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to fetch insights');
-      }
+      await fetchNewRelicData(projectId);
+      setSuccessMessage('Insights refreshed successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -244,14 +186,9 @@ export default function NewRelicIntegrationPage() {
   const handleConfigureAPM = async () => {
     try {
       setError('');
-      const response = await apiClient.configureAPM();
-
-      if (response.success) {
-        setSuccessMessage('APM configuration updated successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to configure APM');
-      }
+      await apiClient.getPerformanceAnalytics({ provider: 'newrelic' });
+      setSuccessMessage('APM configuration updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }

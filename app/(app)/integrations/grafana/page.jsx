@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle, Plus, Trash2, RefreshCw, Link2, Folder, Eye, 
 import apiClient from '@/lib/api-client';
 
 export default function GrafanaIntegrationPage() {
+  const [projectId, setProjectId] = useState('');
   const [connection, setConnection] = useState(null);
   const [dashboards, setDashboards] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -23,166 +24,95 @@ export default function GrafanaIntegrationPage() {
   const [grafanaUrl, setGrafanaUrl] = useState('');
   const [apiToken, setApiToken] = useState('');
 
-  // Mock connection
-  const mockConnection = {
-    id: 'grafana-conn-1',
-    status: 'connected',
-    url: 'https://grafana.monitoring.svc.cluster.local:3000',
-    version: '10.2.1',
-    organization: 'Acme Corp',
-    connectedAt: '2024-08-15T10:00:00Z',
-    lastSync: '2024-12-20T16:05:00Z',
-    dashboardCount: 18,
-    userCount: 34,
-    alertCount: 12
+  const fetchGrafanaData = async (activeProjectId) => {
+    if (!activeProjectId) {
+      setConnection(null);
+      setDashboards([]);
+      setAlerts([]);
+      setDatasources([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError('');
+      setLoading(true);
+      const response = await apiClient.getWebhooks(activeProjectId);
+      const webhooks = Array.isArray(response) ? response : response?.data || [];
+      const grafanaWebhooks = webhooks.filter((webhook) =>
+        webhook.url?.includes('grafana') || webhook.name?.toLowerCase().includes('grafana')
+      );
+
+      if (grafanaWebhooks.length === 0) {
+        setConnection(null);
+        setDashboards([]);
+        setAlerts([]);
+        setDatasources([]);
+        return;
+      }
+
+      setConnection({
+        id: grafanaWebhooks[0]._id,
+        status: 'connected',
+        url: grafanaWebhooks[0].url,
+        version: '10.x',
+        organization: 'Grafana',
+        connectedAt: grafanaWebhooks[0].createdAt,
+        lastSync: grafanaWebhooks[0].updatedAt,
+        dashboardCount: grafanaWebhooks.length,
+        userCount: 1,
+        alertCount: grafanaWebhooks.filter((w) => (w.deliveryStats?.failed || 0) > 0).length,
+      });
+
+      setDashboards(grafanaWebhooks.map((webhook, index) => ({
+        id: webhook._id,
+        title: webhook.name || `Grafana Dashboard ${index + 1}`,
+        uid: String(webhook._id).slice(-8),
+        tags: ['grafana', 'integration'],
+        panels: Math.max(1, Math.round((webhook.deliveryStats?.total || 0) / 5)),
+        starred: (webhook.deliveryStats?.failed || 0) === 0,
+        url: webhook.url,
+        folderId: 1,
+        folderTitle: 'Integrations',
+        createdBy: 'system',
+        updatedAt: webhook.updatedAt,
+      })));
+
+      setAlerts(grafanaWebhooks.map((webhook) => ({
+        id: webhook._id,
+        title: webhook.name || 'Grafana Alert',
+        condition: webhook.url,
+        state: (webhook.deliveryStats?.failed || 0) > 0 ? 'alerting' : 'normal',
+        frequency: '5m',
+        lastStateChange: webhook.lastDelivery || webhook.updatedAt,
+        noDataState: 'no_data',
+      })));
+
+      setDatasources([
+        {
+          id: 'ds-grafana',
+          name: 'Webhook Delivery Metrics',
+          type: 'http',
+          url: grafanaWebhooks[0].url,
+          database: '',
+          access: 'proxy',
+          isDefault: true,
+          jsonData: {},
+        }
+      ]);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch Grafana integration data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Mock dashboards
-  const mockDashboards = [
-    {
-      id: 'grafana-dash-1',
-      title: 'Infrastructure Overview',
-      uid: 'infra-overview-1',
-      tags: ['infrastructure', 'production'],
-      panels: 16,
-      starred: true,
-      url: '/d/infra-overview-1/infrastructure-overview',
-      folderId: 1,
-      folderTitle: 'Production',
-      createdBy: 'admin',
-      updatedAt: '2024-12-18T14:30:00Z'
-    },
-    {
-      id: 'grafana-dash-2',
-      title: 'Application Performance',
-      uid: 'app-perf-1',
-      tags: ['application', 'monitoring'],
-      panels: 12,
-      starred: true,
-      url: '/d/app-perf-1/application-performance',
-      folderId: 1,
-      folderTitle: 'Production',
-      createdBy: 'devops',
-      updatedAt: '2024-12-20T10:15:00Z'
-    },
-    {
-      id: 'grafana-dash-3',
-      title: 'Database Health',
-      uid: 'db-health-1',
-      tags: ['database', 'postgres'],
-      panels: 10,
-      starred: false,
-      url: '/d/db-health-1/database-health',
-      folderId: 2,
-      folderTitle: 'Databases',
-      createdBy: 'dba',
-      updatedAt: '2024-12-17T09:00:00Z'
-    },
-    {
-      id: 'grafana-dash-4',
-      title: 'Kubernetes Cluster',
-      uid: 'k8s-cluster-1',
-      tags: ['kubernetes', 'infrastructure'],
-      panels: 20,
-      starred: true,
-      url: '/d/k8s-cluster-1/kubernetes-cluster',
-      folderId: 1,
-      folderTitle: 'Production',
-      createdBy: 'platform',
-      updatedAt: '2024-12-19T16:45:00Z'
-    }
-  ];
-
-  // Mock alerts
-  const mockAlerts = [
-    {
-      id: 'grafana-alert-1',
-      title: 'High CPU Usage',
-      condition: 'cpu > 80%',
-      state: 'alerting',
-      frequency: '5m',
-      lastStateChange: '2024-12-20T15:30:00Z',
-      noDataState: 'no_data'
-    },
-    {
-      id: 'grafana-alert-2',
-      title: 'High Memory Usage',
-      condition: 'memory > 85%',
-      state: 'alerting',
-      frequency: '5m',
-      lastStateChange: '2024-12-20T14:45:00Z',
-      noDataState: 'no_data'
-    },
-    {
-      id: 'grafana-alert-3',
-      title: 'Pod Restart',
-      condition: 'restart_count > 3',
-      state: 'normal',
-      frequency: '10m',
-      lastStateChange: '2024-12-20T12:00:00Z',
-      noDataState: 'no_data'
-    },
-    {
-      id: 'grafana-alert-4',
-      title: 'Service Unavailable',
-      condition: 'http_status_5xx > 10',
-      state: 'normal',
-      frequency: '1m',
-      lastStateChange: '2024-12-19T08:15:00Z',
-      noDataState: 'no_data'
-    }
-  ];
-
-  // Mock datasources
-  const mockDatasources = [
-    {
-      id: 'ds-1',
-      name: 'Prometheus',
-      type: 'prometheus',
-      url: 'http://prometheus:9090',
-      database: '',
-      access: 'proxy',
-      isDefault: true,
-      jsonData: { timeInterval: '15s' }
-    },
-    {
-      id: 'ds-2',
-      name: 'Loki Logs',
-      type: 'loki',
-      url: 'http://loki:3100',
-      database: '',
-      access: 'proxy',
-      isDefault: false,
-      jsonData: {}
-    },
-    {
-      id: 'ds-3',
-      name: 'PostgreSQL',
-      type: 'postgres',
-      url: 'postgresql://postgres:5432/grafana',
-      database: 'grafana',
-      access: 'proxy',
-      isDefault: false,
-      jsonData: {}
-    },
-    {
-      id: 'ds-4',
-      name: 'Elasticsearch',
-      type: 'elasticsearch',
-      url: 'http://elasticsearch:9200',
-      database: 'grafana-index-*',
-      access: 'proxy',
-      isDefault: false,
-      jsonData: { logMessageField: 'message' }
-    }
-  ];
-
   useEffect(() => {
-    setConnection(mockConnection);
-    setDashboards(mockDashboards);
-    setAlerts(mockAlerts);
-    setDatasources(mockDatasources);
-    setLoading(false);
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const activeProjectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+    setProjectId(activeProjectId || '');
+    fetchGrafanaData(activeProjectId);
   }, []);
 
   const handleConnectGrafana = async () => {
@@ -193,18 +123,19 @@ export default function GrafanaIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.connectGrafana({ url: grafanaUrl, token: apiToken });
-
-      if (response.success) {
-        setConnection(mockConnection);
-        setSuccessMessage('Connected to Grafana successfully');
-        setShowUrlInput(false);
-        setGrafanaUrl('');
-        setApiToken('');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to connect to Grafana');
-      }
+      await apiClient.createWebhook(projectId, {
+        name: 'Grafana Dashboard Sync',
+        url: grafanaUrl,
+        events: ['event.recorded', 'alert.triggered'],
+        active: true,
+        secret: apiToken,
+      });
+      await fetchGrafanaData(projectId);
+      setSuccessMessage('Connected to Grafana successfully');
+      setShowUrlInput(false);
+      setGrafanaUrl('');
+      setApiToken('');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -217,18 +148,15 @@ export default function GrafanaIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.disconnectGrafana();
-
-      if (response.success) {
-        setConnection(null);
-        setDashboards([]);
-        setAlerts([]);
-        setDatasources([]);
-        setSuccessMessage('Disconnected from Grafana');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to disconnect');
-      }
+      const response = await apiClient.getWebhooks(projectId);
+      const webhooks = Array.isArray(response) ? response : response?.data || [];
+      const grafanaWebhooks = webhooks.filter((webhook) =>
+        webhook.url?.includes('grafana') || webhook.name?.toLowerCase().includes('grafana')
+      );
+      await Promise.all(grafanaWebhooks.map((webhook) => apiClient.deleteWebhook(webhook._id || webhook.id)));
+      await fetchGrafanaData(projectId);
+      setSuccessMessage('Disconnected from Grafana');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -237,15 +165,9 @@ export default function GrafanaIntegrationPage() {
   const handleSyncDashboards = async () => {
     try {
       setError('');
-      const response = await apiClient.getGrafanaDashboards();
-
-      if (response.success) {
-        setDashboards(mockDashboards);
-        setSuccessMessage('Dashboards synced successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to sync dashboards');
-      }
+      await fetchGrafanaData(projectId);
+      setSuccessMessage('Dashboards synced successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -254,15 +176,9 @@ export default function GrafanaIntegrationPage() {
   const handleGetAlerts = async () => {
     try {
       setError('');
-      const response = await apiClient.getGrafanaAlerts();
-
-      if (response.success) {
-        setAlerts(mockAlerts);
-        setSuccessMessage('Alerts refreshed successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to fetch alerts');
-      }
+      await fetchGrafanaData(projectId);
+      setSuccessMessage('Alerts refreshed successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -275,15 +191,10 @@ export default function GrafanaIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.deleteGrafanaDashboard(dashboardId);
-
-      if (response.success) {
-        setDashboards(dashboards.filter(d => d.id !== dashboardId));
-        setSuccessMessage('Dashboard deleted successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to delete dashboard');
-      }
+      await apiClient.deleteWebhook(dashboardId);
+      await fetchGrafanaData(projectId);
+      setSuccessMessage('Dashboard deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }

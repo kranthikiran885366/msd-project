@@ -13,13 +13,21 @@ export default function UptimeDashboardPage() {
   const [selectedDeployment, setSelectedDeployment] = useState('');
   const [uptimeMetrics, setUptimeMetrics] = useState(null);
   const [slaStatus, setSlaStatus] = useState(null);
+  const [uptimeHistory, setUptimeHistory] = useState([]);
+  const [incidentHistory, setIncidentHistory] = useState([]);
+  const [downtimeBreakdown, setDowntimeBreakdown] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [timeRange, setTimeRange] = useState('30d'); // 7d, 30d, 90d
 
+  const timeRangeDays = { '7d': 7, '30d': 30, '90d': 90 }[timeRange] || 30;
+  const colors = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'];
+
   // Backend integration for uptime data
   const fetchUptimeData = async () => {
     try {
+      setLoading(true);
+      setError('');
       const userStr = localStorage.getItem('user');
       const user = userStr ? JSON.parse(userStr) : null;
       const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
@@ -29,19 +37,72 @@ export default function UptimeDashboardPage() {
         return;
       }
 
-      const [uptimeRes, slaRes, historyRes, breakdownRes, incidentsRes] = await Promise.all([
-        apiClient.getUptimeMetrics?.(projectId) || {},
-        apiClient.getSlaStatus?.(projectId) || {},
-        apiClient.getUptimeHistory?.(projectId, timeRange) || { data: [] },
-        apiClient.getDowntimeBreakdown?.(projectId) || { data: [] },
-        apiClient.getIncidentHistory?.(projectId) || { data: [] }
+      const deploymentsResponse = await apiClient.getDeployments(projectId);
+      const deploymentList = deploymentsResponse?.data || deploymentsResponse || [];
+      setDeployments(Array.isArray(deploymentList) ? deploymentList : []);
+      setSelectedDeployment((prev) => prev || deploymentList?.[0]?._id || '');
+
+      const [uptimeRes, slaRes, historyRes, incidentsRes] = await Promise.all([
+        apiClient.getUptimeMetrics(projectId, timeRangeDays),
+        apiClient.getSLAStatus(projectId),
+        apiClient.getUptimeHistory(projectId, timeRangeDays),
+        apiClient.getIncidentHistory(projectId, timeRangeDays)
       ]);
 
-      setUptimeMetrics(uptimeRes || {});
-      setSlaStatus(slaRes || {});
-      setUptimeHistory(uptimeRes.data || []);
-      setDowntimeBreakdown(breakdownRes.data || []);
-      setIncidentHistory(incidentsRes.data || []);
+      const uptimeData = uptimeRes?.data || uptimeRes || {};
+      const slaData = slaRes?.data || slaRes || {};
+      const historyData = historyRes?.data || historyRes || [];
+      const incidentsData = incidentsRes?.data || incidentsRes || [];
+
+      const normalizedHistory = Array.isArray(historyData)
+        ? historyData.map((entry) => ({
+            date: entry.date,
+            uptime24h: Number(entry.uptime ?? 100),
+            uptime7d: Number(slaData.uptime7d ?? entry.uptime ?? 100),
+            uptime30d: Number(slaData.uptime30d ?? entry.uptime ?? 100),
+            downtime: Number(entry.downtime || 0)
+          }))
+        : [];
+
+      const normalizedIncidents = Array.isArray(incidentsData)
+        ? incidentsData.map((incident) => ({
+            ...incident,
+            incident: incident.cause || 'Unknown issue',
+            date: incident.startTime,
+            duration: `${incident.duration || 0}m`
+          }))
+        : [];
+
+      const downtimeBySeverity = normalizedIncidents.reduce((acc, incident) => {
+        const severity = incident.severity || 'info';
+        const duration = Number(incident.duration?.replace('m', '') || 0);
+        acc[severity] = (acc[severity] || 0) + duration;
+        return acc;
+      }, {});
+
+      const normalizedDowntimeBreakdown = Object.entries(downtimeBySeverity).map(([name, value]) => ({
+        name,
+        value
+      }));
+
+      const totalDowntime = normalizedHistory.reduce((sum, entry) => sum + entry.downtime, 0);
+      const averageResponseTime = uptimeData.averageResponseTime || 0;
+      const lastIncident = normalizedIncidents[0]?.date || null;
+
+      setUptimeMetrics({
+        uptime24h: Number(slaData.uptime24h ?? uptimeData.uptime ?? 100),
+        uptime7d: Number(slaData.uptime7d ?? uptimeData.uptime ?? 100),
+        uptime30d: Number(slaData.uptime30d ?? uptimeData.uptime ?? 100),
+        uptime90d: Number(uptimeData.uptime ?? slaData.uptime30d ?? 100),
+        totalDowntime30d: totalDowntime,
+        incidents30d: normalizedIncidents.length,
+        averageResponseTime,
+        lastIncident
+      });
+      setSlaStatus(slaData || null);
+      setUptimeHistory(normalizedHistory);
+      setDowntimeBreakdown(normalizedDowntimeBreakdown);
+      setIncidentHistory(normalizedIncidents);
     } catch (error) {
       console.error('Failed to fetch uptime data:', error);
       setError('Failed to load uptime data');
@@ -231,7 +292,7 @@ export default function UptimeDashboardPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={mockUptimeHistory}>
+                <LineChart data={uptimeHistory}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis domain={[99.5, 100.1]} />
@@ -255,7 +316,7 @@ export default function UptimeDashboardPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={mockDowntimeBreakdown}
+                      data={downtimeBreakdown}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
@@ -264,7 +325,7 @@ export default function UptimeDashboardPage() {
                       fill="#8884d8"
                       dataKey="value"
                     >
-                      {mockDowntimeBreakdown.map((entry, index) => (
+                      {downtimeBreakdown.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                       ))}
                     </Pie>
@@ -297,7 +358,7 @@ export default function UptimeDashboardPage() {
                   <div className="p-3 bg-muted rounded">
                     <p className="text-sm text-muted-foreground">Last Incident</p>
                     <p className="text-sm font-semibold">
-                      {new Date(uptimeMetrics.lastIncident).toLocaleString()}
+                      {uptimeMetrics.lastIncident ? new Date(uptimeMetrics.lastIncident).toLocaleString() : 'No incidents'}
                     </p>
                   </div>
                 </div>
@@ -312,7 +373,11 @@ export default function UptimeDashboardPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={mockMonthlyData}>
+                <BarChart data={uptimeHistory.map((entry) => ({
+                  month: new Date(entry.date).toLocaleString('default', { month: 'short' }),
+                  uptime: Number(entry.uptime30d || 0),
+                  downtime: Number(entry.downtime || 0)
+                }))}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis yAxisId="left" domain={[99, 100]} />
@@ -333,11 +398,11 @@ export default function UptimeDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockIncidentHistory.map((incident, idx) => (
+                {incidentHistory.map((incident, idx) => (
                   <div key={idx} className="flex justify-between items-start p-3 border rounded-lg">
                     <div className="flex-1">
                       <p className="font-semibold">{incident.incident}</p>
-                      <p className="text-sm text-muted-foreground">{incident.date}</p>
+                      <p className="text-sm text-muted-foreground">{new Date(incident.date).toLocaleString()}</p>
                     </div>
                     <div className="flex gap-2 items-center">
                       <span className="text-sm text-muted-foreground">{incident.duration}</span>

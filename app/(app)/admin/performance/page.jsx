@@ -1,28 +1,48 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import realtimeService from '@/lib/realtime-service';
-import { TrendingUp, TrendingDown, Activity, Zap } from 'lucide-react';
+import apiClient from '@/lib/api-client';
+import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
 
 export default function PerformancePage() {
   const [metrics, setMetrics] = useState(null);
   const [cpuData, setCpuData] = useState([]);
   const [memoryData, setMemoryData] = useState([]);
   const [latencyData, setLatencyData] = useState([]);
+  const [serviceHealth, setServiceHealth] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const toNumber = (value, fallback = 0) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value.replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    if (value && typeof value === 'object') {
+      const nested = value.avg ?? value.value ?? value.current;
+      return toNumber(nested, fallback);
+    }
+    return fallback;
+  };
+
+  const normalizeRealtimePoint = (point, field) => {
+    if (point && typeof point === 'object') return point;
+    return { time: new Date().toLocaleTimeString(), [field]: toNumber(point) };
+  };
 
   useEffect(() => {
     fetchMetrics();
 
     const handleMetricUpdate = (data) => {
-      setMetrics(data);
-      if (data.cpu) setCpuData(prev => [...prev.slice(-59), data.cpu]);
-      if (data.memory) setMemoryData(prev => [...prev.slice(-59), data.memory]);
-      if (data.latency) setLatencyData(prev => [...prev.slice(-59), data.latency]);
+      setMetrics((prev) => ({ ...(prev || {}), ...(data || {}) }));
+      if (data?.cpu != null) setCpuData(prev => [...prev.slice(-59), normalizeRealtimePoint(data.cpu, 'cpu')]);
+      if (data?.memory != null) setMemoryData(prev => [...prev.slice(-59), normalizeRealtimePoint(data.memory, 'memory')]);
+      if (data?.latency != null) setLatencyData(prev => [...prev.slice(-59), normalizeRealtimePoint(data.latency, 'p95')]);
     };
 
     realtimeService.subscribeToMetrics(null, handleMetricUpdate);
@@ -35,19 +55,60 @@ export default function PerformancePage() {
   const fetchMetrics = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/metrics/performance', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch metrics');
-      const data = await response.json();
-      setMetrics(data);
-      setCpuData(data.cpuHistory || []);
-      setMemoryData(data.memoryHistory || []);
-      setLatencyData(data.latencyHistory || []);
+      const [historyResponse, overviewResponse, projectsResponse] = await Promise.all([
+        apiClient.getAnalyticsHistory({ days: 1 }),
+        apiClient.getAnalyticsOverview(),
+        apiClient.getProjects()
+      ]);
+
+      const history = historyResponse?.data || historyResponse || [];
+      const overview = overviewResponse?.data || overviewResponse || {};
+      const projects = Array.isArray(projectsResponse) ? projectsResponse : projectsResponse?.data || [];
+
+      const normalizedHistory = history.map((item, index) => ({
+        time: item.date || `${index}`,
+        cpu: toNumber(item.cpuUsage),
+        memory: toNumber(item.memoryUsage),
+        p50: toNumber(item.p50ResponseTime ?? item.avgResponseTime ?? item.responseTime),
+        p95: toNumber(item.p95ResponseTime ?? item.p95),
+        p99: Math.max(toNumber(item.p99ResponseTime ?? item.p99), toNumber(item.p95ResponseTime ?? item.avgResponseTime ?? item.responseTime))
+      }));
+
+      setMetrics(overview);
+      setCpuData(normalizedHistory.map(item => ({ time: item.time, cpu: item.cpu, threshold: 80 })));
+      setMemoryData(normalizedHistory.map(item => ({ time: item.time, memory: item.memory })));
+      setLatencyData(normalizedHistory.map(item => ({ time: item.time, p50: item.p50, p95: item.p95, p99: item.p99 })));
+
+      if (projects.length > 0) {
+        const healthResults = await Promise.all(
+          projects.slice(0, 5).map(async (project) => {
+            try {
+              const health = await apiClient.getServiceHealth(project._id || project.id);
+              return {
+                service: project.name,
+                status: health?.status || 'unknown',
+                uptime: `${toNumber(health?.statusCode || health?.uptime).toFixed(2)}%`
+              };
+            } catch {
+              return {
+                service: project.name,
+                status: 'unknown',
+                uptime: 'N/A'
+              };
+            }
+          })
+        );
+        setServiceHealth(healthResults);
+      } else {
+        setServiceHealth([]);
+      }
     } catch (error) {
       console.error('Error fetching metrics:', error);
+      setMetrics({});
+      setCpuData([]);
+      setMemoryData([]);
+      setLatencyData([]);
+      setServiceHealth([]);
     } finally {
       setLoading(false);
     }
@@ -55,23 +116,15 @@ export default function PerformancePage() {
 
   if (loading) return <div className="p-8">Loading performance metrics...</div>;
 
-  const mockCpuData = cpuData.length === 0 ? Array.from({ length: 60 }, (_, i) => ({
-    time: `${i}m`,
-    cpu: 30 + Math.random() * 40,
-    threshold: 80
-  })) : cpuData;
+  const avg = (values) => {
+    if (!values.length) return 0;
+    return values.reduce((sum, item) => sum + item, 0) / values.length;
+  };
 
-  const mockMemoryData = memoryData.length === 0 ? Array.from({ length: 60 }, (_, i) => ({
-    time: `${i}m`,
-    memory: 40 + Math.random() * 30
-  })) : memoryData;
-
-  const mockLatencyData = latencyData.length === 0 ? Array.from({ length: 60 }, (_, i) => ({
-    time: `${i}m`,
-    p50: 45 + Math.random() * 10,
-    p95: 80 + Math.random() * 30,
-    p99: 120 + Math.random() * 80
-  })) : latencyData;
+  const avgCpu = avg(cpuData.map(item => Number(item.cpu || 0))).toFixed(1);
+  const avgMemory = avg(memoryData.map(item => Number(item.memory || 0))).toFixed(1);
+  const latestLatency = toNumber(latencyData[latencyData.length - 1]?.p95 || metrics?.p95ResponseTime || metrics?.avgResponseTime || 0);
+  const errorRate = toNumber(metrics?.errorRate || metrics?.avgErrorRate || 0).toFixed(2);
 
   return (
     <div className="space-y-6 p-6">
@@ -88,10 +141,10 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <p className="text-3xl font-bold">45%</p>
+              <p className="text-3xl font-bold">{avgCpu}%</p>
               <TrendingDown className="w-5 h-5 text-green-600" />
             </div>
-            <p className="text-xs text-gray-600 mt-2">↓ 5% from last hour</p>
+            <p className="text-xs text-gray-600 mt-2">Derived from recent analytics history</p>
           </CardContent>
         </Card>
 
@@ -101,10 +154,10 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <p className="text-3xl font-bold">62%</p>
+              <p className="text-3xl font-bold">{avgMemory}%</p>
               <TrendingUp className="w-5 h-5 text-orange-600" />
             </div>
-            <p className="text-xs text-gray-600 mt-2">↑ 3% from last hour</p>
+            <p className="text-xs text-gray-600 mt-2">Based on collected memory samples</p>
           </CardContent>
         </Card>
 
@@ -114,10 +167,10 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <p className="text-3xl font-bold">125ms</p>
+              <p className="text-3xl font-bold">{latestLatency}ms</p>
               <TrendingDown className="w-5 h-5 text-green-600" />
             </div>
-            <p className="text-xs text-gray-600 mt-2">Target: 150ms ✓</p>
+            <p className="text-xs text-gray-600 mt-2">Current P95 latency from backend analytics</p>
           </CardContent>
         </Card>
 
@@ -127,10 +180,10 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <p className="text-3xl font-bold">0.02%</p>
+              <p className="text-3xl font-bold">{errorRate}%</p>
               <Badge className="bg-green-600">Healthy</Badge>
             </div>
-            <p className="text-xs text-gray-600 mt-2">Target: &lt;0.1% ✓</p>
+            <p className="text-xs text-gray-600 mt-2">Latest aggregated error ratio</p>
           </CardContent>
         </Card>
       </div>
@@ -144,7 +197,7 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={mockCpuData}>
+              <AreaChart data={cpuData}>
                 <defs>
                   <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
@@ -159,6 +212,7 @@ export default function PerformancePage() {
                 <Line type="monotone" dataKey="threshold" stroke="#ef4444" strokeDasharray="5 5" />
               </AreaChart>
             </ResponsiveContainer>
+            {cpuData.length === 0 && <p className="text-xs text-gray-600 mt-2">No CPU samples available.</p>}
           </CardContent>
         </Card>
 
@@ -169,7 +223,7 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={mockMemoryData}>
+              <AreaChart data={memoryData}>
                 <defs>
                   <linearGradient id="colorMemory" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
@@ -183,6 +237,7 @@ export default function PerformancePage() {
                 <Area type="monotone" dataKey="memory" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorMemory)" />
               </AreaChart>
             </ResponsiveContainer>
+            {memoryData.length === 0 && <p className="text-xs text-gray-600 mt-2">No memory samples available.</p>}
           </CardContent>
         </Card>
       </div>
@@ -194,7 +249,7 @@ export default function PerformancePage() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={mockLatencyData}>
+            <LineChart data={latencyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="time" />
               <YAxis />
@@ -205,6 +260,7 @@ export default function PerformancePage() {
               <Line type="monotone" dataKey="p99" stroke="#ef4444" name="P99" />
             </LineChart>
           </ResponsiveContainer>
+          {latencyData.length === 0 && <p className="text-xs text-gray-600 mt-2">No latency samples available.</p>}
         </CardContent>
       </Card>
 
@@ -215,20 +271,16 @@ export default function PerformancePage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {[
-              { service: 'API Server', status: 'healthy', uptime: '99.98%' },
-              { service: 'Database', status: 'healthy', uptime: '99.99%' },
-              { service: 'Cache (Redis)', status: 'healthy', uptime: '99.97%' },
-              { service: 'Message Queue', status: 'healthy', uptime: '99.98%' },
-              { service: 'Search Engine', status: 'healthy', uptime: '99.95%' }
-            ].map((item, idx) => (
+            {serviceHealth.length === 0 ? (
+              <p className="text-sm text-gray-600">No service health data available.</p>
+            ) : serviceHealth.map((item, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                 <div className="flex items-center gap-3">
                   <Activity className="w-4 h-4 text-green-600" />
                   <p className="font-semibold text-sm">{item.service}</p>
                 </div>
                 <div className="text-right">
-                  <Badge variant="default" className="bg-green-600">Online</Badge>
+                  <Badge variant="default" className={item.status === 'healthy' ? 'bg-green-600' : 'bg-gray-600'}>{item.status}</Badge>
                   <p className="text-xs text-gray-600 mt-1">{item.uptime}</p>
                 </div>
               </div>

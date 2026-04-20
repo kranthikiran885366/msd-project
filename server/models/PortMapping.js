@@ -12,8 +12,9 @@ const PortMappingSchema = new mongoose.Schema({
         type: Number,
         required: true,
         unique: true,
-        min: 3001,
-        max: 4000
+        // Range enforced at service layer via env PORT_RANGE_START/END
+        min: 1024,
+        max: 65535
     },
     subdomain: {
         type: String,

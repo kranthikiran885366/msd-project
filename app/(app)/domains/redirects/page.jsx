@@ -13,6 +13,7 @@ import apiClient from '@/lib/api-client';
 
 export default function DomainRedirectsPage() {
   const [domains, setDomains] = useState([]);
+  const [projectId, setProjectId] = useState('');
   const [selectedDomain, setSelectedDomain] = useState('');
   const [redirects, setRedirects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,104 +30,71 @@ export default function DomainRedirectsPage() {
     enabled: true
   });
 
-  // Mock redirect data
-  const mockRedirects = [
-    {
-      id: 1,
-      domain: 'old-domain.com',
-      sourceUrl: '/old-page',
-      destinationUrl: 'https://new-domain.com/new-page',
-      redirectType: '301',
-      enabled: true,
-      hits: 1250,
-      lastHit: '2024-12-20T14:32:00Z',
-      created: '2024-01-15T10:00:00Z'
-    },
-    {
-      id: 2,
-      domain: 'old-domain.com',
-      sourceUrl: '/about',
-      destinationUrl: 'https://new-domain.com/company/about',
-      redirectType: '301',
-      enabled: true,
-      hits: 450,
-      lastHit: '2024-12-20T12:15:00Z',
-      created: '2024-01-20T14:30:00Z'
-    },
-    {
-      id: 3,
-      domain: 'legacy.example.com',
-      sourceUrl: '/',
-      destinationUrl: 'https://example.com',
-      redirectType: '301',
-      enabled: true,
-      hits: 5200,
-      lastHit: '2024-12-20T15:45:00Z',
-      created: '2023-06-10T08:45:00Z'
-    },
-    {
-      id: 4,
-      domain: 'staging.example.com',
-      sourceUrl: '/api/*',
-      destinationUrl: 'https://api.example.com',
-      redirectType: '307',
-      enabled: false,
-      hits: 0,
-      lastHit: null,
-      created: '2024-03-05T11:20:00Z'
-    },
-    {
-      id: 5,
-      domain: 'example.com',
-      sourceUrl: '/blog/*',
-      destinationUrl: 'https://blog.example.com',
-      redirectType: '302',
-      enabled: true,
-      hits: 850,
-      lastHit: '2024-12-20T13:22:00Z',
-      created: '2024-02-28T09:15:00Z'
-    },
-    {
-      id: 6,
-      domain: 'example.com',
-      sourceUrl: '/images/*',
-      destinationUrl: 'https://cdn.example.com/images',
-      redirectType: '301',
-      enabled: true,
-      hits: 12500,
-      lastHit: '2024-12-20T15:59:00Z',
-      created: '2023-11-12T16:40:00Z'
-    }
-  ];
-
   const fetchDomains = useCallback(async () => {
     try {
+      setLoading(true);
       setError('');
-      const response = await apiClient.getDomains();
-      if (response.success) {
-        setDomains(response.data || []);
-        if (response.data?.length > 0 && !selectedDomain) {
-          setSelectedDomain(response.data[0].id);
-        }
-      } else {
-        setError(response.error || 'Failed to fetch domains');
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const activeProjectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+
+      if (!activeProjectId) {
+        setDomains([]);
+        setRedirects([]);
+        setError('Please select a project first');
+        return;
       }
+
+      setProjectId(activeProjectId);
+      const response = await apiClient.getDomains(activeProjectId);
+      const domainList = Array.isArray(response) ? response : response?.data || [];
+      const normalizedDomains = domainList.map((domain) => ({
+        ...domain,
+        id: domain._id || domain.id,
+        name: domain.host || domain.name
+      }));
+
+      setDomains(normalizedDomains);
+      setSelectedDomain((prev) => prev || normalizedDomains[0]?.id || '');
     } catch (err) {
       setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
     }
-  }, [selectedDomain]);
+  }, []);
+
+  const fetchRedirects = useCallback(async (domainId) => {
+    if (!domainId) {
+      setRedirects([]);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      const response = await apiClient.getDomainRedirects({ domainId });
+      const redirectList = response?.data || [];
+      const normalizedRedirects = redirectList.map((redirect) => ({
+        ...redirect,
+        id: redirect._id || redirect.id,
+        created: redirect.createdAt || redirect.created
+      }));
+      setRedirects(normalizedRedirects);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch redirects');
+      setRedirects([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchDomains();
   }, []);
 
   useEffect(() => {
-    if (selectedDomain) {
-      const domainName = domains.find(d => d.id === selectedDomain)?.name;
-      setRedirects(mockRedirects.filter(r => r.domain === domainName));
-    }
-    setLoading(false);
-  }, [selectedDomain, domains]);
+    fetchRedirects(selectedDomain);
+  }, [selectedDomain, fetchRedirects]);
 
   const handleInputChange = (field, value) => {
     setFormData({...formData, [field]: value});
@@ -140,31 +108,19 @@ export default function DomainRedirectsPage() {
 
     try {
       setError('');
-      const domainName = domains.find(d => d.id === selectedDomain)?.name;
-
       if (editingId) {
-        // Update
         const response = await apiClient.updateDomainRedirect(editingId, formData);
         if (response.success) {
-          setRedirects(redirects.map(r => r.id === editingId ? {...r, ...formData} : r));
+          await fetchRedirects(selectedDomain);
           setSuccessMessage('Redirect updated successfully');
           setEditingId(null);
         } else {
           setError(response.error || 'Failed to update redirect');
         }
       } else {
-        // Create
         const response = await apiClient.addDomainRedirect(selectedDomain, formData);
         if (response.success) {
-          const newRedirect = {
-            id: redirects.length + 1,
-            domain: domainName,
-            ...formData,
-            hits: 0,
-            lastHit: null,
-            created: new Date().toISOString()
-          };
-          setRedirects([...redirects, newRedirect]);
+          await fetchRedirects(selectedDomain);
           setSuccessMessage('Redirect created successfully');
         } else {
           setError(response.error || 'Failed to create redirect');
@@ -185,7 +141,7 @@ export default function DomainRedirectsPage() {
       const response = await apiClient.deleteDomainRedirect(redirectId);
 
       if (response.success) {
-        setRedirects(redirects.filter(r => r.id !== redirectId));
+        await fetchRedirects(selectedDomain);
         setSuccessMessage('Redirect deleted successfully');
         setDeleteConfirm(null);
         setTimeout(() => setSuccessMessage(''), 3000);
@@ -270,7 +226,9 @@ export default function DomainRedirectsPage() {
             value={selectedDomain}
             onChange={(e) => setSelectedDomain(e.target.value)}
             className="w-full h-10 rounded-md border border-input bg-background px-3 py-2"
+            disabled={!projectId || domains.length === 0}
           >
+            {domains.length === 0 && <option value="">No domains available</option>}
             {domains.map(d => (
               <option key={d.id} value={d.id}>
                 {d.name}
@@ -305,7 +263,7 @@ export default function DomainRedirectsPage() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Total Hits</p>
               <p className="text-3xl font-bold">
-                {redirects.reduce((sum, r) => sum + r.hits, 0).toLocaleString()}
+                {redirects.reduce((sum, r) => sum + (r.hits || 0), 0).toLocaleString()}
               </p>
             </div>
           </CardContent>
@@ -315,7 +273,7 @@ export default function DomainRedirectsPage() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Avg Hits/Day</p>
               <p className="text-3xl font-bold">
-                {Math.round(redirects.reduce((sum, r) => sum + r.hits, 0) / (redirects.length || 1))}
+                {Math.round(redirects.reduce((sum, r) => sum + (r.hits || 0), 0) / (redirects.length || 1))}
               </p>
             </div>
           </CardContent>
@@ -422,7 +380,7 @@ export default function DomainRedirectsPage() {
                 <div className="grid grid-cols-3 gap-4 p-3 bg-muted rounded text-sm">
                   <div>
                     <p className="text-muted-foreground">Total Hits</p>
-                    <p className="font-semibold text-lg">{redirect.hits.toLocaleString()}</p>
+                    <p className="font-semibold text-lg">{(redirect.hits || 0).toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Last Hit</p>
@@ -435,7 +393,7 @@ export default function DomainRedirectsPage() {
                   <div>
                     <p className="text-muted-foreground">Created</p>
                     <p className="font-semibold">
-                      {new Date(redirect.created).toLocaleDateString()}
+                      {new Date(redirect.created || Date.now()).toLocaleDateString()}
                     </p>
                   </div>
                 </div>

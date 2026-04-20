@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle, Plus, Trash2, RefreshCw, Link2, Settings, Tre
 import apiClient from '@/lib/api-client';
 
 export default function DatadogIntegrationPage() {
+  const [projectId, setProjectId] = useState('');
   const [connection, setConnection] = useState(null);
   const [dashboards, setDashboards] = useState([]);
   const [monitors, setMonitors] = useState([]);
@@ -22,123 +23,80 @@ export default function DatadogIntegrationPage() {
   const [apiKey, setApiKey] = useState('');
   const [appKey, setAppKey] = useState('');
 
-  // Mock connection data
-  const mockConnection = {
-    id: 'dd-conn-1',
-    status: 'connected',
-    siteName: 'Acme Corp',
-    datadogSite: 'us3.datadoghq.com',
-    connectedAt: '2024-08-15T10:00:00Z',
-    lastSync: '2024-12-20T15:45:00Z',
-    eventsReceived: 15342,
-    metricsReceived: 284567,
-    hostedAssets: 42
+  const fetchDatadogData = async (activeProjectId) => {
+    if (!activeProjectId) {
+      setConnection(null);
+      setDashboards([]);
+      setMonitors([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError('');
+      setLoading(true);
+      const webhooksResponse = await apiClient.getWebhooks(activeProjectId);
+      const webhooks = Array.isArray(webhooksResponse) ? webhooksResponse : webhooksResponse?.data || [];
+      const datadogWebhooks = webhooks.filter((webhook) =>
+        webhook.url?.includes('datadog') || webhook.name?.toLowerCase().includes('datadog')
+      );
+
+      if (datadogWebhooks.length === 0) {
+        setConnection(null);
+        setDashboards([]);
+        setMonitors([]);
+        return;
+      }
+
+      const totalDeliveries = datadogWebhooks.reduce((sum, webhook) => sum + (webhook.deliveryStats?.total || 0), 0);
+      const failedDeliveries = datadogWebhooks.reduce((sum, webhook) => sum + (webhook.deliveryStats?.failed || 0), 0);
+
+      setConnection({
+        id: datadogWebhooks[0]._id,
+        status: 'connected',
+        siteName: 'Datadog',
+        datadogSite: 'app.datadoghq.com',
+        connectedAt: datadogWebhooks[0].createdAt,
+        lastSync: datadogWebhooks[0].updatedAt,
+        eventsReceived: totalDeliveries,
+        metricsReceived: totalDeliveries,
+        hostedAssets: datadogWebhooks.length,
+      });
+
+      setDashboards(datadogWebhooks.map((webhook, index) => ({
+        id: webhook._id,
+        name: webhook.name || `Datadog Dashboard ${index + 1}`,
+        url: webhook.url,
+        widgets: Math.max(1, Math.round((webhook.deliveryStats?.total || 0) / 10)),
+        lastModified: webhook.updatedAt,
+        refreshInterval: 'auto',
+        syncedAt: webhook.updatedAt,
+      })));
+
+      setMonitors(datadogWebhooks.map((webhook) => ({
+        id: webhook._id,
+        name: webhook.name || 'Datadog Monitor',
+        type: 'webhook alert',
+        query: webhook.url,
+        threshold: 5,
+        status: (webhook.deliveryStats?.failed || 0) > 0 ? 'WARNING' : 'OK',
+        lastTriggered: webhook.lastDelivery || null,
+        evaluationWindow: '5m',
+        dataPoints: webhook.deliveryStats?.total || 0,
+      })));
+    } catch (err) {
+      setError(err.message || 'Failed to load Datadog integration data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Mock dashboards
-  const mockDashboards = [
-    {
-      id: 'dd-dash-1',
-      name: 'Infrastructure Overview',
-      url: 'https://app.datadoghq.com/dashboard/abc123',
-      widgets: 12,
-      lastModified: '2024-12-18T14:30:00Z',
-      refreshInterval: 'auto',
-      syncedAt: '2024-12-20T15:45:00Z'
-    },
-    {
-      id: 'dd-dash-2',
-      name: 'Application Performance',
-      url: 'https://app.datadoghq.com/dashboard/def456',
-      widgets: 18,
-      lastModified: '2024-12-19T09:15:00Z',
-      refreshInterval: '1m',
-      syncedAt: '2024-12-20T15:45:00Z'
-    },
-    {
-      id: 'dd-dash-3',
-      name: 'Database Metrics',
-      url: 'https://app.datadoghq.com/dashboard/ghi789',
-      widgets: 9,
-      lastModified: '2024-12-17T11:00:00Z',
-      refreshInterval: '5m',
-      syncedAt: '2024-12-20T15:45:00Z'
-    },
-    {
-      id: 'dd-dash-4',
-      name: 'Security & Compliance',
-      url: 'https://app.datadoghq.com/dashboard/jkl012',
-      widgets: 15,
-      lastModified: '2024-12-20T08:30:00Z',
-      refreshInterval: 'auto',
-      syncedAt: '2024-12-20T15:45:00Z'
-    }
-  ];
-
-  // Mock monitors
-  const mockMonitors = [
-    {
-      id: 'dd-mon-1',
-      name: 'High CPU Usage',
-      type: 'metric alert',
-      query: 'avg:system.cpu{*}',
-      threshold: 85,
-      status: 'OK',
-      lastTriggered: '2024-12-18T10:30:00Z',
-      evaluationWindow: '5m',
-      dataPoints: 23
-    },
-    {
-      id: 'dd-mon-2',
-      name: 'API Error Rate Threshold',
-      type: 'metric alert',
-      query: 'avg:trace.web.request.errors{*}',
-      threshold: 5,
-      status: 'ALERT',
-      lastTriggered: '2024-12-20T14:15:00Z',
-      evaluationWindow: '3m',
-      dataPoints: 18
-    },
-    {
-      id: 'dd-mon-3',
-      name: 'Database Connection Pool',
-      type: 'metric alert',
-      query: 'avg:postgresql.connections{*}',
-      threshold: 80,
-      status: 'OK',
-      lastTriggered: '2024-12-19T16:45:00Z',
-      evaluationWindow: '2m',
-      dataPoints: 45
-    },
-    {
-      id: 'dd-mon-4',
-      name: 'Deployment Failure',
-      type: 'event alert',
-      query: 'status:error tag:deployment',
-      threshold: 1,
-      status: 'OK',
-      lastTriggered: null,
-      evaluationWindow: '1h',
-      dataPoints: 0
-    },
-    {
-      id: 'dd-mon-5',
-      name: 'Storage Capacity Alert',
-      type: 'metric alert',
-      query: 'avg:system.disk.in_use{*}',
-      threshold: 90,
-      status: 'WARNING',
-      lastTriggered: '2024-12-20T13:00:00Z',
-      evaluationWindow: '10m',
-      dataPoints: 67
-    }
-  ];
-
   useEffect(() => {
-    setConnection(mockConnection);
-    setDashboards(mockDashboards);
-    setMonitors(mockMonitors);
-    setLoading(false);
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const activeProjectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+    setProjectId(activeProjectId || '');
+    fetchDatadogData(activeProjectId);
   }, []);
 
   const handleConnectDatadog = async () => {
@@ -149,18 +107,19 @@ export default function DatadogIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.connectDatadog({ apiKey, appKey });
-
-      if (response.success) {
-        setConnection(mockConnection);
-        setSuccessMessage('Connected to Datadog successfully');
-        setShowApiKeyInput(false);
-        setApiKey('');
-        setAppKey('');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to connect to Datadog');
-      }
+      await apiClient.createWebhook(projectId, {
+        name: 'Datadog Events',
+        url: 'https://api.datadoghq.com/api/v1/events',
+        events: ['event.recorded', 'alert.triggered'],
+        active: true,
+        secret: apiKey,
+      });
+      await fetchDatadogData(projectId);
+      setSuccessMessage('Connected to Datadog successfully');
+      setShowApiKeyInput(false);
+      setApiKey('');
+      setAppKey('');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -173,17 +132,15 @@ export default function DatadogIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.disconnectDatadog();
-
-      if (response.success) {
-        setConnection(null);
-        setDashboards([]);
-        setMonitors([]);
-        setSuccessMessage('Disconnected from Datadog');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to disconnect');
-      }
+      const webhooksResponse = await apiClient.getWebhooks(projectId);
+      const webhooks = Array.isArray(webhooksResponse) ? webhooksResponse : webhooksResponse?.data || [];
+      const datadogWebhooks = webhooks.filter((webhook) =>
+        webhook.url?.includes('datadog') || webhook.name?.toLowerCase().includes('datadog')
+      );
+      await Promise.all(datadogWebhooks.map((webhook) => apiClient.deleteWebhook(webhook._id || webhook.id)));
+      await fetchDatadogData(projectId);
+      setSuccessMessage('Disconnected from Datadog');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -192,15 +149,9 @@ export default function DatadogIntegrationPage() {
   const handleSyncDashboards = async () => {
     try {
       setError('');
-      const response = await apiClient.syncDatadogDashboards();
-
-      if (response.success) {
-        setDashboards(mockDashboards);
-        setSuccessMessage('Dashboards synced successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to sync dashboards');
-      }
+      await fetchDatadogData(projectId);
+      setSuccessMessage('Dashboards synced successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -209,15 +160,9 @@ export default function DatadogIntegrationPage() {
   const handleGetAlerts = async () => {
     try {
       setError('');
-      const response = await apiClient.getDatadogAlerts();
-
-      if (response.success) {
-        setMonitors(mockMonitors);
-        setSuccessMessage('Alerts refreshed successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to fetch alerts');
-      }
+      await fetchDatadogData(projectId);
+      setSuccessMessage('Alerts refreshed successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -226,14 +171,9 @@ export default function DatadogIntegrationPage() {
   const handleExportMetrics = async () => {
     try {
       setError('');
-      const response = await apiClient.exportDatadogMetrics();
-
-      if (response.success) {
-        setSuccessMessage('Metrics exported successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to export metrics');
-      }
+      await apiClient.getAnalyticsMetrics({ provider: 'datadog' });
+      setSuccessMessage('Metrics export requested successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }

@@ -12,6 +12,8 @@ import apiClient from '@/lib/api-client';
 
 export default function SSLCertificatesPage() {
   const [certificates, setCertificates] = useState([]);
+  const [domains, setDomains] = useState([]);
+  const [selectedDomainId, setSelectedDomainId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -26,74 +28,78 @@ export default function SSLCertificatesPage() {
     chainFile: null,
     name: ''
   });
+  const selectedDomain = domains.find((domain) => domain.id === selectedDomainId);
 
-  // Mock certificates data
-  const mockCertificates = [
-    {
-      id: 1,
-      domain: 'api.example.com',
-      name: 'Production API Certificate',
-      issuer: "Let's Encrypt",
-      status: 'active',
-      issuedAt: '2024-01-15',
-      expiresAt: '2025-01-15',
-      daysUntilExpiry: 320,
-      fingerprint: 'A1:B2:C3:D4:E5:F6:G7:H8:I9:J0',
-      autoRenew: true,
-      certificateChain: 'ACME issued by R3'
-    },
-    {
-      id: 2,
-      domain: 'app.example.com',
-      name: 'Web Application Certificate',
-      issuer: "Let's Encrypt",
-      status: 'active',
-      issuedAt: '2024-02-01',
-      expiresAt: '2025-02-01',
-      daysUntilExpiry: 335,
-      fingerprint: 'F1:E2:D3:C4:B5:A6:G7:H8:I9:J0',
-      autoRenew: true,
-      certificateChain: 'ACME issued by R3'
-    },
-    {
-      id: 3,
-      domain: 'old.example.com',
-      name: 'Legacy Certificate',
-      issuer: 'DigiCert',
-      status: 'expiring_soon',
-      issuedAt: '2023-01-20',
-      expiresAt: '2025-01-20',
-      daysUntilExpiry: 45,
-      fingerprint: 'Z9:Y8:X7:W6:V5:U4:T3:S2:R1:Q0',
-      autoRenew: false,
-      certificateChain: 'DigiCert SHA2 Secure Server CA'
-    },
-    {
-      id: 4,
-      domain: 'staging.example.com',
-      name: 'Staging Certificate',
-      issuer: "Let's Encrypt",
-      status: 'active',
-      issuedAt: '2024-03-10',
-      expiresAt: '2025-03-10',
-      daysUntilExpiry: 360,
-      fingerprint: 'P1:O2:N3:M4:L5:K6:J7:I8:H9:G0',
-      autoRenew: true,
-      certificateChain: 'ACME issued by R3'
-    }
-  ];
+  const normalizeCertificate = useCallback((certificate) => {
+    const expiresAt = certificate.expiresAt ? new Date(certificate.expiresAt) : null;
+    const issuedAt = certificate.issuedAt ? new Date(certificate.issuedAt) : null;
+    const daysUntilExpiry = expiresAt
+      ? Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : 0;
 
-  const fetchCertificates = useCallback(async () => {
+    return {
+      ...certificate,
+      id: certificate._id || certificate.id,
+      issuedAt: issuedAt ? issuedAt.toISOString().split('T')[0] : '-',
+      expiresAt: expiresAt ? expiresAt.toISOString().split('T')[0] : '-',
+      daysUntilExpiry,
+      autoRenew: certificate.autoRenew ?? true
+    };
+  }, []);
+
+  const fetchDomains = useCallback(async () => {
     try {
       setError('');
-      // Mock API call
-      setCertificates(mockCertificates);
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+      if (!projectId) {
+        setError('Please select a project first');
+        setDomains([]);
+        setSelectedDomainId('');
+        setCertificates([]);
+        return;
+      }
+
+      const response = await apiClient.getDomains(projectId);
+      const domainList = Array.isArray(response) ? response : response?.data || [];
+      const normalizedDomains = domainList.map((domain) => ({
+        ...domain,
+        id: domain._id || domain.id,
+        name: domain.host || domain.name
+      }));
+
+      setDomains(normalizedDomains);
+      setSelectedDomainId((prev) => prev || normalizedDomains[0]?.id || '');
+    } catch (err) {
+      setError(err.message || 'Failed to fetch domains');
+    }
+  }, []);
+
+  const fetchCertificates = useCallback(async () => {
+    if (!selectedDomainId) {
+      setCertificates([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError('');
+      setLoading(true);
+      const response = await apiClient.getSSLCertificates({ domainId: selectedDomainId });
+      const certificateList = response?.data || [];
+      setCertificates(certificateList.map(normalizeCertificate));
     } catch (err) {
       setError(err.message || 'Failed to fetch certificates');
+      setCertificates([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [normalizeCertificate, selectedDomainId]);
+
+  useEffect(() => {
+    fetchDomains();
+  }, [fetchDomains]);
 
   useEffect(() => {
     fetchCertificates();
@@ -108,7 +114,7 @@ export default function SSLCertificatesPage() {
   };
 
   const handleUploadCertificate = async () => {
-    if (!formData.domainName || !formData.certFile || !formData.keyFile || !formData.name) {
+    if (!selectedDomainId || !formData.certFile || !formData.keyFile || !formData.name) {
       setError('Please fill in all required fields');
       return;
     }
@@ -119,7 +125,8 @@ export default function SSLCertificatesPage() {
 
       // Prepare form data
       const uploadData = new FormData();
-      uploadData.append('domain', formData.domainName);
+      uploadData.append('domainId', selectedDomainId);
+      uploadData.append('domain', formData.domainName || selectedDomain?.name || '');
       uploadData.append('name', formData.name);
       uploadData.append('certificate', formData.certFile);
       uploadData.append('key', formData.keyFile);
@@ -131,7 +138,7 @@ export default function SSLCertificatesPage() {
 
       if (response.success) {
         setSuccessMessage('Certificate uploaded successfully!');
-        setCertificates([...certificates, response.data]);
+        await fetchCertificates();
         setFormData({ domainName: '', certFile: null, keyFile: null, chainFile: null, name: '' });
         setShowUploadForm(false);
         setTimeout(() => setSuccessMessage(''), 3000);
@@ -151,7 +158,7 @@ export default function SSLCertificatesPage() {
       const response = await apiClient.deleteSSLCertificate(certId);
 
       if (response.success) {
-        setCertificates(certificates.filter(c => c.id !== certId));
+        await fetchCertificates();
         setSuccessMessage('Certificate deleted successfully');
         setDeleteConfirm(null);
         setTimeout(() => setSuccessMessage(''), 3000);
@@ -169,8 +176,7 @@ export default function SSLCertificatesPage() {
       const response = await apiClient.renewSSLCertificate(certId);
 
       if (response.success) {
-        const updated = certificates.map(c => c.id === certId ? {...c, ...response.data} : c);
-        setCertificates(updated);
+        await fetchCertificates();
         setSuccessMessage('Certificate renewal initiated');
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
@@ -232,6 +238,27 @@ export default function SSLCertificatesPage() {
         </Alert>
       )}
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Select Domain</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <select
+            value={selectedDomainId}
+            onChange={(e) => setSelectedDomainId(e.target.value)}
+            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2"
+            disabled={domains.length === 0}
+          >
+            {domains.length === 0 && <option value="">No domains available</option>}
+            {domains.map((domain) => (
+              <option key={domain.id} value={domain.id}>
+                {domain.name}
+              </option>
+            ))}
+          </select>
+        </CardContent>
+      </Card>
+
       {/* Upload Form */}
       {showUploadForm && (
         <Card>
@@ -254,7 +281,7 @@ export default function SSLCertificatesPage() {
               <Input
                 id="domainName"
                 placeholder="example.com"
-                value={formData.domainName}
+                value={formData.domainName || selectedDomain?.name || ''}
                 onChange={(e) => handleInputChange('domainName', e.target.value)}
               />
             </div>

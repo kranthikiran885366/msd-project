@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle, Plus, Trash2, RefreshCw, Settings, Copy, Lock
 import apiClient from '@/lib/api-client';
 
 export default function APIGatewayPage() {
+  const [projectId, setProjectId] = useState('');
   const [endpoints, setEndpoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -29,123 +30,67 @@ export default function APIGatewayPage() {
     cacheTTL: 300
   });
 
-  // Mock API Gateway Endpoints
-  const mockEndpoints = [
-    {
-      id: 'api-1',
-      name: 'User Service',
-      path: '/api/users',
-      targetUrl: 'https://users-service.internal:8080/v1/users',
+  const normalizeGatewayEndpoint = (webhook) => {
+    let parsedPath = '/';
+    try {
+      parsedPath = new URL(webhook.url).pathname || '/';
+    } catch (_) {}
+
+    const total = webhook.deliveryStats?.total || 0;
+    const perHour = total > 0 ? Math.max(1, Math.round(total / 24)) : 0;
+    const failureRate = webhook.deliveryStats?.failureRate || 0;
+
+    return {
+      id: webhook._id || webhook.id,
+      name: webhook.name || `Endpoint ${String(webhook._id || webhook.id).slice(-6)}`,
+      path: parsedPath,
+      targetUrl: webhook.url,
       method: 'ANY',
-      status: 'active',
-      rateLimit: 10000,
+      status: webhook.active ? 'active' : 'maintenance',
+      rateLimit: webhook.metadata?.rateLimit || 1000,
       rateLimitPeriod: 'hour',
-      authRequired: true,
-      authType: 'bearer',
-      caching: true,
-      cacheTTL: 600,
-      requestsPerSecond: 245,
-      maxRequestsPerSecond: 1000,
-      errorRate: 0.2,
-      avgLatency: 125,
-      maxLatency: 850,
-      uptime: 99.98,
-      createdAt: '2024-09-10T10:00:00Z',
-      lastModified: '2024-12-15T14:30:00Z'
-    },
-    {
-      id: 'api-2',
-      name: 'Product Catalog',
-      path: '/api/products',
-      targetUrl: 'https://products-service.internal:8080/v2/products',
-      method: 'ANY',
-      status: 'active',
-      rateLimit: 5000,
-      rateLimitPeriod: 'hour',
-      authRequired: true,
-      authType: 'bearer',
-      caching: true,
-      cacheTTL: 1800,
-      requestsPerSecond: 412,
-      maxRequestsPerSecond: 500,
-      errorRate: 0.1,
-      avgLatency: 215,
-      maxLatency: 1200,
-      uptime: 99.95,
-      createdAt: '2024-08-20T09:00:00Z',
-      lastModified: '2024-12-18T11:20:00Z'
-    },
-    {
-      id: 'api-3',
-      name: 'Analytics Events',
-      path: '/api/events',
-      targetUrl: 'https://analytics.internal:9000/collect',
-      method: 'POST',
-      status: 'active',
-      rateLimit: 50000,
-      rateLimitPeriod: 'hour',
-      authRequired: false,
-      authType: 'none',
-      caching: false,
-      cacheTTL: 0,
-      requestsPerSecond: 8932,
-      maxRequestsPerSecond: 50000,
-      errorRate: 0.05,
-      avgLatency: 45,
-      maxLatency: 250,
-      uptime: 99.99,
-      createdAt: '2024-07-15T08:00:00Z',
-      lastModified: '2024-12-19T09:45:00Z'
-    },
-    {
-      id: 'api-4',
-      name: 'Payment Gateway',
-      path: '/api/payments',
-      targetUrl: 'https://payments.internal:8443/v1/transactions',
-      method: 'POST',
-      status: 'active',
-      rateLimit: 1000,
-      rateLimitPeriod: 'hour',
-      authRequired: true,
-      authType: 'api-key',
-      caching: false,
-      cacheTTL: 0,
-      requestsPerSecond: 85,
-      maxRequestsPerSecond: 100,
-      errorRate: 0.3,
-      avgLatency: 450,
-      maxLatency: 2100,
-      uptime: 99.97,
-      createdAt: '2024-10-01T12:00:00Z',
-      lastModified: '2024-12-17T16:00:00Z'
-    },
-    {
-      id: 'api-5',
-      name: 'Legacy Auth',
-      path: '/api/auth-v1',
-      targetUrl: 'https://legacy-auth.internal:3000/auth',
-      method: 'ANY',
-      status: 'maintenance',
-      rateLimit: 500,
-      rateLimitPeriod: 'hour',
-      authRequired: true,
-      authType: 'basic',
-      caching: false,
-      cacheTTL: 0,
-      requestsPerSecond: 12,
-      maxRequestsPerSecond: 50,
-      errorRate: 1.5,
-      avgLatency: 680,
-      maxLatency: 3400,
-      uptime: 98.5,
-      createdAt: '2024-06-01T14:00:00Z',
-      lastModified: '2024-12-10T10:30:00Z'
+      authRequired: webhook.metadata?.authRequired ?? true,
+      authType: webhook.metadata?.authRequired ? 'bearer' : 'none',
+      caching: webhook.metadata?.caching || false,
+      cacheTTL: 300,
+      requestsPerSecond: perHour,
+      maxRequestsPerSecond: webhook.metadata?.rateLimit || 1000,
+      errorRate: Number(failureRate),
+      avgLatency: 0,
+      maxLatency: 0,
+      uptime: Number((100 - failureRate).toFixed(2)),
+      createdAt: webhook.createdAt,
+      lastModified: webhook.updatedAt
+    };
+  };
+
+  const fetchEndpoints = async (activeProjectId) => {
+    if (!activeProjectId) {
+      setEndpoints([]);
+      setLoading(false);
+      return;
     }
-  ];
+
+    try {
+      setError('');
+      setLoading(true);
+      const response = await apiClient.getWebhooks(activeProjectId);
+      const list = Array.isArray(response) ? response : response?.data || [];
+      setEndpoints(list.map(normalizeGatewayEndpoint));
+    } catch (err) {
+      setError(err.message || 'Failed to fetch endpoints');
+      setEndpoints([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setEndpoints(mockEndpoints);
-    setLoading(false);
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const activeProjectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+    setProjectId(activeProjectId || '');
+    fetchEndpoints(activeProjectId);
   }, []);
 
   const handleAddEndpoint = async () => {
@@ -156,31 +101,12 @@ export default function APIGatewayPage() {
 
     try {
       setError('');
-      const response = await apiClient.createGatewayEndpoint(formData);
-
-      if (response.success) {
-        const newEndpoint = {
-          id: `api-${endpoints.length + 1}`,
-          status: 'active',
-          requestsPerSecond: 0,
-          maxRequestsPerSecond: formData.rateLimit / 3600,
-          errorRate: 0,
-          avgLatency: 0,
-          maxLatency: 0,
-          uptime: 100,
-          createdAt: new Date().toISOString(),
-          lastModified: new Date().toISOString(),
-          authType: formData.authRequired ? 'bearer' : 'none',
-          ...formData
-        };
-        setEndpoints([...endpoints, newEndpoint]);
-        setSuccessMessage('API endpoint created successfully');
-        setFormData({ name: '', path: '', targetUrl: '', method: 'GET', rateLimit: 1000, rateLimitPeriod: 'hour', authRequired: true, caching: false, cacheTTL: 300 });
-        setShowForm(false);
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to create endpoint');
-      }
+      await apiClient.createGatewayEndpoint({ ...formData, projectId });
+      await fetchEndpoints(projectId);
+      setSuccessMessage('API endpoint created successfully');
+      setFormData({ name: '', path: '', targetUrl: '', method: 'GET', rateLimit: 1000, rateLimitPeriod: 'hour', authRequired: true, caching: false, cacheTTL: 300 });
+      setShowForm(false);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -193,15 +119,10 @@ export default function APIGatewayPage() {
 
     try {
       setError('');
-      const response = await apiClient.deleteGatewayEndpoint(endpointId);
-
-      if (response.success) {
-        setEndpoints(endpoints.filter(e => e.id !== endpointId));
-        setSuccessMessage('Endpoint deleted successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to delete endpoint');
-      }
+      await apiClient.deleteGatewayEndpoint(endpointId);
+      await fetchEndpoints(projectId);
+      setSuccessMessage('Endpoint deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -210,17 +131,10 @@ export default function APIGatewayPage() {
   const handleUpdateRateLimit = async (endpointId, newLimit) => {
     try {
       setError('');
-      const response = await apiClient.configureRateLimiting(endpointId, { rateLimit: newLimit });
-
-      if (response.success) {
-        setEndpoints(endpoints.map(e =>
-          e.id === endpointId ? {...e, rateLimit: newLimit, maxRequestsPerSecond: newLimit / 3600} : e
-        ));
-        setSuccessMessage('Rate limit updated successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to update rate limit');
-      }
+      await apiClient.configureRateLimiting(endpointId, { rateLimit: newLimit });
+      await fetchEndpoints(projectId);
+      setSuccessMessage('Rate limit updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -236,8 +150,12 @@ export default function APIGatewayPage() {
 
   const activeEndpoints = endpoints.filter(e => e.status === 'active').length;
   const totalRequests = endpoints.reduce((sum, e) => sum + e.requestsPerSecond, 0);
-  const avgErrorRate = (endpoints.reduce((sum, e) => sum + e.errorRate, 0) / endpoints.length).toFixed(2);
-  const avgLatency = Math.round(endpoints.reduce((sum, e) => sum + e.avgLatency, 0) / endpoints.length);
+  const avgErrorRate = endpoints.length > 0
+    ? (endpoints.reduce((sum, e) => sum + e.errorRate, 0) / endpoints.length).toFixed(2)
+    : '0.00';
+  const avgLatency = endpoints.length > 0
+    ? Math.round(endpoints.reduce((sum, e) => sum + e.avgLatency, 0) / endpoints.length)
+    : 0;
 
   return (
     <div className="p-6 space-y-6">

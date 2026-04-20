@@ -7,11 +7,30 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertCircle, TrendingUp, Users, Zap, Eye, ArrowRight } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import apiClient from '@/lib/api-client';
 
 export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const toNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
+  };
+
+  const normalizeUser = (user) => {
+    if (!user) return 'System';
+    if (typeof user === 'string') return user;
+    if (typeof user === 'object') return user.name || user.email || user._id || 'System';
+    return 'System';
+  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -20,18 +39,66 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const [overviewResponse, historyResponse, auditResponse, projectsResponse] = await Promise.all([
+        apiClient.getAnalyticsOverview(),
+        apiClient.getAnalyticsHistory({ days: 30 }),
+        apiClient.getAuditLogs({ limit: 20 }),
+        apiClient.getProjects()
+      ]);
+
+      const overview = overviewResponse?.data || overviewResponse || {};
+      const history = historyResponse?.data || historyResponse || [];
+      const auditLogs = auditResponse?.logs || [];
+      const projects = projectsResponse || [];
+
+      const chartData = history.slice(-6).map((item, index) => ({
+        month: item.date || `Point ${index + 1}`,
+        deployments: toNumber(item.deployments),
+        errors: toNumber(item.errors ?? item.failedDeployments ?? item.errorRate),
+        users: toNumber(item.activeUsers)
+      }));
+
+      const recentActions = auditLogs.map((log) => ({
+        id: log._id || log.id,
+        action: log.action || 'UNKNOWN_ACTION',
+        user: normalizeUser(log.userId),
+        time: log.createdAt || log.timestamp,
+        type: String(log.action || '').includes('DELETED') ? 'delete' : String(log.action || '').includes('UPDATED') ? 'modify' : 'create'
+      })).sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
+
+      const teamActivity = Object.values(
+        recentActions.reduce((acc, action) => {
+          const user = action.user || 'Unknown';
+          if (!acc[user]) {
+            acc[user] = { team: user, activityCount: 0, latestTime: action.time };
+          }
+          acc[user].activityCount += 1;
+          if (new Date(action.time || 0) > new Date(acc[user].latestTime || 0)) {
+            acc[user].latestTime = action.time;
+          }
+          return acc;
+        }, {})
+      ).slice(0, 3).map((item) => ({
+        team: item.team,
+        activity: `${item.activityCount} recent admin actions`,
+        time: formatDateTime(item.latestTime)
+      }));
+
+      setDashboardData({
+        stats: {
+          totalUsers: overview.activeUsers || 0,
+          activeDeployments: overview.inProgressDeployments || 0,
+          totalProjects: projects.length
+        },
+        systemMetrics: {
+          uptime: `${Number(overview.uptime || 0).toFixed(2)}%`,
+          errorRate: `${Number(overview.errorRate || 0).toFixed(2)}%`
+        },
+        chartData,
+        recentActions,
+        teamActivity
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
-      }
-      
-      const data = await response.json();
-      setDashboardData(data);
+      setError(null);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setError(error.message);
@@ -45,16 +112,6 @@ export default function AdminDashboard() {
     { title: 'API & SDKs', desc: 'Manage API keys and SDK documentation', href: '/admin/api', icon: '🔌' },
     { title: 'Team Management', desc: 'Manage users and permissions', href: '/admin/team', icon: '👥' },
     { title: 'Audit Logs', desc: 'View compliance and audit logs', href: '/admin/audit', icon: '📋' },
-  ];
-
-  // Mock chart data - this should come from API in real implementation
-  const chartData = [
-    { month: 'Jan', deployments: 45, errors: 2, users: 120 },
-    { month: 'Feb', deployments: 52, errors: 1, users: 135 },
-    { month: 'Mar', deployments: 48, errors: 3, users: 142 },
-    { month: 'Apr', deployments: 61, errors: 1, users: 158 },
-    { month: 'May', deployments: 55, errors: 2, users: 167 },
-    { month: 'Jun', deployments: 67, errors: 1, users: 184 },
   ];
 
   if (loading) {
@@ -80,7 +137,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const { stats, systemMetrics, recentDeployments } = dashboardData || {};
+  const { stats, systemMetrics, chartData = [], recentActions = [], teamActivity = [] } = dashboardData || {};
 
   return (
     <div className="space-y-8 p-6">
@@ -229,31 +286,19 @@ export default function AdminDashboard() {
               <CardTitle>System Alerts</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">High Memory Usage</p>
-                  <p className="text-xs text-gray-600">Storage service memory at 85%. Consider scaling up.</p>
-                </div>
-                <Button size="sm" variant="outline">Review</Button>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">Scheduled Maintenance</p>
-                  <p className="text-xs text-gray-600">Database backup scheduled for tonight at 2:00 AM UTC.</p>
-                </div>
-                <Button size="sm" variant="outline">Details</Button>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                <AlertCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">All Systems Healthy</p>
-                  <p className="text-xs text-gray-600">All services are operating within normal parameters.</p>
-                </div>
-              </div>
+              {recentActions.length === 0 ? (
+                <p className="text-sm text-gray-600">No recent alerts or actions available.</p>
+              ) : (
+                recentActions.slice(0, 3).map((action) => (
+                  <div key={action.id} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">{action.action}</p>
+                      <p className="text-xs text-gray-600">{action.user} • {formatDateTime(action.time)}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -311,14 +356,10 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[
-                  { action: 'Created new project', user: 'Sarah Chen', time: '2 hours ago', type: 'create' },
-                  { action: 'Modified API key permissions', user: 'Alex Rodriguez', time: '4 hours ago', type: 'modify' },
-                  { action: 'Added team member', user: 'Jordan Kim', time: '1 day ago', type: 'create' },
-                  { action: 'Deleted deprecated API key', user: 'Sarah Chen', time: '2 days ago', type: 'delete' },
-                  { action: 'Updated security policy', user: 'Admin', time: '3 days ago', type: 'modify' },
-                ].map((item, idx) => (
-                  <Card key={idx} className="border">
+                {recentActions.length === 0 ? (
+                  <p className="text-sm text-gray-600">No recent admin activity available.</p>
+                ) : recentActions.map((item) => (
+                  <Card key={item.id} className="border">
                     <CardContent className="pt-6">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -332,7 +373,7 @@ export default function AdminDashboard() {
                             </Badge>
                           </div>
                           <div className="mt-2 text-sm text-gray-600">
-                            <span className="font-semibold">{item.user}</span> {item.time}
+                            <span className="font-semibold">{item.user}</span> {formatDateTime(item.time)}
                           </div>
                         </div>
                         <Button size="sm" variant="outline">View Details</Button>
@@ -351,11 +392,9 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[
-                  { team: 'Platform Engineers', activity: 'Created 5 deployments', time: '2 hours ago' },
-                  { team: 'DevOps Team', activity: 'Updated 3 projects', time: '6 hours ago' },
-                  { team: 'Security Team', activity: 'Reviewed access logs', time: '1 day ago' },
-                ].map((item) => (
+                {teamActivity.length === 0 ? (
+                  <p className="text-sm text-gray-600">No team activity available.</p>
+                ) : teamActivity.map((item) => (
                   <div key={item.team} className="flex items-start justify-between p-3 border rounded">
                     <div>
                       <p className="font-semibold text-sm">{item.team}</p>

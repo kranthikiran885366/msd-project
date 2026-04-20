@@ -155,6 +155,11 @@ class GitIntegrationService {
     }
   }
 
+  // Backward-compatible aliases for older call sites.
+  _extractCommitInfo(provider, payload) {
+    return this.extractCommitInfo(provider, payload);
+  }
+
   isPreviewDeploy(provider, payload) {
     switch (provider) {
       case 'github':
@@ -168,14 +173,26 @@ class GitIntegrationService {
     }
   }
 
+  _isPreviewDeploy(provider, payload) {
+    return this.isPreviewDeploy(provider, payload);
+  }
+
   isValidCronExpression(cron) {
     const cronRegex = /^(\*|([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])|(\*\/([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9]))) (\*|([0-9]|1[0-9]|2[0-3])|(\*\/([0-9]|1[0-9]|2[0-3]))) (\*|([1-9]|1[0-9]|2[0-9]|3[0-1])|(\*\/([1-9]|1[0-9]|2[0-9]|3[0-1]))) (\*|([1-9]|1[0-2])|(\*\/([1-9]|1[0-2]))) (\*|([0-6])|(\*\/([0-6])))$/;
     return cronRegex.test(cron);
   }
 
+  _isValidCronExpression(cron) {
+    return this.isValidCronExpression(cron);
+  }
+
   getNextRunTime(cronExpression) {
     const parser = require('cron-parser');
     return parser.parseExpression(cronExpression).next().toDate();
+  }
+
+  _getNextRunTime(cronExpression) {
+    return this.getNextRunTime(cronExpression);
   }
 }
 

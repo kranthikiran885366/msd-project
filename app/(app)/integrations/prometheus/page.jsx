@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle, Plus, Trash2, RefreshCw, Link2, Zap, AlertTri
 import apiClient from '@/lib/api-client';
 
 export default function PrometheusIntegrationPage() {
+  const [projectId, setProjectId] = useState('');
   const [connection, setConnection] = useState(null);
   const [targets, setTargets] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -22,165 +23,103 @@ export default function PrometheusIntegrationPage() {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [prometheusUrl, setPrometheusUrl] = useState('');
 
-  // Mock connection
-  const mockConnection = {
-    id: 'prom-conn-1',
-    status: 'healthy',
-    url: 'https://prometheus.monitoring.svc.cluster.local:9090',
-    version: '2.48.0',
-    uptime: '45d 12h',
-    connectedAt: '2024-09-10T08:00:00Z',
-    lastScrape: '2024-12-20T16:02:00Z',
-    scrapeInterval: '15s',
-    dataRetention: '15d',
-    timeSeriesCount: 2847562
+  const fetchPrometheusData = async (activeProjectId) => {
+    if (!activeProjectId) {
+      setConnection(null);
+      setTargets([]);
+      setAlerts([]);
+      setMetrics([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError('');
+      setLoading(true);
+      const response = await apiClient.getWebhooks(activeProjectId);
+      const webhooks = Array.isArray(response) ? response : response?.data || [];
+      const prometheusWebhooks = webhooks.filter((webhook) =>
+        webhook.url?.includes('prometheus') || webhook.name?.toLowerCase().includes('prometheus')
+      );
+
+      if (prometheusWebhooks.length === 0) {
+        setConnection(null);
+        setTargets([]);
+        setAlerts([]);
+        setMetrics([]);
+        return;
+      }
+
+      const totalSeries = prometheusWebhooks.reduce((sum, webhook) => sum + (webhook.deliveryStats?.total || 0), 0);
+      const failed = prometheusWebhooks.reduce((sum, webhook) => sum + (webhook.deliveryStats?.failed || 0), 0);
+
+      setConnection({
+        id: prometheusWebhooks[0]._id,
+        status: 'healthy',
+        url: prometheusWebhooks[0].url,
+        version: '2.x',
+        uptime: '-',
+        connectedAt: prometheusWebhooks[0].createdAt,
+        lastScrape: prometheusWebhooks[0].lastDelivery || prometheusWebhooks[0].updatedAt,
+        scrapeInterval: '15s',
+        dataRetention: '15d',
+        timeSeriesCount: totalSeries,
+      });
+
+      setTargets(prometheusWebhooks.map((webhook) => ({
+        id: webhook._id,
+        job: webhook.name || 'prometheus',
+        instance: webhook.url,
+        state: (webhook.deliveryStats?.failed || 0) > 0 ? 'down' : 'up',
+        labels: { provider: 'prometheus' },
+        scrapeUrl: webhook.url,
+        interval: '15s',
+        timeout: '10s',
+        lastScrape: webhook.lastDelivery || webhook.updatedAt,
+        scrapeDuration: 0,
+        samplesScraped: webhook.deliveryStats?.total || 0,
+      })));
+
+      setAlerts(prometheusWebhooks.map((webhook) => ({
+        id: webhook._id,
+        name: webhook.name || 'Prometheus Alert',
+        state: (webhook.deliveryStats?.failed || 0) > 0 ? 'firing' : 'resolved',
+        severity: (webhook.deliveryStats?.failed || 0) > 0 ? 'warning' : 'info',
+        expr: webhook.url,
+        duration: '5m',
+        firedAt: webhook.lastDelivery || webhook.updatedAt,
+        value: webhook.deliveryStats?.failed || 0,
+      })));
+
+      setMetrics([
+        {
+          id: 'prom-metric-total',
+          name: 'webhook_deliveries_total',
+          type: 'counter',
+          help: 'Total Prometheus integration deliveries',
+          value: totalSeries,
+        },
+        {
+          id: 'prom-metric-failed',
+          name: 'webhook_deliveries_failed_total',
+          type: 'counter',
+          help: 'Failed Prometheus integration deliveries',
+          value: failed,
+        },
+      ]);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch Prometheus integration data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Mock targets
-  const mockTargets = [
-    {
-      id: 'prom-target-1',
-      job: 'prometheus',
-      instance: 'localhost:9090',
-      state: 'up',
-      labels: { group: 'monitoring', env: 'production' },
-      scrapeUrl: process.env.NEXT_PUBLIC_PROMETHEUS_URL + '/metrics',
-      interval: '15s',
-      timeout: '10s',
-      lastScrape: '2024-12-20T16:02:00Z',
-      scrapeDuration: 45,
-      samplesScraped: 1234
-    },
-    {
-      id: 'prom-target-2',
-      job: 'kubernetes-nodes',
-      instance: 'node-1.internal:9100',
-      state: 'up',
-      labels: { group: 'kubernetes', env: 'production', node: 'prod-1' },
-      scrapeUrl: 'http://node-1.internal:9100/metrics',
-      interval: '30s',
-      timeout: '10s',
-      lastScrape: '2024-12-20T16:01:00Z',
-      scrapeDuration: 234,
-      samplesScraped: 3456
-    },
-    {
-      id: 'prom-target-3',
-      job: 'docker-containers',
-      instance: 'docker-host:9323',
-      state: 'up',
-      labels: { group: 'docker', env: 'staging' },
-      scrapeUrl: 'http://docker-host:9323/metrics',
-      interval: '15s',
-      timeout: '10s',
-      lastScrape: '2024-12-20T16:02:00Z',
-      scrapeDuration: 156,
-      samplesScraped: 2891
-    },
-    {
-      id: 'prom-target-4',
-      job: 'application-metrics',
-      instance: 'app-server-1:8080',
-      state: 'down',
-      labels: { group: 'application', env: 'production', service: 'api' },
-      scrapeUrl: 'http://app-server-1:8080/metrics',
-      interval: '15s',
-      timeout: '10s',
-      lastScrape: '2024-12-20T15:45:00Z',
-      scrapeDuration: 0,
-      samplesScraped: 0
-    }
-  ];
-
-  // Mock alerts
-  const mockAlerts = [
-    {
-      id: 'prom-alert-1',
-      name: 'HighCPUUsage',
-      state: 'firing',
-      severity: 'warning',
-      expr: 'node_cpu_seconds_total > 80',
-      duration: '5m',
-      firedAt: '2024-12-20T15:30:00Z',
-      value: 87.5
-    },
-    {
-      id: 'prom-alert-2',
-      name: 'HighMemoryUsage',
-      state: 'firing',
-      severity: 'critical',
-      expr: 'node_memory_MemAvailable_bytes < 1000000000',
-      duration: '10m',
-      firedAt: '2024-12-20T14:45:00Z',
-      value: 850000000
-    },
-    {
-      id: 'prom-alert-3',
-      name: 'DiskSpaceLow',
-      state: 'resolved',
-      severity: 'warning',
-      expr: 'node_filesystem_avail_bytes < 5000000000',
-      duration: '15m',
-      firedAt: '2024-12-20T13:00:00Z',
-      value: 0
-    },
-    {
-      id: 'prom-alert-4',
-      name: 'ServiceDown',
-      state: 'firing',
-      severity: 'critical',
-      expr: 'up{job="application-metrics"} == 0',
-      duration: '2m',
-      firedAt: '2024-12-20T16:00:00Z',
-      value: 0
-    }
-  ];
-
-  // Mock metrics
-  const mockMetrics = [
-    {
-      id: 'prom-metric-1',
-      name: 'node_cpu_seconds_total',
-      type: 'counter',
-      help: 'Seconds the cpu spent in different modes',
-      value: 1847236
-    },
-    {
-      id: 'prom-metric-2',
-      name: 'node_memory_MemTotal_bytes',
-      type: 'gauge',
-      help: 'Memory information field MemTotal_bytes',
-      value: 33631002624
-    },
-    {
-      id: 'prom-metric-3',
-      name: 'http_requests_total',
-      type: 'counter',
-      help: 'Total HTTP requests processed',
-      value: 245723
-    },
-    {
-      id: 'prom-metric-4',
-      name: 'http_request_duration_seconds',
-      type: 'histogram',
-      help: 'HTTP request latencies in seconds',
-      value: 0.145
-    },
-    {
-      id: 'prom-metric-5',
-      name: 'process_resident_memory_bytes',
-      type: 'gauge',
-      help: 'Resident memory size in bytes',
-      value: 268435456
-    }
-  ];
-
   useEffect(() => {
-    setConnection(mockConnection);
-    setTargets(mockTargets);
-    setAlerts(mockAlerts);
-    setMetrics(mockMetrics);
-    setLoading(false);
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const activeProjectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+    setProjectId(activeProjectId || '');
+    fetchPrometheusData(activeProjectId);
   }, []);
 
   const handleConnectPrometheus = async () => {
@@ -191,17 +130,17 @@ export default function PrometheusIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.connectPrometheus({ url: prometheusUrl });
-
-      if (response.success) {
-        setConnection(mockConnection);
-        setSuccessMessage('Connected to Prometheus successfully');
-        setShowUrlInput(false);
-        setPrometheusUrl('');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to connect to Prometheus');
-      }
+      await apiClient.createWebhook(projectId, {
+        name: 'Prometheus Metrics',
+        url: prometheusUrl,
+        events: ['metric.recorded', 'alert.triggered'],
+        active: true,
+      });
+      await fetchPrometheusData(projectId);
+      setSuccessMessage('Connected to Prometheus successfully');
+      setShowUrlInput(false);
+      setPrometheusUrl('');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -214,18 +153,15 @@ export default function PrometheusIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.disconnectPrometheus();
-
-      if (response.success) {
-        setConnection(null);
-        setTargets([]);
-        setAlerts([]);
-        setMetrics([]);
-        setSuccessMessage('Disconnected from Prometheus');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to disconnect');
-      }
+      const response = await apiClient.getWebhooks(projectId);
+      const webhooks = Array.isArray(response) ? response : response?.data || [];
+      const prometheusWebhooks = webhooks.filter((webhook) =>
+        webhook.url?.includes('prometheus') || webhook.name?.toLowerCase().includes('prometheus')
+      );
+      await Promise.all(prometheusWebhooks.map((webhook) => apiClient.deleteWebhook(webhook._id || webhook.id)));
+      await fetchPrometheusData(projectId);
+      setSuccessMessage('Disconnected from Prometheus');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -234,15 +170,9 @@ export default function PrometheusIntegrationPage() {
   const handleGetAlerts = async () => {
     try {
       setError('');
-      const response = await apiClient.getPrometheusAlerts();
-
-      if (response.success) {
-        setAlerts(mockAlerts);
-        setSuccessMessage('Alerts refreshed successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to fetch alerts');
-      }
+      await fetchPrometheusData(projectId);
+      setSuccessMessage('Alerts refreshed successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -251,14 +181,9 @@ export default function PrometheusIntegrationPage() {
   const handleQueryMetrics = async (query) => {
     try {
       setError('');
-      const response = await apiClient.queryPrometheus({ query });
-
-      if (response.success) {
-        setSuccessMessage('Query executed successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to execute query');
-      }
+      await apiClient.getAnalyticsMetrics({ query });
+      setSuccessMessage('Query executed successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }

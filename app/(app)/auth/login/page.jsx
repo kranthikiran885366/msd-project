@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Mail, Lock, Eye, EyeOff, Github, Chrome, AlertCircle, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import apiClient from '@/lib/api-client';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -25,7 +26,6 @@ export default function LoginPage() {
     setSuccess('');
 
     try {
-      // Simulate API call
       if (!email || !password) {
         throw new Error('Email and password are required');
       }
@@ -34,7 +34,7 @@ export default function LoginPage() {
         throw new Error('Invalid email format');
       }
 
-      // Mock successful login
+      await apiClient.login(email, password);
       setSuccess('Login successful! Redirecting...');
       setTimeout(() => {
         window.location.href = '/dashboard';
@@ -48,8 +48,17 @@ export default function LoginPage() {
 
   const handleOAuth = (provider) => {
     setLoading(true);
-    // Redirect to OAuth endpoint
-    window.location.href = `/api/auth/${provider}`;
+    if (provider === 'github') {
+      apiClient.startGitHubOAuth();
+      return;
+    }
+
+    if (provider === 'google') {
+      apiClient.startGoogleOAuth();
+      return;
+    }
+
+    setLoading(false);
   };
 
   return (

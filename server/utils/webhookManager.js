@@ -149,10 +149,20 @@ class WebhookManager {
   }
 }
 
-module.exports = new WebhookManager();
-module.exports.createWebhook = (provider, repoDetails, webhookUrl) =>
-  new WebhookManager().createWebhook(provider, repoDetails, webhookUrl);
-module.exports.removeWebhook = (provider, repoDetails, webhookId) =>
-  new WebhookManager().removeWebhook(provider, repoDetails, webhookId);
-module.exports.validateGitSignature = (provider, payload, signature) =>
-  new WebhookManager().validateGitSignature(provider, payload, signature);
+const webhookManager = new WebhookManager();
+
+const createWebhook = (provider, repoDetails, webhookUrl) =>
+  webhookManager.createWebhook(provider, repoDetails, webhookUrl);
+
+const removeWebhook = (provider, repoDetails, webhookId) =>
+  webhookManager.removeWebhook(provider, repoDetails, webhookId);
+
+const validateGitSignature = (provider, payload, signature) =>
+  webhookManager.validateGitSignature(provider, payload, signature);
+
+module.exports = {
+  webhookManager,
+  createWebhook,
+  removeWebhook,
+  validateGitSignature,
+};

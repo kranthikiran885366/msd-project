@@ -1,3 +1,4 @@
+'use strict';
 const mongoose = require('mongoose');
 
 const WorkerNodeSchema = new mongoose.Schema({
@@ -11,9 +12,23 @@ const WorkerNodeSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    // AWS EC2: private IP used for internal VPC communication
+    privateIp: {
+        type: String,
+        default: ''
+    },
+    // AWS EC2: public IP used for live app URL generation
+    publicIp: {
+        type: String,
+        default: ''
+    },
     region: {
         type: String,
         default: 'us-east-1'
+    },
+    availabilityZone: {
+        type: String,
+        default: ''
     },
     status: {
         type: String,
@@ -48,41 +63,22 @@ const WorkerNodeSchema = new mongoose.Schema({
         min: 0
     },
     totalCapacity: {
-        cpu: {
-            type: Number,
-            default: 2
-        },
-        memory: {
-            type: Number,
-            default: 2048
-        },
-        storage: {
-            type: Number,
-            default: 10240
-        }
+        cpu: { type: Number, default: 2 },
+        memory: { type: Number, default: 2048 },   // MB
+        storage: { type: Number, default: 10240 }  // MB
     },
     registeredAt: {
         type: Date,
         default: Date.now
     },
-    errors: [
-        {
-            timestamp: Date,
-            message: String
-        }
-    ]
-}, {
-    timestamps: true
-});
+    errors: [{
+        timestamp: Date,
+        message: String
+    }]
+}, { timestamps: true });
 
-// Index for efficient querying
 WorkerNodeSchema.index({ status: 1, lastHeartbeat: -1 });
-WorkerNodeSchema.index({ region: 1 });
-
-// Virtuals for derived values
-WorkerNodeSchema.virtual('uptime').get(function () {
-    return Date.now() - this.registeredAt.getTime();
-});
+WorkerNodeSchema.index({ region: 1, status: 1 });
 
 WorkerNodeSchema.virtual('isHealthy').get(function () {
     return this.status === 'active';

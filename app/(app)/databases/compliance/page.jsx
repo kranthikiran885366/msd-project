@@ -18,143 +18,12 @@ export default function InfrastructureCompliancePage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [selectedFramework, setSelectedFramework] = useState('soc2');
 
-  // Mock compliance frameworks
-  const frameworks = [
-    {
-      id: 'soc2',
-      name: 'SOC 2 Type II',
-      icon: '🔒',
-      lastAudit: '2024-11-15T10:00:00Z',
-      expiresAt: '2025-11-14T23:59:59Z',
-      status: 'compliant',
-      requirements: [
-        { requirement: 'Encryption at rest', status: 'met', evidence: 'AES-256 implemented' },
-        { requirement: 'Encryption in transit', status: 'met', evidence: 'TLS 1.2+ enforced' },
-        { requirement: 'Access controls', status: 'met', evidence: 'RBAC configured' },
-        { requirement: 'Audit logging', status: 'met', evidence: '90 days retention' },
-        { requirement: 'Incident response', status: 'met', evidence: 'Plan documented' },
-        { requirement: 'Change management', status: 'met', evidence: 'Process in place' }
-      ],
-      certifications: [
-        { name: 'SOC 2 Type II Certificate', issued: '2023-11-15', expires: '2025-11-14', status: 'active' }
-      ]
-    },
-    {
-      id: 'hipaa',
-      name: 'HIPAA',
-      icon: '🏥',
-      lastAudit: '2024-10-20T14:30:00Z',
-      expiresAt: '2025-10-19T23:59:59Z',
-      status: 'compliant',
-      requirements: [
-        { requirement: 'Data protection', status: 'met', evidence: 'HIPAA BAA signed' },
-        { requirement: 'Administrative safeguards', status: 'met', evidence: 'Training completed' },
-        { requirement: 'Physical safeguards', status: 'met', evidence: 'Data center certified' },
-        { requirement: 'Technical safeguards', status: 'met', evidence: 'Encryption enabled' },
-        { requirement: 'Breach notification', status: 'met', evidence: 'Process defined' }
-      ],
-      certifications: [
-        { name: 'HIPAA Compliance Certificate', issued: '2023-10-20', expires: '2025-10-19', status: 'active' }
-      ]
-    },
-    {
-      id: 'gdpr',
-      name: 'GDPR',
-      icon: '🌍',
-      lastAudit: '2024-09-10T09:00:00Z',
-      expiresAt: '2025-09-09T23:59:59Z',
-      status: 'compliant',
-      requirements: [
-        { requirement: 'Data minimization', status: 'met', evidence: 'Policy implemented' },
-        { requirement: 'Consent management', status: 'met', evidence: 'System configured' },
-        { requirement: 'Data subject rights', status: 'met', evidence: 'Access controls set' },
-        { requirement: 'DPA in place', status: 'met', evidence: 'Signed with processors' },
-        { requirement: 'Privacy by design', status: 'met', evidence: 'Architecture reviewed' }
-      ],
-      certifications: [
-        { name: 'GDPR Compliance Assessment', issued: '2023-09-10', expires: '2025-09-09', status: 'active' }
-      ]
-    },
-    {
-      id: 'pci-dss',
-      name: 'PCI DSS',
-      icon: '💳',
-      lastAudit: '2024-08-25T11:15:00Z',
-      expiresAt: '2025-08-24T23:59:59Z',
-      status: 'compliant',
-      requirements: [
-        { requirement: 'Network security', status: 'met', evidence: 'Firewall configured' },
-        { requirement: 'Cardholder data protection', status: 'met', evidence: 'Encrypted storage' },
-        { requirement: 'Vulnerability management', status: 'met', evidence: 'Annual scan' },
-        { requirement: 'Strong access controls', status: 'met', evidence: 'MFA enabled' },
-        { requirement: 'Regular monitoring', status: 'met', evidence: 'Logs retained' }
-      ],
-      certifications: [
-        { name: 'PCI DSS v3.2.1 Attestation', issued: '2023-08-25', expires: '2025-08-24', status: 'active' }
-      ]
-    },
-    {
-      id: 'iso27001',
-      name: 'ISO 27001',
-      icon: '📋',
-      lastAudit: '2024-07-18T13:45:00Z',
-      expiresAt: '2025-07-17T23:59:59Z',
-      status: 'in-progress',
-      requirements: [
-        { requirement: 'Information security policy', status: 'met', evidence: 'Documented' },
-        { requirement: 'Risk assessment', status: 'met', evidence: 'Completed annually' },
-        { requirement: 'Asset management', status: 'met', evidence: 'Inventory maintained' },
-        { requirement: 'Access control', status: 'pending', evidence: 'Review in progress' },
-        { requirement: 'Cryptography', status: 'met', evidence: 'Standards applied' }
-      ],
-      certifications: [
-        { name: 'ISO 27001 Certificate', issued: '2023-07-18', expires: '2025-07-17', status: 'active' }
-      ]
-    }
-  ];
-
-  // Mock audit trail
-  const mockAuditTrail = [
-    {
-      id: 1,
-      date: '2024-12-20T10:30:00Z',
-      action: 'Compliance status updated',
-      framework: 'SOC 2 Type II',
-      details: 'All requirements verified compliant',
-      user: 'admin@company.com'
-    },
-    {
-      id: 2,
-      date: '2024-12-15T14:15:00Z',
-      action: 'Certification renewed',
-      framework: 'SOC 2 Type II',
-      details: 'SOC 2 Type II certificate renewed for 1 year',
-      user: 'auditor@external.com'
-    },
-    {
-      id: 3,
-      date: '2024-12-10T09:00:00Z',
-      action: 'Audit completed',
-      framework: 'HIPAA',
-      details: 'Annual HIPAA compliance audit completed successfully',
-      user: 'auditor@external.com'
-    },
-    {
-      id: 4,
-      date: '2024-12-01T16:45:00Z',
-      action: 'Policy updated',
-      framework: 'GDPR',
-      details: 'Data retention policy updated to align with GDPR requirements',
-      user: 'security@company.com'
-    },
-    {
-      id: 5,
-      date: '2024-11-25T11:20:00Z',
-      action: 'Requirement verified',
-      framework: 'PCI DSS',
-      details: 'Network segmentation requirement verified',
-      user: 'compliance@company.com'
-    }
+  const frameworkCatalog = [
+    { id: 'soc2', name: 'SOC 2 Type II', icon: '🔒' },
+    { id: 'hipaa', name: 'HIPAA', icon: '🏥' },
+    { id: 'gdpr', name: 'GDPR', icon: '🌍' },
+    { id: 'pci-dss', name: 'PCI DSS', icon: '💳' },
+    { id: 'iso27001', name: 'ISO 27001', icon: '📋' }
   ];
 
   const fetchDatabases = useCallback(async () => {
@@ -179,17 +48,43 @@ export default function InfrastructureCompliancePage() {
       const response = await apiClient.getDatabaseCompliance(selectedDb);
       
       if (response) {
-        // Use real compliance data from API
-        const status = {};
-        frameworks.forEach(fw => {
-          const met = fw.requirements.filter(r => r.status === 'met').length;
-          status[fw.id] = {
-            ...fw,
-            completionPercentage: Math.round((met / fw.requirements.length) * 100)
+        const checks = response?.checks || {};
+        const requirements = Object.entries(checks).map(([key, check]) => ({
+          requirement: key.charAt(0).toUpperCase() + key.slice(1),
+          status: check.status === 'pass' ? 'met' : 'pending',
+          evidence: check.description || 'No evidence provided'
+        }));
+        const completionPercentage = requirements.length > 0
+          ? Math.round((requirements.filter((req) => req.status === 'met').length / requirements.length) * 100)
+          : 0;
+
+        const status = frameworkCatalog.reduce((acc, framework) => {
+          acc[framework.id] = {
+            ...framework,
+            lastAudit: response?.lastCheck || new Date().toISOString(),
+            expiresAt: null,
+            status: response?.overall === 'compliant' ? 'compliant' : 'in-progress',
+            requirements,
+            certifications: [],
+            completionPercentage
           };
-        });
+          return acc;
+        }, {});
+
+        const auditResponse = await apiClient.getAuditLogs({ resourceType: 'Database', limit: 20 });
+        const logs = auditResponse?.logs || [];
+
         setComplianceStatus(status);
-        setAuditTrail(mockAuditTrail);
+        setAuditTrail(logs
+          .filter((log) => !selectedDb || String(log.resourceId) === String(selectedDb))
+          .map((log) => ({
+            id: log._id || log.id,
+            date: log.createdAt,
+            action: log.action,
+            framework: 'Database Compliance',
+            details: log.metadata ? JSON.stringify(log.metadata) : 'Compliance operation logged',
+            user: log.userId || 'System'
+          })));
       }
     } catch (err) {
       setError(err.message || 'Failed to fetch compliance data');
@@ -328,10 +223,12 @@ export default function InfrastructureCompliancePage() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Compliance Score</p>
               <p className="text-3xl font-bold">
-                {Math.round(
-                  Object.values(complianceStatus).reduce((sum, f) => sum + f.completionPercentage, 0) / 
-                  Object.keys(complianceStatus).length
-                )}%
+                {Object.keys(complianceStatus).length > 0
+                  ? Math.round(
+                      Object.values(complianceStatus).reduce((sum, f) => sum + f.completionPercentage, 0) / 
+                      Object.keys(complianceStatus).length
+                    )
+                  : 0}%
               </p>
             </div>
           </CardContent>
@@ -453,7 +350,9 @@ export default function InfrastructureCompliancePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {selectedFrameworkData.certifications.map((cert, idx) => (
+                {selectedFrameworkData.certifications.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No active certifications available from the backend response.</p>
+                ) : selectedFrameworkData.certifications.map((cert, idx) => (
                   <div key={idx} className="p-4 border rounded-lg">
                     <div className="flex justify-between items-start mb-2">
                       <p className="font-semibold">{cert.name}</p>
@@ -490,7 +389,9 @@ export default function InfrastructureCompliancePage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {auditTrail.map(trail => (
+            {auditTrail.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No compliance audit trail entries found.</p>
+            ) : auditTrail.map(trail => (
               <div key={trail.id} className="flex gap-4 pb-4 border-b last:border-b-0">
                 <div className="flex-shrink-0">
                   <div className="w-2 h-2 rounded-full bg-blue-500 mt-2" />

@@ -29,14 +29,18 @@ import {
   Code2,
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import apiClient from "@/lib/api-client"
 
 export default function BuildsPage() {
+  const [projectId, setProjectId] = useState("")
   const [builds, setBuilds] = useState([])
   const [selectedBuild, setSelectedBuild] = useState(null)
   const [showNewBuild, setShowNewBuild] = useState(false)
   const [showBuildDetails, setShowBuildDetails] = useState(false)
   const [buildLogs, setBuildLogs] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
   const [filter, setFilter] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
 
@@ -48,77 +52,68 @@ export default function BuildsPage() {
   })
 
   useEffect(() => {
+    const userStr = localStorage.getItem("user")
+    const user = userStr ? JSON.parse(userStr) : null
+    const activeProjectId = user?.currentProjectId || localStorage.getItem("currentProjectId")
+    setProjectId(activeProjectId || "")
+  }, [])
+
+  useEffect(() => {
+    if (!projectId) {
+      setBuilds([])
+      return
+    }
+
     fetchBuilds()
     const interval = setInterval(fetchBuilds, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [projectId])
 
   const fetchBuilds = async () => {
+    if (!projectId) return
+
     try {
-      // Mock data - replace with real API call
-      setBuilds([
-        {
-          id: 1,
-          projectId: 1,
-          branch: "main",
-          commit: "abc123def",
-          status: "success",
-          duration: 245,
-          trigger: "git-push",
-          author: "John Doe",
-          message: "Add new features",
-          createdAt: new Date(Date.now() - 1000 * 60 * 5),
-          completedAt: new Date(Date.now() - 1000 * 60 * 1),
-          cacheHit: true,
-          metrics: { buildSize: 45, cacheHitRate: 85 },
-        },
-        {
-          id: 2,
-          projectId: 1,
-          branch: "develop",
-          commit: "def456ghi",
-          status: "failed",
-          duration: 180,
-          trigger: "manual",
-          author: "Jane Smith",
-          message: "Bug fixes",
-          createdAt: new Date(Date.now() - 1000 * 60 * 30),
-          completedAt: new Date(Date.now() - 1000 * 60 * 25),
-          cacheHit: false,
-          metrics: { buildSize: 52, cacheHitRate: 60 },
-        },
-        {
-          id: 3,
-          projectId: 1,
-          branch: "feature/dashboard",
-          commit: "ghi789jkl",
-          status: "building",
-          duration: null,
-          trigger: "git-push",
-          author: "Bob Wilson",
-          message: "Dashboard redesign",
-          createdAt: new Date(Date.now() - 1000 * 60 * 2),
-          completedAt: null,
-          cacheHit: true,
-          metrics: { buildSize: 0, cacheHitRate: 75 },
-        },
-      ])
+      setError("")
+      const response = await apiClient.getBuilds(projectId, { limit: 100 })
+      const buildList = response?.builds || response?.data?.builds || []
+      const normalizedBuilds = buildList.map((build) => ({
+        ...build,
+        id: build._id || build.id,
+        commit: build.commit || build.commitSha || "-",
+        status: ["running", "building", "installing", "packaging", "docker_building", "docker_running"].includes(build.status)
+          ? "building"
+          : build.status === "queued"
+            ? "pending"
+            : build.status,
+        duration: build.duration ? Math.round(build.duration / 1000) : null,
+        author: build.author || "System",
+      }))
+      setBuilds(normalizedBuilds)
     } catch (error) {
       console.error("Failed to fetch builds:", error)
+      setError(error.message || "Failed to load builds")
     }
   }
 
   const handleCreateBuild = async () => {
+    if (!projectId) {
+      setError("Please select a project first")
+      return
+    }
+
     setLoading(true)
     try {
-      // Mock API call
-      const newBuildData = {
-        ...newBuild,
-        id: builds.length + 1,
-        status: "pending",
-        createdAt: new Date(),
-      }
-      setBuilds([newBuildData, ...builds])
+      setError("")
+      await apiClient.createBuild(projectId, {
+        branch: newBuild.branch,
+        buildConfig: {
+          buildCommand: newBuild.buildCommand,
+          installCommand: newBuild.installCommand,
+          environment: newBuild.environment,
+        },
+        triggeredBy: "manual",
+      })
+      await fetchBuilds()
       setShowNewBuild(false)
       setNewBuild({
         branch: "main",
@@ -126,41 +121,55 @@ export default function BuildsPage() {
         installCommand: "npm install",
         environment: "production",
       })
+      setSuccessMessage("Build triggered successfully")
+      setTimeout(() => setSuccessMessage(""), 3000)
+    } catch (error) {
+      setError(error.message || "Failed to trigger build")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleViewLogs = (build) => {
+  const handleViewLogs = async (build) => {
     setSelectedBuild(build)
-    setBuildLogs([
-      { timestamp: "14:32:12", message: "Starting build...", level: "info" },
-      { timestamp: "14:32:15", message: "Installing dependencies...", level: "info" },
-      { timestamp: "14:32:45", message: "Running build script...", level: "info" },
-      { timestamp: "14:33:20", message: "Build complete!", level: "info" },
-      { timestamp: "14:33:22", message: "Deploying to production...", level: "info" },
-      { timestamp: "14:33:45", message: "Deployment successful", level: "success" },
-    ])
+    try {
+      const response = await apiClient.getBuildLogs(projectId, build.id)
+      const logs = response?.logs || response?.data?.logs || []
+      setBuildLogs(
+        logs.map((log) => ({
+          timestamp: new Date(log.timestamp).toLocaleTimeString(),
+          message: log.line,
+          level: log.level,
+        }))
+      )
+    } catch (error) {
+      setBuildLogs([])
+      setError(error.message || "Failed to fetch build logs")
+    }
     setShowBuildDetails(true)
   }
 
   const handleRetryBuild = async (buildId) => {
     try {
-      // Mock retry
-      const updatedBuilds = builds.map(b => (b.id === buildId ? { ...b, status: "pending" } : b))
-      setBuilds(updatedBuilds)
+      await apiClient.retryBuild(projectId, buildId)
+      await fetchBuilds()
+      setSuccessMessage("Build retry started")
+      setTimeout(() => setSuccessMessage(""), 3000)
     } catch (error) {
       console.error("Failed to retry build:", error)
+      setError(error.message || "Failed to retry build")
     }
   }
 
   const handleCancelBuild = async (buildId) => {
     try {
-      // Mock cancel
-      const updatedBuilds = builds.map(b => (b.id === buildId ? { ...b, status: "canceled" } : b))
-      setBuilds(updatedBuilds)
+      await apiClient.cancelBuild(projectId, buildId, "Canceled by user")
+      await fetchBuilds()
+      setSuccessMessage("Build canceled")
+      setTimeout(() => setSuccessMessage(""), 3000)
     } catch (error) {
       console.error("Failed to cancel build:", error)
+      setError(error.message || "Failed to cancel build")
     }
   }
 
@@ -184,18 +193,81 @@ export default function BuildsPage() {
     return matchesStatus && matchesSearch
   })
 
-  const analyticsData = [
-    { day: "Mon", successful: 5, failed: 1, duration: 240 },
-    { day: "Tue", successful: 7, failed: 2, duration: 210 },
-    { day: "Wed", successful: 6, failed: 0, duration: 195 },
-    { day: "Thu", successful: 8, failed: 1, duration: 220 },
-    { day: "Fri", successful: 9, failed: 2, duration: 240 },
-    { day: "Sat", successful: 3, failed: 0, duration: 180 },
-    { day: "Sun", successful: 4, failed: 1, duration: 200 },
-  ]
+  const analyticsData = (() => {
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (6 - i))
+      const key = d.toISOString().split("T")[0]
+      return {
+        key,
+        day: d.toLocaleDateString(undefined, { weekday: "short" }),
+        successful: 0,
+        failed: 0,
+        durationTotal: 0,
+        durationCount: 0,
+      }
+    })
+
+    const dayMap = new Map(last7Days.map((entry) => [entry.key, entry]))
+    for (const build of builds) {
+      const key = new Date(build.createdAt).toISOString().split("T")[0]
+      const dayEntry = dayMap.get(key)
+      if (!dayEntry) continue
+      if (build.status === "success") dayEntry.successful += 1
+      if (build.status === "failed") dayEntry.failed += 1
+      if (build.duration) {
+        dayEntry.durationTotal += build.duration
+        dayEntry.durationCount += 1
+      }
+    }
+
+    return last7Days.map((entry) => ({
+      day: entry.day,
+      successful: entry.successful,
+      failed: entry.failed,
+      duration: entry.durationCount > 0 ? Math.round(entry.durationTotal / entry.durationCount) : 0,
+    }))
+  })()
+
+  const branchStats = Object.entries(
+    builds.reduce((acc, build) => {
+      const branch = build.branch || "unknown"
+      if (!acc[branch]) {
+        acc[branch] = { total: 0, success: 0 }
+      }
+      acc[branch].total += 1
+      if (build.status === "success") acc[branch].success += 1
+      return acc
+    }, {})
+  )
+
+  const avgDuration = builds.filter((b) => b.duration).length
+    ? Math.round(builds.reduce((sum, b) => sum + (b.duration || 0), 0) / builds.filter((b) => b.duration).length)
+    : 0
+  const fastestBuild = builds.filter((b) => b.duration).sort((a, b) => a.duration - b.duration)[0]
+  const successRate = builds.length
+    ? Math.round((builds.filter((b) => b.status === "success").length / builds.length) * 100)
+    : 0
+  const cacheHitRate = builds.length
+    ? Math.round((builds.filter((b) => b.cacheHit).length / builds.length) * 100)
+    : 0
 
   return (
     <div className="p-6 space-y-6">
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {successMessage && (
+        <Alert className="border-green-200 bg-green-50">
+          <CheckCircle2 className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">{successMessage}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold mb-2">Builds & CI/CD</h1>
@@ -236,7 +308,11 @@ export default function BuildsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Environment</Label>
-                <select className="w-full border rounded px-3 py-2 bg-background">
+                <select
+                  className="w-full border rounded px-3 py-2 bg-background"
+                  value={newBuild.environment}
+                  onChange={(e) => setNewBuild({ ...newBuild, environment: e.target.value })}
+                >
                   <option>production</option>
                   <option>staging</option>
                   <option>development</option>
@@ -272,9 +348,7 @@ export default function BuildsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Success Rate</p>
-                <p className="text-2xl font-bold mt-2">
-                  {((builds.filter(b => b.status === "success").length / builds.length) * 100).toFixed(0)}%
-                </p>
+                <p className="text-2xl font-bold mt-2">{successRate}%</p>
               </div>
               <CheckCircle2 className="w-8 h-8 text-green-500" />
             </div>
@@ -285,9 +359,7 @@ export default function BuildsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Avg Duration</p>
-                <p className="text-2xl font-bold mt-2">
-                  {Math.round(builds.reduce((s, b) => s + (b.duration || 0), 0) / builds.filter(b => b.duration).length)}s
-                </p>
+                <p className="text-2xl font-bold mt-2">{avgDuration}s</p>
               </div>
               <Clock className="w-8 h-8 text-blue-500" />
             </div>
@@ -298,7 +370,7 @@ export default function BuildsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Cache Hit Rate</p>
-                <p className="text-2xl font-bold mt-2">78%</p>
+                <p className="text-2xl font-bold mt-2">{cacheHitRate}%</p>
               </div>
               <Code2 className="w-8 h-8 text-purple-500" />
             </div>
@@ -447,15 +519,16 @@ export default function BuildsPage() {
                 <CardTitle>Success Rate by Branch</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {["main", "develop", "feature/dashboard"].map((branch) => (
+                {branchStats.slice(0, 5).map(([branch, stats]) => (
                   <div key={branch} className="flex justify-between items-center">
                     <div>
                       <div className="font-medium text-sm">{branch}</div>
-                      <div className="text-xs text-muted-foreground">12 builds</div>
+                      <div className="text-xs text-muted-foreground">{stats.total} builds</div>
                     </div>
-                    <Badge>95%</Badge>
+                    <Badge>{stats.total > 0 ? Math.round((stats.success / stats.total) * 100) : 0}%</Badge>
                   </div>
                 ))}
+                {branchStats.length === 0 && <p className="text-sm text-muted-foreground">No build data yet.</p>}
               </CardContent>
             </Card>
 
@@ -465,14 +538,14 @@ export default function BuildsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <div className="text-sm font-medium mb-2">Average build time: 4m 12s</div>
+                  <div className="text-sm font-medium mb-2">Average build time: {avgDuration}s</div>
                   <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500" style={{ width: "65%" }} />
+                    <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, Math.max(5, avgDuration / 6))}%` }} />
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm font-medium mb-2">Fastest build: 2m 30s</div>
-                  <div className="text-xs text-muted-foreground">main branch</div>
+                  <div className="text-sm font-medium mb-2">Fastest build: {fastestBuild ? `${fastestBuild.duration}s` : "-"}</div>
+                  <div className="text-xs text-muted-foreground">{fastestBuild?.branch || "No data"}</div>
                 </div>
               </CardContent>
             </Card>

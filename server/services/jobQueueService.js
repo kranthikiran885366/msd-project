@@ -1,3 +1,4 @@
+const IORedis = require('ioredis');
 const { Queue, Worker, QueueEvents } = require('bullmq');
 
 class JobQueueService {
@@ -20,9 +21,11 @@ class JobQueueService {
                 enableReadyCheck: false,
             };
 
+            this.client = new IORedis(redisConnection);
+
             // Initialize job queue with ioredis-style connection
             this.queue = new Queue('deployments', {
-                connection: redisConnection,
+                connection: this.client,
                 defaultJobOptions: {
                     attempts: 3,
                     backoff: {
@@ -35,7 +38,7 @@ class JobQueueService {
             });
 
             // Initialize queue events
-            this.queueEvents = new QueueEvents('deployments', { connection: redisConnection });
+            this.queueEvents = new QueueEvents('deployments', { connection: this.client });
 
             console.log('[v0] Job queue service initialized');
             this.isConnected = true;

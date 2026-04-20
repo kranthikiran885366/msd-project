@@ -1,66 +1,65 @@
+'use strict';
 const axios = require('axios');
 
 class NodeRegistry {
     constructor(nodeId, backendUrl) {
-        this.nodeId = nodeId;
+        this.nodeId     = nodeId;
         this.backendUrl = backendUrl;
-        this.client = axios.create({
+        this.client     = axios.create({
             baseURL: backendUrl,
-            timeout: 10000
+            timeout: 10000,
+            headers: this._buildAuthHeaders()
         });
     }
 
-    /**
-     * Register node with backend
-     */
+    // Returns Authorization header using WORKER_SECRET
+    _buildAuthHeaders() {
+        const secret = process.env.WORKER_SECRET || '';
+        return secret ? { Authorization: `Bearer ${secret}` } : {};
+    }
+
+    // Expose for agent.js polling calls
+    authHeaders() {
+        return this._buildAuthHeaders();
+    }
+
     async register(nodeData) {
         try {
             const response = await this.client.post('/api/nodes/register', {
                 nodeId: this.nodeId,
                 ...nodeData
             });
-
-            console.log(`[v0] Node registered successfully: ${this.nodeId}`);
+            console.log(`[registry] Registered: ${this.nodeId}`);
             return response.data;
         } catch (error) {
-            console.error('[v0] Failed to register node:', error.message);
+            console.error('[registry] Registration failed:', error.message);
             throw error;
         }
     }
 
-    /**
-     * Send heartbeat to backend
-     */
     async sendHeartbeat(metrics) {
         try {
             const response = await this.client.post('/api/nodes/heartbeat', {
                 nodeId: this.nodeId,
                 metrics
             });
-
             return response.data;
         } catch (error) {
-            console.error('[v0] Failed to send heartbeat:', error.message);
-            // Don't throw - heartbeat failures shouldn't crash the agent
+            // Non-fatal — log and continue
+            console.error('[registry] Heartbeat failed:', error.message);
         }
     }
 
-    /**
-     * Get node status
-     */
     async getNodeStatus() {
         try {
             const response = await this.client.get(`/api/nodes/${this.nodeId}`);
             return response.data;
         } catch (error) {
-            console.error('[v0] Failed to get node status:', error.message);
+            console.error('[registry] getNodeStatus failed:', error.message);
             return null;
         }
     }
 
-    /**
-     * Report error to backend
-     */
     async reportError(errorMessage, context = {}) {
         try {
             await this.client.post(`/api/nodes/${this.nodeId}/error`, {
@@ -69,7 +68,7 @@ class NodeRegistry {
                 timestamp: new Date()
             });
         } catch (error) {
-            console.error('[v0] Failed to report error:', error.message);
+            console.error('[registry] reportError failed:', error.message);
         }
     }
 }

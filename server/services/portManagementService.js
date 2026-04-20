@@ -2,8 +2,9 @@ const PortMapping = require('../models/PortMapping');
 
 class PortManagementService {
     constructor() {
-        this.portRangeStart = 3001;
-        this.portRangeEnd = 4000;
+        // FIX: read from env vars, not hardcoded
+        this.portRangeStart = parseInt(process.env.PORT_RANGE_START || '4000', 10);
+        this.portRangeEnd   = parseInt(process.env.PORT_RANGE_END   || '5000', 10);
         this.usedPorts = new Set();
     }
 

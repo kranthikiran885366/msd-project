@@ -17,6 +17,64 @@ export default function MetricsPage() {
   const [projects, setProjects] = useState([])
   const [refreshing, setRefreshing] = useState(false)
 
+  const toNumber = (value, fallback = 0) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : fallback
+    if (typeof value === "string") {
+      const parsed = Number.parseFloat(value.replace(/[^0-9.-]/g, ""))
+      return Number.isFinite(parsed) ? parsed : fallback
+    }
+    return fallback
+  }
+
+  const getTimeRangeDays = (range) => {
+    const ranges = { "1h": 1, "24h": 1, "7d": 7, "30d": 30 }
+    return ranges[range] || 1
+  }
+
+  const metricValue = (source, ...keys) => {
+    for (const key of keys) {
+      const raw = source?.[key]
+      if (raw == null) continue
+      if (typeof raw === "number" || typeof raw === "string") {
+        const parsed = toNumber(raw, NaN)
+        if (!Number.isNaN(parsed)) return parsed
+      }
+      if (typeof raw === "object") {
+        const nested = [raw.avg, raw.value, raw.current, raw.total].find((v) => v != null)
+        const parsed = toNumber(nested, NaN)
+        if (!Number.isNaN(parsed)) return parsed
+      }
+    }
+    return 0
+  }
+
+  const buildMetricsPayload = (source = {}) => ({
+    performance: {
+      responseTime: { value: metricValue(source, "avgResponseTime", "responseTime", "latency"), change: 0, unit: "ms" },
+      throughput: { value: metricValue(source, "avgThroughput", "throughput", "apiCalls"), change: 0, unit: "req/min" },
+      errorRate: { value: metricValue(source, "avgErrorRate", "errorRate"), change: 0, unit: "%" },
+      uptime: { value: metricValue(source, "uptime", "statusCode") || 99.9, change: 0, unit: "%" }
+    },
+    resources: {
+      cpuUsage: { value: metricValue(source, "cpuUsage", "cpu"), change: 0, unit: "%" },
+      memoryUsage: { value: metricValue(source, "memoryUsage", "memory"), change: 0, unit: "%" },
+      diskUsage: { value: metricValue(source, "diskUsage", "disk"), change: 0, unit: "%" },
+      networkIO: { value: metricValue(source, "networkIO", "bandwidth", "network"), change: 0, unit: "MB/s" }
+    },
+    database: {
+      connections: { value: metricValue(source, "dbConnections", "connections"), change: 0, unit: "" },
+      queryTime: { value: metricValue(source, "queryTime", "avgResponseTime"), change: 0, unit: "ms" },
+      cacheHitRate: { value: metricValue(source, "cacheHitRate"), change: 0, unit: "%" },
+      diskIO: { value: metricValue(source, "diskIO"), change: 0, unit: "MB/s" }
+    },
+    business: {
+      activeUsers: { value: metricValue(source, "activeUsers", "users"), change: 0, unit: "" },
+      pageViews: { value: metricValue(source, "pageViews", "apiCalls"), change: 0, unit: "" },
+      conversionRate: { value: metricValue(source, "conversionRate"), change: 0, unit: "%" },
+      revenue: { value: metricValue(source, "revenue"), change: 0, unit: "$" }
+    }
+  })
+
   useEffect(() => {
     loadMetrics()
     loadProjects()
@@ -24,52 +82,34 @@ export default function MetricsPage() {
 
   const loadProjects = async () => {
     try {
-      const data = await apiClient.get('/projects')
-      setProjects(data.projects || [])
+      const data = await apiClient.getProjects()
+      const normalizedProjects = (data || []).map((project) => ({
+        ...project,
+        id: project.id || project._id
+      }))
+      setProjects(normalizedProjects)
     } catch (error) {
       console.error('Failed to load projects:', error)
-      setProjects([
-        { id: "proj_1", name: "clouddeck-web" },
-        { id: "proj_2", name: "clouddeck-api" }
-      ])
+      setProjects([])
     }
   }
 
   const loadMetrics = async () => {
     try {
       setLoading(true)
-      const params = { timeRange, projectId: selectedProject !== "all" ? selectedProject : undefined }
-      const data = await apiClient.get('/metrics', { params })
-      setMetrics(data.metrics || {})
+
+      if (selectedProject === "all") {
+        const overviewResponse = await apiClient.getAnalyticsOverview()
+        const overview = overviewResponse?.data || overviewResponse || {}
+        setMetrics(buildMetricsPayload(overview))
+      } else {
+        const summaryResponse = await apiClient.getMetricsSummary(selectedProject, getTimeRangeDays(timeRange))
+        const summary = summaryResponse?.data || summaryResponse || {}
+        setMetrics(buildMetricsPayload(summary))
+      }
     } catch (error) {
       console.error('Failed to load metrics:', error)
-      // Mock data fallback
-      setMetrics({
-        performance: {
-          responseTime: { value: 245, change: -12, unit: "ms" },
-          throughput: { value: 1250, change: 8, unit: "req/min" },
-          errorRate: { value: 0.8, change: -0.3, unit: "%" },
-          uptime: { value: 99.9, change: 0.1, unit: "%" }
-        },
-        resources: {
-          cpuUsage: { value: 45, change: 5, unit: "%" },
-          memoryUsage: { value: 68, change: -2, unit: "%" },
-          diskUsage: { value: 32, change: 1, unit: "%" },
-          networkIO: { value: 125, change: 15, unit: "MB/s" }
-        },
-        database: {
-          connections: { value: 45, change: 3, unit: "" },
-          queryTime: { value: 85, change: -8, unit: "ms" },
-          cacheHitRate: { value: 94, change: 2, unit: "%" },
-          diskIO: { value: 15, change: -5, unit: "MB/s" }
-        },
-        business: {
-          activeUsers: { value: 1250, change: 120, unit: "" },
-          pageViews: { value: 15600, change: 850, unit: "" },
-          conversionRate: { value: 3.2, change: 0.4, unit: "%" },
-          revenue: { value: 12500, change: 1200, unit: "$" }
-        }
-      })
+      setMetrics({})
     } finally {
       setLoading(false)
     }

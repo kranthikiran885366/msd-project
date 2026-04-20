@@ -50,11 +50,24 @@ export default function RestorePage() {
       setError('');
       setLoading(true);
 
-      const backupsRes = await apiClient.getBackups(selectedDb);
+      const [backupsRes, auditRes] = await Promise.all([
+        apiClient.getBackups(selectedDb),
+        apiClient.getAuditLogs({ resourceType: 'Database', action: 'DATABASE_BACKUP_RESTORED', limit: 50 })
+      ]);
       setBackups(backupsRes?.backups || []);
-      
-      // Mock restore history for now since API doesn't have this endpoint
-      setRestores([]);
+
+      const restoreLogs = (auditRes?.logs || [])
+        .filter((log) => String(log.resourceId) === String(selectedDb))
+        .map((log) => ({
+          id: log._id || log.id,
+          backupName: log.metadata?.backupId || 'Unknown backup',
+          databaseName: databases.find((d) => String(d._id) === String(log.resourceId))?.name || 'Unknown',
+          startedAt: new Date(log.createdAt).toLocaleString(),
+          completedAt: new Date(log.createdAt).toLocaleString(),
+          duration: 'Completed',
+          status: 'completed'
+        }));
+      setRestores(restoreLogs);
     } catch (err) {
       setError(err.message || 'Failed to fetch restore data');
     } finally {
@@ -73,18 +86,8 @@ export default function RestorePage() {
 
       setSaving(true);
       await apiClient.restoreBackup(selectedDb, selectedBackup);
-      
-      const newRestore = {
-        id: Date.now(),
-        backupName: backups.find(b => b._id === selectedBackup || b.name === selectedBackup)?.name || selectedBackup,
-        databaseName: databases.find(d => d._id === selectedDb)?.name || 'Unknown',
-        startedAt: new Date().toLocaleString(),
-        completedAt: null,
-        duration: 'In progress',
-        status: 'in-progress'
-      };
-      
-      setRestores([newRestore, ...restores]);
+
+      await fetchRestoreData();
       setSelectedBackup(null);
       setShowRestoreForm(false);
       setSuccessMessage('Restore initiated successfully');

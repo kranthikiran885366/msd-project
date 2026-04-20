@@ -6,6 +6,7 @@ const buildService = require('./buildService');
 const notificationService = require('./notificationService');
 const webhookService = require('./webhookService');
 const logService = require('./logService');
+const deployerFactory = require('./deployers/deployerFactory');
 
 class DeploymentService {
     // FIX: was (projectId, environmentId, options) — controller passes a flat options object
@@ -37,7 +38,9 @@ class DeploymentService {
             deploymentContext,
             canaryDeployment,
             triggeredBy,
-            userId,
+            deployedBy: userId,
+            provider: options.provider || project.deploymentSettings?.provider || 'custom',
+            providerConfig: options.providerConfig || {},
             logs: []
         });
 
@@ -53,15 +56,57 @@ class DeploymentService {
         const deployment = await Deployment.findById(deploymentId).populate('projectId');
         if (!deployment) throw new Error('Deployment not found');
 
+        const project  = deployment.projectId;
+        const provider = deployment.provider || project.deploymentSettings?.provider || 'custom';
+
         try {
+            // ── Internal Docker-based deployment (AWS EC2 worker nodes) ──────────
+            if (provider === 'custom') {
+                await this.updateDeploymentStatus(deploymentId, 'building');
+
+                const jobQueueService       = require('./jobQueueService');
+                const projectConfigService  = require('./projectConfigService');
+
+                if (!jobQueueService.isConnected) {
+                    throw new Error('Job queue not available — ensure Redis is running');
+                }
+
+                // Resolve build/runtime config (with auto-detection fallbacks)
+                const deployConfig = await projectConfigService.resolveDeployConfig(project._id);
+
+                // Decrypt env variables — never logged, only sent to worker over private network
+                const envMap = await projectConfigService.getDecryptedEnvMap(project._id);
+
+                await jobQueueService.queueDeployment(deploymentId.toString(), {
+                    repositoryUrl: project.repository?.name
+                        ? `https://github.com/${project.repository.owner}/${project.repository.name}`
+                        : null,
+                    branch:          deployment.gitBranch || project.repository?.branch || 'main',
+                    // Runtime config
+                    runtime:         deployConfig.runtime,
+                    installCommand:  deployConfig.installCommand,
+                    buildCommand:    deployConfig.buildCommand,
+                    startCommand:    deployConfig.startCommand,
+                    appPort:         deployConfig.port,
+                    // Env vars (decrypted, sent over private VPC only)
+                    envVariables:    envMap,
+                    // Routing
+                    region:          project.deploymentSettings?.region || 'us-east-1',
+                    accessToken:     project.repository?.accessToken,
+                });
+
+                console.log(`[deploy] Deployment ${deploymentId} queued — runtime=${deployConfig.runtime} port=${deployConfig.port}`);
+                return;
+            }
+
+            // ── External provider deployment (Vercel / Netlify / Render) ─────────
             await this.updateDeploymentStatus(deploymentId, 'building');
 
-            const build = await buildService.createBuild(deployment.projectId._id, {
-                branch: deployment.gitBranch,
+            const build = await buildService.createBuild(project._id, {
+                branch:    deployment.gitBranch,
                 commitSha: deployment.gitCommit,
                 deploymentId: deployment._id,
             });
-
             deployment.buildId = build._id;
             await deployment.save();
 
@@ -70,37 +115,28 @@ class DeploymentService {
 
             await this.updateDeploymentStatus(deploymentId, 'deploying');
 
-            // Attempt provider deployment if not custom
-            const project = deployment.projectId;
-            const provider = deployment.provider || project.deploymentSettings?.provider || 'custom';
             let deployUrl = null;
-
-            if (provider !== 'custom') {
-                try {
-                    const deployerFactory = require('./deployers/deployerFactory');
-                    // FIX: factory exposes getAdapter(), not getDeployer()
-                    const adapter = deployerFactory.getAdapter(provider);
-                    const deployResult = await adapter.createDeployment(project, {
-                        branch: deployment.gitBranch,
-                        framework: project.framework,
-                        buildCommand: project.buildSettings?.buildCommand,
-                        outputDirectory: project.buildSettings?.outputDirectory,
-                    });
-                    deployUrl = deployResult.url;
-                } catch (adapterErr) {
-                    console.warn(`[deploy] Provider adapter error (non-fatal): ${adapterErr.message}`);
-                }
+            try {
+                const adapter = deployerFactory.getAdapter(provider);
+                const deployResult = await adapter.createDeployment(project, {
+                    branch:          deployment.gitBranch,
+                    framework:       project.framework,
+                    buildCommand:    project.buildSettings?.buildCommand,
+                    outputDirectory: project.buildSettings?.outputDirectory,
+                });
+                deployUrl = deployResult.url;
+            } catch (adapterErr) {
+                console.warn(`[deploy] Provider adapter error (non-fatal): ${adapterErr.message}`);
             }
 
             await this.updateDeploymentStatus(deploymentId, 'running', {
                 productionUrl: deployUrl,
-                deployTime: Date.now(),
+                deployTime:    Date.now(),
             });
 
             try {
-                await webhookService.triggerWebhook(deployment.projectId._id, 'deployment.success', {
-                    deployment: deployment.toObject(),
-                    url: deployUrl,
+                await webhookService.triggerWebhook(project._id, 'deployment.success', {
+                    deployment: deployment.toObject(), url: deployUrl,
                 });
                 await notificationService.sendDeploymentNotification(deployment, 'success');
             } catch (notifyErr) {
@@ -109,11 +145,9 @@ class DeploymentService {
 
         } catch (error) {
             await this.updateDeploymentStatus(deploymentId, 'failed', { rollbackReason: error.message });
-
             try {
-                await webhookService.triggerWebhook(deployment.projectId._id, 'deployment.failed', {
-                    deployment: deployment.toObject(),
-                    error: error.message,
+                await webhookService.triggerWebhook(project._id, 'deployment.failed', {
+                    deployment: deployment.toObject(), error: error.message,
                 });
                 await notificationService.sendDeploymentNotification(deployment, 'failed', error.message);
             } catch (notifyErr) {
@@ -240,11 +274,162 @@ class DeploymentService {
             throw new Error('Cannot cancel deployment in current status');
         }
 
-        await this.updateDeploymentStatus(deploymentId, 'failed', { rollbackReason: 'Cancelled by user' });
+        if (deployment.buildId) {
+            try {
+                await buildService.cancelBuild(deployment.buildId);
+            } catch (_) {
+                // Ignore build cancellation errors and still mark deployment as canceled.
+            }
+        }
+
+        await this.updateDeploymentStatus(deploymentId, 'rolled-back', { rollbackReason: 'Cancelled by user' });
         try {
             await notificationService.sendDeploymentNotification(deployment, 'cancelled');
         } catch (_) {}
         return deployment;
+    }
+
+    // Compatibility method used by blueprint service.
+    async startDeployment(deploymentId) {
+        this.processDeployment(deploymentId).catch((error) => {
+            console.error(`[deploy] startDeployment failed for ${deploymentId}:`, error.message);
+        });
+
+        return await Deployment.findById(deploymentId).lean();
+    }
+
+    // Provider-first deployment flow used by providers controller.
+    async startDeploymentWithProvider(deploymentId, project, config = {}) {
+        const deployment = await Deployment.findById(deploymentId);
+        if (!deployment) throw new Error('Deployment not found');
+
+        const provider = String(config.provider || deployment.provider || project?.deploymentSettings?.provider || 'custom').toLowerCase();
+        deployment.provider = provider;
+        deployment.providerConfig = {
+            ...(deployment.providerConfig || {}),
+            ...config,
+        };
+        await deployment.save();
+
+        if (provider === 'custom') {
+            await this.startDeployment(deploymentId);
+            return {
+                providerDeploymentId: null,
+                status: 'queued',
+                url: deployment.productionUrl || null,
+            };
+        }
+
+        const result = await deployerFactory.createDeployment(provider, project, {
+            ...config,
+            branch: config.gitBranch || deployment.gitBranch,
+            framework: config.framework || project?.framework,
+            buildCommand: config.buildCommand || project?.buildSettings?.buildCommand,
+            outputDirectory: config.outputDirectory || project?.buildSettings?.outputDirectory,
+        });
+
+        await this.updateDeploymentStatus(deploymentId, result.status || 'deploying', {
+            provider,
+            providerDeploymentId: result.providerDeploymentId,
+            providerMetadata: result.metadata || {},
+            productionUrl: result.url || deployment.productionUrl,
+        });
+
+        return {
+            providerDeploymentId: result.providerDeploymentId,
+            status: result.status || 'deploying',
+            url: result.url || null,
+        };
+    }
+
+    async pollDeploymentStatus(deploymentId) {
+        const deployment = await Deployment.findById(deploymentId).populate('projectId');
+        if (!deployment) throw new Error('Deployment not found');
+
+        if (!deployment.providerDeploymentId || deployment.provider === 'custom') {
+            return {
+                deploymentId: deployment._id,
+                provider: deployment.provider || 'custom',
+                status: deployment.status,
+                url: deployment.productionUrl || deployment.previewUrl || null,
+            };
+        }
+
+        const providerStatus = await deployerFactory.getDeploymentStatus(
+            deployment.provider,
+            deployment.providerDeploymentId,
+        );
+
+        const updates = {
+            providerMetadata: {
+                ...(deployment.providerMetadata || {}),
+                ...(providerStatus.metadata || {}),
+            },
+        };
+
+        if (providerStatus.url) {
+            if (deployment.environment === 'preview') {
+                updates.previewUrl = providerStatus.url;
+            } else {
+                updates.productionUrl = providerStatus.url;
+            }
+        }
+
+        if (providerStatus.metadata?.buildTime) {
+            updates.buildTime = providerStatus.metadata.buildTime;
+        }
+        if (providerStatus.metadata?.deployTime) {
+            updates.deployTime = providerStatus.metadata.deployTime;
+        }
+
+        await this.updateDeploymentStatus(deploymentId, providerStatus.status || deployment.status, updates);
+
+        return {
+            deploymentId: deployment._id,
+            provider: deployment.provider,
+            providerDeploymentId: deployment.providerDeploymentId,
+            status: providerStatus.status || deployment.status,
+            progress: providerStatus.progress ?? null,
+            url: providerStatus.url || deployment.productionUrl || deployment.previewUrl || null,
+            metadata: providerStatus.metadata || {},
+        };
+    }
+
+    async getProviderLogs(deploymentId, options = {}) {
+        const deployment = await Deployment.findById(deploymentId).select('provider providerDeploymentId logs');
+        if (!deployment) throw new Error('Deployment not found');
+
+        if (deployment.provider && deployment.provider !== 'custom' && deployment.providerDeploymentId) {
+            return await deployerFactory.getDeploymentLogs(
+                deployment.provider,
+                deployment.providerDeploymentId,
+                options,
+            );
+        }
+
+        const offset = Number(options.offset || 0);
+        const limit = Number(options.limit || 50);
+        const logs = Array.isArray(deployment.logs) ? deployment.logs : [];
+        return {
+            logs: logs.slice(offset, offset + limit),
+            hasMore: logs.length > offset + limit,
+        };
+    }
+
+    async cancelDeploymentViaProvider(deploymentId) {
+        const deployment = await Deployment.findById(deploymentId);
+        if (!deployment) throw new Error('Deployment not found');
+
+        if (deployment.provider && deployment.provider !== 'custom' && deployment.providerDeploymentId) {
+            try {
+                await deployerFactory.cancelDeployment(deployment.provider, deployment.providerDeploymentId);
+            } catch (error) {
+                console.warn(`[deploy] Provider cancellation warning: ${error.message}`);
+            }
+        }
+
+        await this.cancelDeployment(deploymentId);
+        return { success: true, message: 'Deployment canceled' };
     }
 
     async addDeploymentLog(deploymentId, message, level = 'info') {

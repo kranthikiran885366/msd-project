@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle, Plus, Trash2, RefreshCw, Copy, Eye, EyeOff, P
 import apiClient from '@/lib/api-client';
 
 export default function WebhookEndpointsPage() {
+  const [projectId, setProjectId] = useState('');
   const [endpoints, setEndpoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,90 +28,6 @@ export default function WebhookEndpointsPage() {
     active: true,
     headers: [{ key: 'X-Custom-Header', value: 'value' }]
   });
-
-  // Mock webhook endpoints
-  const mockEndpoints = [
-    {
-      id: 'webhook-ep-1',
-      name: 'Deployment Webhook',
-      description: 'Receives deployment events',
-      url: 'https://webhook.company.com/deploy',
-      secret: 'whsec_test1234567890abcdef',
-      active: true,
-      eventTypes: ['deployment.created', 'deployment.started', 'deployment.completed', 'deployment.failed'],
-      totalDeliveries: 1247,
-      successfulDeliveries: 1234,
-      failedDeliveries: 13,
-      lastDelivery: '2024-12-20T16:02:00Z',
-      nextRetry: null,
-      createdAt: '2024-09-15T10:00:00Z',
-      updatedAt: '2024-12-20T14:30:00Z'
-    },
-    {
-      id: 'webhook-ep-2',
-      name: 'Alert Webhook',
-      description: 'Alert event notifications',
-      url: 'https://webhook.company.com/alerts',
-      secret: 'whsec_alert1234567890abcdef',
-      active: true,
-      eventTypes: ['alert.triggered', 'alert.resolved', 'alert.acknowledged'],
-      totalDeliveries: 523,
-      successfulDeliveries: 518,
-      failedDeliveries: 5,
-      lastDelivery: '2024-12-20T15:45:00Z',
-      nextRetry: null,
-      createdAt: '2024-08-20T09:00:00Z',
-      updatedAt: '2024-12-18T11:20:00Z'
-    },
-    {
-      id: 'webhook-ep-3',
-      name: 'Scaling Events',
-      description: 'Auto-scaling event tracking',
-      url: 'https://webhook.company.com/scaling',
-      secret: 'whsec_scaling1234567890abcd',
-      active: true,
-      eventTypes: ['scaling.initiated', 'scaling.completed', 'scaling.failed'],
-      totalDeliveries: 342,
-      successfulDeliveries: 340,
-      failedDeliveries: 2,
-      lastDelivery: '2024-12-20T16:00:00Z',
-      nextRetry: null,
-      createdAt: '2024-10-01T12:00:00Z',
-      updatedAt: '2024-12-19T15:30:00Z'
-    },
-    {
-      id: 'webhook-ep-4',
-      name: 'Backup Notifications',
-      description: 'Database backup status updates',
-      url: 'https://webhook.company.com/backups',
-      secret: 'whsec_backup1234567890abcde',
-      active: false,
-      eventTypes: ['backup.started', 'backup.completed', 'backup.failed', 'backup.verified'],
-      totalDeliveries: 128,
-      successfulDeliveries: 127,
-      failedDeliveries: 1,
-      lastDelivery: '2024-12-15T08:00:00Z',
-      nextRetry: null,
-      createdAt: '2024-07-10T14:00:00Z',
-      updatedAt: '2024-12-10T10:30:00Z'
-    },
-    {
-      id: 'webhook-ep-5',
-      name: 'Analytics Ingestion',
-      description: 'Send metrics to analytics platform',
-      url: 'https://webhook.company.com/analytics',
-      secret: 'whsec_analytics1234567890abc',
-      active: true,
-      eventTypes: ['metric.recorded', 'event.recorded', 'trace.recorded'],
-      totalDeliveries: 8932,
-      successfulDeliveries: 8754,
-      failedDeliveries: 178,
-      lastDelivery: '2024-12-20T16:02:00Z',
-      nextRetry: '2024-12-20T16:05:00Z',
-      createdAt: '2024-06-01T09:00:00Z',
-      updatedAt: '2024-12-20T15:45:00Z'
-    }
-  ];
 
   const eventTypeOptions = [
     'deployment.created',
@@ -132,9 +49,46 @@ export default function WebhookEndpointsPage() {
     'trace.recorded'
   ];
 
+  const normalizeWebhook = (webhook) => ({
+    ...webhook,
+    id: webhook._id || webhook.id,
+    name: webhook.name || `Webhook ${String(webhook._id || webhook.id).slice(-6)}`,
+    description: webhook.description || '',
+    eventTypes: webhook.events || webhook.eventTypes || [],
+    totalDeliveries: webhook.deliveryStats?.total || 0,
+    successfulDeliveries: webhook.deliveryStats?.success || 0,
+    failedDeliveries: webhook.deliveryStats?.failed || 0,
+    nextRetry: null,
+    secret: webhook.secret || ''
+  });
+
+  const fetchEndpoints = async (activeProjectId) => {
+    if (!activeProjectId) {
+      setEndpoints([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError('');
+      setLoading(true);
+      const response = await apiClient.getWebhooks(activeProjectId);
+      const list = Array.isArray(response) ? response : response?.data || [];
+      setEndpoints(list.map(normalizeWebhook));
+    } catch (err) {
+      setError(err.message || 'Failed to fetch endpoints');
+      setEndpoints([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setEndpoints(mockEndpoints);
-    setLoading(false);
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const activeProjectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+    setProjectId(activeProjectId || '');
+    fetchEndpoints(activeProjectId);
   }, []);
 
   const handleCreateEndpoint = async () => {
@@ -145,40 +99,23 @@ export default function WebhookEndpointsPage() {
 
     try {
       setError('');
-      const response = await apiClient.createWebhookEndpoint(formData);
-
-      if (response.success) {
-        const newSecret = `whsec_${Math.random().toString(36).substring(2, 20)}`;
-        const newEndpoint = {
-          id: `webhook-ep-${endpoints.length + 1}`,
-          secret: newSecret,
-          active: true,
-          totalDeliveries: 0,
-          successfulDeliveries: 0,
-          failedDeliveries: 0,
-          lastDelivery: null,
-          nextRetry: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          headers: [{ key: 'X-Custom-Header', value: 'value' }],
-          ...formData
-        };
-        setEndpoints([...endpoints, newEndpoint]);
-        setSuccessMessage('Webhook endpoint created successfully');
-        setFormData({
-          name: '',
-          description: '',
-          url: '',
-          eventTypes: [],
-          secret: '',
-          active: true,
-          headers: [{ key: 'X-Custom-Header', value: 'value' }]
-        });
-        setShowForm(false);
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to create endpoint');
-      }
+      await apiClient.createWebhookEndpoint({
+        ...formData,
+        projectId,
+      });
+      await fetchEndpoints(projectId);
+      setSuccessMessage('Webhook endpoint created successfully');
+      setFormData({
+        name: '',
+        description: '',
+        url: '',
+        eventTypes: [],
+        secret: '',
+        active: true,
+        headers: [{ key: 'X-Custom-Header', value: 'value' }]
+      });
+      setShowForm(false);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -191,15 +128,10 @@ export default function WebhookEndpointsPage() {
 
     try {
       setError('');
-      const response = await apiClient.deleteWebhookEndpoint(endpointId);
-
-      if (response.success) {
-        setEndpoints(endpoints.filter(e => e.id !== endpointId));
-        setSuccessMessage('Endpoint deleted successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to delete endpoint');
-      }
+      await apiClient.deleteWebhookEndpoint(endpointId);
+      await fetchEndpoints(projectId);
+      setSuccessMessage('Endpoint deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -208,14 +140,9 @@ export default function WebhookEndpointsPage() {
   const handleTestEndpoint = async (endpointId) => {
     try {
       setError('');
-      const response = await apiClient.testWebhookEndpoint(endpointId);
-
-      if (response.success) {
-        setSuccessMessage('Test payload sent successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Test failed');
-      }
+      await apiClient.testWebhookEndpoint(endpointId);
+      setSuccessMessage('Test payload sent successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -224,14 +151,10 @@ export default function WebhookEndpointsPage() {
   const handleGetLogs = async (endpointId) => {
     try {
       setError('');
-      const response = await apiClient.getWebhookEndpointLogs(endpointId);
-
-      if (response.success) {
-        setSuccessMessage('Logs retrieved successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to fetch logs');
-      }
+      const deliveries = await apiClient.getWebhookEndpointLogs(endpointId, { limit: 1 });
+      const lastDelivery = Array.isArray(deliveries) ? deliveries[0] : deliveries?.deliveries?.[0];
+      setSuccessMessage(lastDelivery ? `Last delivery status: ${lastDelivery.status}` : 'No deliveries yet');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -247,7 +170,9 @@ export default function WebhookEndpointsPage() {
 
   const activeEndpoints = endpoints.filter(e => e.active).length;
   const totalDeliveries = endpoints.reduce((sum, e) => sum + e.totalDeliveries, 0);
-  const avgSuccessRate = ((endpoints.reduce((sum, e) => sum + e.successfulDeliveries, 0) / totalDeliveries) * 100).toFixed(1);
+  const avgSuccessRate = totalDeliveries > 0
+    ? ((endpoints.reduce((sum, e) => sum + e.successfulDeliveries, 0) / totalDeliveries) * 100).toFixed(1)
+    : '0.0';
 
   return (
     <div className="p-6 space-y-6">

@@ -1,272 +1,170 @@
-const jobQueueService = require('./jobQueueService');
+'use strict';
+const jobQueueService       = require('./jobQueueService');
 const nodeManagementService = require('./nodeManagementService');
 
 class JobSchedulerService {
     constructor() {
-        this.scheduling = false;
+        this.scheduling         = false;
         this.schedulingInterval = null;
-        this.jobTimeout = 600000; // 10 minutes default
+        this.timeoutInterval    = null;
+        this.jobTimeoutMs       = 600000; // 10 minutes
     }
 
-    /**
-     * Start the job scheduler
-     */
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
     async startScheduler(pollInterval = 5000) {
         if (this.scheduling) return;
-
-        console.log('[v0] Starting job scheduler...');
+        console.log('[scheduler] Starting job scheduler...');
         this.scheduling = true;
 
-        // Process jobs immediately
         await this.processJobs();
 
-        // Then set up interval
         this.schedulingInterval = setInterval(async () => {
-            try {
-                await this.processJobs();
-            } catch (error) {
-                console.error('[v0] Error in scheduler loop:', error);
-            }
+            try { await this.processJobs(); }
+            catch (err) { console.error('[scheduler] processJobs error:', err.message); }
         }, pollInterval);
+
+        // Monitor stuck jobs every 60 s
+        this.timeoutInterval = setInterval(async () => {
+            try { await this.monitorJobTimeouts(); }
+            catch (_) {}
+        }, 60000);
     }
 
-    /**
-     * Stop the job scheduler
-     */
     stopScheduler() {
-        if (this.schedulingInterval) {
-            clearInterval(this.schedulingInterval);
-            this.schedulingInterval = null;
-        }
+        if (this.schedulingInterval) { clearInterval(this.schedulingInterval); this.schedulingInterval = null; }
+        if (this.timeoutInterval)    { clearInterval(this.timeoutInterval);    this.timeoutInterval    = null; }
         this.scheduling = false;
-        console.log('[v0] Job scheduler stopped');
+        console.log('[scheduler] Stopped');
     }
 
-    /**
-     * Main scheduling loop - process pending jobs
-     */
+    // ── Core scheduling loop ──────────────────────────────────────────────────
+
     async processJobs() {
-        try {
-            const pendingJobs = await jobQueueService.getPendingJobs();
-            if (pendingJobs.length === 0) return;
+        const pendingJobs = await jobQueueService.getPendingJobs();
+        if (pendingJobs.length === 0) return;
 
-            console.log(`[v0] Processing ${pendingJobs.length} pending jobs...`);
+        console.log(`[scheduler] ${pendingJobs.length} pending job(s)`);
 
-            // Get available nodes
-            const availableNodes = await nodeManagementService.getAvailableNodes();
-            if (availableNodes.length === 0) {
-                console.log('[v0] No available worker nodes, jobs waiting in queue');
-                return;
+        // Get available nodes; pass preferred region from first job if present
+        const firstJobRegion = pendingJobs[0]?.data?.region || null;
+        const availableNodes = await nodeManagementService.getAvailableNodes(firstJobRegion);
+
+        if (availableNodes.length === 0) {
+            console.log('[scheduler] No available worker nodes — jobs waiting');
+            return;
+        }
+
+        for (const job of pendingJobs) {
+            if (!job) continue;
+
+            // Skip jobs already assigned to a node
+            if (job.data?.assignedNodeId) continue;
+
+            const jobRegion = job.data?.region || null;
+            const node = await this._selectBestNode(availableNodes, jobRegion);
+            if (!node) {
+                console.log('[scheduler] All nodes at capacity');
+                break;
             }
 
-            // Try to assign jobs to nodes
-            for (const job of pendingJobs) {
-                if (!job) continue;
-
-                const assignedNode = await this.selectBestNode(availableNodes);
-                if (!assignedNode) {
-                    console.log('[v0] No capacity available, remaining jobs in queue');
-                    break;
-                }
-
-                // Assign job to node
-                try {
-                    await this.assignJobToNode(job, assignedNode);
-                    
-                    // Update node capacity after assignment
-                    assignedNode.activeContainers += 1;
-                } catch (error) {
-                    console.error(`[v0] Error assigning job ${job.id}:`, error.message);
-                }
+            try {
+                await this._assignJobToNode(job, node);
+                // Optimistically reduce capacity so next iteration picks a different node
+                node.activeContainers += 1;
+            } catch (err) {
+                console.error(`[scheduler] Failed to assign job ${job.id}:`, err.message);
             }
-        } catch (error) {
-            console.error('[v0] Error in job processing loop:', error);
         }
     }
 
-    /**
-     * Select the best node based on capacity and resource utilization
-     */
-    async selectBestNode(availableNodes) {
-        if (availableNodes.length === 0) return null;
+    // ── Node selection — region-aware, load-balanced ──────────────────────────
 
-        // Calculate capacity score for each node
-        let bestNode = null;
-        let bestScore = Infinity;
+    async _selectBestNode(availableNodes, preferredRegion = null) {
+        let candidates = availableNodes.filter(n => n.activeContainers < 10);
+        if (candidates.length === 0) return null;
 
-        for (const node of availableNodes) {
-            // Check if node has capacity
-            if (node.activeContainers >= 10) continue; // Max 10 containers per node
-            
-            // Calculate CPU and memory utilization
-            const cpuLoad = node.cpuUsage || 0;
-            const memoryLoad = node.memoryUsage || 0;
-            const containerLoad = (node.activeContainers / 10) * 100;
-
-            // Scoring: lower is better
-            // Weighted score: 30% CPU + 30% Memory + 40% Container utilization
-            const score = (cpuLoad * 0.3) + (memoryLoad * 0.3) + (containerLoad * 0.4);
-
-            if (score < bestScore) {
-                bestScore = score;
-                bestNode = node;
-            }
+        // Prefer same-region nodes (AWS AZ locality)
+        if (preferredRegion) {
+            const regional = candidates.filter(n => n.region === preferredRegion);
+            if (regional.length > 0) candidates = regional;
         }
 
-        return bestNode;
-    }
-
-    /**
-     * Assign a job to a specific node
-     */
-    async assignJobToNode(job, node) {
-        try {
-            console.log(`[v0] Assigning job ${job.id} to node ${node.nodeId}`);
-
-            // Store node assignment in job metadata
-            job.data = job.data || {};
-            job.data.assignedNodeId = node.nodeId;
-            job.data.assignedAt = new Date();
-
-            await job.update(job.data);
-
-            // Update job status to indicate it's been assigned
-            await jobQueueService.updateJobProgress(job.id, {
-                status: 'assigned',
-                nodeId: node.nodeId,
-                timestamp: new Date()
-            });
-
-            // Update node's active container count
-            await nodeManagementService.incrementActiveContainers(node.nodeId);
-
-            console.log(`[v0] Successfully assigned job ${job.id} to node ${node.nodeId}`);
-            return true;
-        } catch (error) {
-            console.error(`[v0] Failed to assign job to node:`, error);
-            throw error;
+        // Score: lower is better — 30% CPU + 30% memory + 40% container utilisation
+        let best = null, bestScore = Infinity;
+        for (const n of candidates) {
+            const score = (n.cpuUsage * 0.3) + (n.memoryUsage * 0.3) + ((n.activeContainers / 10) * 100 * 0.4);
+            if (score < bestScore) { bestScore = score; best = n; }
         }
+        return best;
     }
 
-    /**
-     * Handle job completion
-     */
-    async onJobCompleted(jobId, result) {
-        try {
-            const job = await jobQueueService.getJob(jobId);
-            if (!job) return;
+    async _assignJobToNode(job, node) {
+        console.log(`[scheduler] Assigning job ${job.id} → node ${node.nodeId} (${node.region})`);
 
-            const nodeId = job.data?.assignedNodeId;
-            if (nodeId) {
-                // Decrement active containers
-                await nodeManagementService.decrementActiveContainers(nodeId);
-            }
+        await job.updateData({
+            ...job.data,
+            assignedNodeId: node.nodeId,
+            assignedAt:     new Date()
+        });
 
-            console.log(`[v0] Job ${jobId} completed successfully`);
-        } catch (error) {
-            console.error(`[v0] Error handling job completion:`, error);
-        }
+        await jobQueueService.updateJobProgress(job.id, {
+            status: 'assigned',
+            nodeId: node.nodeId,
+            timestamp: new Date()
+        });
+
+        await nodeManagementService.incrementActiveContainers(node.nodeId);
+        console.log(`[scheduler] Job ${job.id} assigned to ${node.nodeId}`);
     }
 
-    /**
-     * Handle job failure
-     */
+    // ── Completion / failure hooks ────────────────────────────────────────────
+
+    async onJobCompleted(jobId) {
+        const job = await jobQueueService.getJob(jobId);
+        if (!job) return;
+        const nodeId = job.data?.assignedNodeId;
+        if (nodeId) await nodeManagementService.decrementActiveContainers(nodeId).catch(() => {});
+        console.log(`[scheduler] Job ${jobId} completed`);
+    }
+
     async onJobFailed(jobId, error) {
-        try {
-            const job = await jobQueueService.getJob(jobId);
-            if (!job) return;
-
-            const nodeId = job.data?.assignedNodeId;
-            if (nodeId) {
-                // Mark node as having an error, but don't immediately fail it
-                await nodeManagementService.recordNodeError(nodeId, error.message);
-                
-                // Decrement active containers
-                await nodeManagementService.decrementActiveContainers(nodeId);
-            }
-
-            console.log(`[v0] Job ${jobId} failed: ${error.message}`);
-
-            // Check if we should retry
-            if (job.attemptsMade < job.opts.attempts) {
-                console.log(`[v0] Job ${jobId} will be retried (attempt ${job.attemptsMade + 1}/${job.opts.attempts})`);
-            } else {
-                console.log(`[v0] Job ${jobId} exhausted all retry attempts`);
-            }
-        } catch (error) {
-            console.error(`[v0] Error handling job failure:`, error);
+        const job = await jobQueueService.getJob(jobId);
+        if (!job) return;
+        const nodeId = job.data?.assignedNodeId;
+        if (nodeId) {
+            await nodeManagementService.recordNodeError(nodeId, error?.message || String(error)).catch(() => {});
+            await nodeManagementService.decrementActiveContainers(nodeId).catch(() => {});
         }
+        console.log(`[scheduler] Job ${jobId} failed: ${error?.message}`);
     }
 
-    /**
-     * Reschedule failed jobs
-     */
-    async rescheduleFailedJobs() {
-        try {
-            const failedJobs = await jobQueueService.getFailedJobs(100);
-            console.log(`[v0] Found ${failedJobs.length} failed jobs to reschedule`);
+    // ── Timeout monitoring ────────────────────────────────────────────────────
 
-            for (const job of failedJobs) {
-                if (job.attemptsMade < 3) {
-                    // Move job back to waiting queue for retry
-                    await job.retry();
-                    console.log(`[v0] Rescheduled job ${job.id} for retry`);
-                }
-            }
-        } catch (error) {
-            console.error('[v0] Error rescheduling failed jobs:', error);
-        }
-    }
-
-    /**
-     * Monitor job timeouts
-     */
     async monitorJobTimeouts() {
-        try {
-            const activeJobs = await jobQueueService.getActiveJobs();
-            const now = Date.now();
-
-            for (const job of activeJobs) {
-                const elapsedTime = now - job.processedOn;
-                
-                if (elapsedTime > this.jobTimeout) {
-                    console.warn(`[v0] Job ${job.id} exceeded timeout (${elapsedTime}ms), marking as failed`);
-                    await job.fail(new Error('Job timeout exceeded'));
-                    
-                    // Trigger failure handler
+        const activeJobs = await jobQueueService.getActiveJobs();
+        const now = Date.now();
+        for (const job of activeJobs) {
+            if (!job.processedOn) continue;
+            const elapsed = now - job.processedOn;
+            if (elapsed > this.jobTimeoutMs) {
+                console.warn(`[scheduler] Job ${job.id} timed out (${Math.round(elapsed / 1000)}s)`);
+                try {
+                    await job.moveToFailed(new Error('Job timeout exceeded'), true);
                     await this.onJobFailed(job.id, new Error('Job timeout'));
-                }
+                } catch (_) {}
             }
-        } catch (error) {
-            console.error('[v0] Error monitoring job timeouts:', error);
         }
     }
 
-    /**
-     * Get scheduler statistics
-     */
+    // ── Stats ─────────────────────────────────────────────────────────────────
+
     async getSchedulerStats() {
-        try {
-            const queueStats = await jobQueueService.getQueueStats();
-            const nodeStats = await nodeManagementService.getNodeStats();
-
-            return {
-                queue: queueStats,
-                nodes: nodeStats,
-                isRunning: this.scheduling
-            };
-        } catch (error) {
-            console.error('[v0] Error getting scheduler stats:', error);
-            return null;
-        }
-    }
-
-    /**
-     * Set job timeout
-     */
-    setJobTimeout(timeout) {
-        this.jobTimeout = timeout;
-        console.log(`[v0] Job timeout set to ${timeout}ms`);
+        const [queue, nodes] = await Promise.all([
+            jobQueueService.getQueueStats(),
+            nodeManagementService.getNodeStats()
+        ]);
+        return { queue, nodes, isRunning: this.scheduling };
     }
 }
 

@@ -133,4 +133,20 @@ router.get('/stats/utilization', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/ports/nginx-config
+ * Generate nginx upstream config for all active port mappings
+ */
+router.get('/nginx-config', async (req, res) => {
+    try {
+        const mappings = await portManagementService.getAllActiveMappings();
+        const nodeIp = process.env.NODE_IP || 'localhost';
+        const config = await portManagementService.generateNginxConfig(nodeIp, mappings);
+        res.type('text/plain').send(config);
+    } catch (error) {
+        console.error('[v0] Error generating nginx config:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

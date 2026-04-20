@@ -11,12 +11,12 @@ import { AlertCircle, CheckCircle, Plus, Trash2, RefreshCw, Code, Play, Settings
 import apiClient from '@/lib/api-client';
 
 export default function CustomIntegrationBuilderPage() {
+  const [projectId, setProjectId] = useState('');
   const [integrations, setIntegrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [selectedIntegration, setSelectedIntegration] = useState(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -32,133 +32,50 @@ export default function CustomIntegrationBuilderPage() {
     timeout: 30
   });
 
-  // Mock custom integrations
-  const mockIntegrations = [
-    {
-      id: 'custom-1',
-      name: 'Slack Notifications',
-      description: 'Send deployment notifications to Slack',
-      type: 'webhook',
-      status: 'active',
-      endpoint: 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX',
-      method: 'POST',
-      lastExecuted: '2024-12-20T15:45:00Z',
-      successRate: 98.5,
-      totalExecutions: 342,
-      headers: [
-        { key: 'Authorization', value: 'Bearer ***' }
-      ],
-      transformScript: `
-function transform(event) {
-  return {
-    text: "Deployment: " + event.deployment.name,
-    attachments: [{
-      color: event.status === 'success' ? 'good' : 'danger',
-      fields: [
-        { title: "Status", value: event.status, short: true },
-        { title: "Environment", value: event.environment, short: true }
-      ]
-    }]
-  };
-}
-      `,
-      createdAt: '2024-09-10T10:00:00Z',
-      updatedAt: '2024-12-15T14:30:00Z'
-    },
-    {
-      id: 'custom-2',
-      name: 'PagerDuty Incidents',
-      description: 'Create incidents in PagerDuty on critical alerts',
-      type: 'webhook',
-      status: 'active',
-      endpoint: 'https://events.pagerduty.com/v2/enqueue',
-      method: 'POST',
-      lastExecuted: '2024-12-20T16:00:00Z',
-      successRate: 99.2,
-      totalExecutions: 156,
-      headers: [
-        { key: 'Authorization', value: 'Token token=***' }
-      ],
-      transformScript: `
-function transform(alert) {
-  return {
-    routing_key: "R1234567890abcdef",
-    event_action: alert.severity === 'critical' ? 'trigger' : 'resolve',
-    payload: {
-      summary: alert.title,
-      severity: alert.severity,
-      source: "Deployment Platform"
+  const normalizeIntegration = (webhook) => ({
+    id: webhook._id || webhook.id,
+    name: webhook.name || `Integration ${String(webhook._id || webhook.id).slice(-6)}`,
+    description: webhook.description || '',
+    type: webhook.type || 'webhook',
+    status: webhook.active ? 'active' : 'inactive',
+    endpoint: webhook.url,
+    method: 'POST',
+    lastExecuted: webhook.lastDelivery || null,
+    successRate: Number((100 - (webhook.deliveryStats?.failureRate || 0)).toFixed(1)),
+    totalExecutions: webhook.deliveryStats?.total || 0,
+    headers: webhook.headers || [{ key: 'Content-Type', value: 'application/json' }],
+    transformScript: webhook.transformScript || '',
+    createdAt: webhook.createdAt,
+    updatedAt: webhook.updatedAt
+  });
+
+  const fetchIntegrations = async (activeProjectId) => {
+    if (!activeProjectId) {
+      setIntegrations([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError('');
+      setLoading(true);
+      const response = await apiClient.getWebhooks(activeProjectId);
+      const list = Array.isArray(response) ? response : response?.data || [];
+      setIntegrations(list.map(normalizeIntegration));
+    } catch (err) {
+      setError(err.message || 'Failed to fetch custom integrations');
+      setIntegrations([]);
+    } finally {
+      setLoading(false);
     }
   };
-}
-      `,
-      createdAt: '2024-10-05T12:00:00Z',
-      updatedAt: '2024-12-18T11:20:00Z'
-    },
-    {
-      id: 'custom-3',
-      name: 'Datadog Events',
-      description: 'Log deployment events to Datadog',
-      type: 'webhook',
-      status: 'active',
-      endpoint: 'https://api.datadoghq.com/api/v1/events',
-      method: 'POST',
-      lastExecuted: '2024-12-20T15:30:00Z',
-      successRate: 97.8,
-      totalExecutions: 234,
-      headers: [
-        { key: 'DD-API-KEY', value: '***' },
-        { key: 'DD-APPLICATION-KEY', value: '***' }
-      ],
-      transformScript: `
-function transform(event) {
-  return {
-    title: event.deployment.name + " deployment",
-    text: event.message,
-    priority: event.priority,
-    tags: ["deployment", event.environment, event.status],
-    alert_type: event.status === 'error' ? 'error' : 'success'
-  };
-}
-      `,
-      createdAt: '2024-11-01T08:00:00Z',
-      updatedAt: '2024-12-19T09:45:00Z'
-    },
-    {
-      id: 'custom-4',
-      name: 'HTTP Analytics Logger',
-      description: 'Send analytics data to custom logging service',
-      type: 'rest-api',
-      status: 'active',
-      endpoint: 'https://logs.internal.company.com/v1/logs',
-      method: 'POST',
-      lastExecuted: '2024-12-20T16:02:00Z',
-      successRate: 96.3,
-      totalExecutions: 5847,
-      headers: [
-        { key: 'X-API-Key', value: '***' },
-        { key: 'X-Service', value: 'deployment-platform' }
-      ],
-      transformScript: `
-function transform(data) {
-  return {
-    timestamp: new Date().toISOString(),
-    service: "deployment-platform",
-    level: data.level || "info",
-    message: data.message,
-    metadata: data.metadata || {},
-    source: data.source
-  };
-}
-      `,
-      createdAt: '2024-08-20T09:00:00Z',
-      updatedAt: '2024-12-20T10:30:00Z'
-    }
-  ];
 
   useEffect(() => {
-    setIntegrations(mockIntegrations);
-    setLoading(false);
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const activeProjectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+    setProjectId(activeProjectId || '');
+    fetchIntegrations(activeProjectId);
   }, []);
 
   const handleCreateIntegration = async () => {
@@ -169,39 +86,24 @@ function transform(data) {
 
     try {
       setError('');
-      const response = await apiClient.createCustomIntegration(formData);
-
-      if (response.success) {
-        const newIntegration = {
-          id: `custom-${integrations.length + 1}`,
-          status: 'active',
-          lastExecuted: null,
-          successRate: 0,
-          totalExecutions: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          ...formData
-        };
-        setIntegrations([...integrations, newIntegration]);
-        setSuccessMessage('Custom integration created successfully');
-        setFormData({
-          name: '',
-          description: '',
-          type: 'webhook',
-          method: 'POST',
-          endpoint: '',
-          headers: [{ key: 'Content-Type', value: 'application/json' }],
-          transformScript: '',
-          enabled: true,
-          retryPolicy: 'exponential',
-          maxRetries: 3,
-          timeout: 30
-        });
-        setShowForm(false);
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to create integration');
-      }
+      await apiClient.createCustomIntegration({ ...formData, projectId });
+      await fetchIntegrations(projectId);
+      setSuccessMessage('Custom integration created successfully');
+      setFormData({
+        name: '',
+        description: '',
+        type: 'webhook',
+        method: 'POST',
+        endpoint: '',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        transformScript: '',
+        enabled: true,
+        retryPolicy: 'exponential',
+        maxRetries: 3,
+        timeout: 30
+      });
+      setShowForm(false);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -214,15 +116,10 @@ function transform(data) {
 
     try {
       setError('');
-      const response = await apiClient.deleteCustomIntegration(integrationId);
-
-      if (response.success) {
-        setIntegrations(integrations.filter(i => i.id !== integrationId));
-        setSuccessMessage('Integration deleted successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to delete integration');
-      }
+      await apiClient.deleteCustomIntegration(integrationId);
+      await fetchIntegrations(projectId);
+      setSuccessMessage('Integration deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -231,14 +128,9 @@ function transform(data) {
   const handleTestIntegration = async (integrationId) => {
     try {
       setError('');
-      const response = await apiClient.testCustomIntegration(integrationId);
-
-      if (response.success) {
-        setSuccessMessage('Integration test successful');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Integration test failed');
-      }
+      await apiClient.testCustomIntegration(integrationId);
+      setSuccessMessage('Integration test successful');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -247,14 +139,10 @@ function transform(data) {
   const handleGetLogs = async (integrationId) => {
     try {
       setError('');
-      const response = await apiClient.getCustomIntegrationLogs(integrationId);
-
-      if (response.success) {
-        setSuccessMessage('Logs retrieved successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to fetch logs');
-      }
+      const deliveries = await apiClient.getCustomIntegrationLogs(integrationId, { limit: 1 });
+      const lastDelivery = Array.isArray(deliveries) ? deliveries[0] : deliveries?.deliveries?.[0];
+      setSuccessMessage(lastDelivery ? `Last delivery status: ${lastDelivery.status}` : 'No delivery logs yet');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -270,7 +158,9 @@ function transform(data) {
 
   const activeIntegrations = integrations.filter(i => i.status === 'active').length;
   const totalExecutions = integrations.reduce((sum, i) => sum + i.totalExecutions, 0);
-  const avgSuccessRate = (integrations.reduce((sum, i) => sum + i.successRate, 0) / integrations.length).toFixed(1);
+  const avgSuccessRate = integrations.length > 0
+    ? (integrations.reduce((sum, i) => sum + i.successRate, 0) / integrations.length).toFixed(1)
+    : '0.0';
 
   return (
     <div className="p-6 space-y-6">

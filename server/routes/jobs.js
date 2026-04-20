@@ -1,14 +1,17 @@
+'use strict';
 const express = require('express');
-const router = express.Router();
-const jobQueueService = require('../services/jobQueueService');
-const jobSchedulerService = require('../services/jobSchedulerService');
-const { validateRequest } = require('../middleware/validation');
+const router  = express.Router();
+const jobQueueService    = require('../services/jobQueueService');
+const jobSchedulerService= require('../services/jobSchedulerService');
+const internalAuth       = require('../middleware/internalAuth');
+const authMiddleware     = require('../middleware/auth');
+const { validateRequest }= require('../middleware/validation');
 
 /**
  * POST /api/jobs/queue
- * Queue a new deployment job
+ * Queue a new deployment job (authenticated user action).
  */
-router.post('/queue', validateRequest(['deploymentId']), async (req, res) => {
+router.post('/queue', authMiddleware, validateRequest(['deploymentId']), async (req, res) => {
     try {
         const { deploymentId, options } = req.body;
 
@@ -38,38 +41,32 @@ router.post('/queue', validateRequest(['deploymentId']), async (req, res) => {
 
 /**
  * GET /api/jobs/pull?nodeId=xxx
- * Pull available jobs for a worker node
+ * Pull one available job for a worker node (internal — worker auth required).
+ * Stamps assignedNodeId to prevent double-dispatch.
  */
-router.get('/pull', validateRequest(['nodeId']), async (req, res) => {
+router.get('/pull', internalAuth, validateRequest(['nodeId']), async (req, res) => {
     try {
         const { nodeId } = req.query;
         const pendingJobs = await jobQueueService.getPendingJobs();
 
-        if (pendingJobs.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'No jobs available'
-            });
+        // Skip jobs already assigned to another node
+        const unassigned = pendingJobs.filter(j => !j.data?.assignedNodeId);
+
+        if (unassigned.length === 0) {
+            return res.status(404).json({ success: false, message: 'No jobs available' });
         }
 
-        // Get a small batch of jobs (max 2)
-        const jobs = pendingJobs.slice(0, 2).map(job => ({
-            id: job.id,
-            deploymentId: job.data.deploymentId,
-            data: job.data
-        }));
+        const job = unassigned[0];
+        await job.updateData({ ...job.data, assignedNodeId: nodeId, assignedAt: new Date() }).catch(() => {});
 
         res.json({
             success: true,
-            jobs,
-            count: jobs.length
+            jobs: [{ id: job.id, deploymentId: job.data.deploymentId, data: job.data }],
+            count: 1
         });
     } catch (error) {
-        console.error('[v0] Error pulling jobs:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        console.error('[jobs] Pull error:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

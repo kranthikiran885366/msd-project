@@ -49,8 +49,13 @@ const portsRoutes = require("./routes/ports")
 const app = express()
 
 // Middleware
-// Configure CORS. Allow the Next.js frontend (port 5000) and any Replit proxy origins.
-const allowedOrigins = [config.clientUrl, 'http://localhost:5000', 'http://127.0.0.1:5000']
+// Configure CORS. Allow the Next.js frontend and any configured extra origins.
+const allowedOrigins = [
+  config.clientUrl,
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  ...(process.env.EXTRA_ALLOWED_ORIGINS ? process.env.EXTRA_ALLOWED_ORIGINS.split(',').map(s => s.trim()) : [])
+]
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -185,9 +190,35 @@ ErrorMonitoringService.init();
 
 // Connect to database and start server
 connectDB()
-  .then(() => {
+  .then(async () => {
+    // Initialize job queue
+    try {
+      const jobQueueService = require('./services/jobQueueService');
+      await jobQueueService.initialize();
+      console.log('[startup] Job queue initialized');
+
+      // Start job scheduler after queue is ready
+      const jobSchedulerService = require('./services/jobSchedulerService');
+      await jobSchedulerService.startScheduler();
+      console.log('[startup] Job scheduler started');
+
+      // Initialize port management
+      const portManagementService = require('./services/portManagementService');
+      await portManagementService.initialize();
+      console.log('[startup] Port management initialized');
+
+      // Start node health check monitor
+      const nodeManagementService = require('./services/nodeManagementService');
+      nodeManagementService.startHealthCheck(30000);
+      console.log('[startup] Node health check started');
+    } catch (initErr) {
+      console.warn('[startup] Infrastructure services init warning (non-fatal):', initErr.message);
+    }
+
     app.listen(config.port, () => {
       console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`)
+      console.log(`Public URL:  ${config.publicUrl}`)
+      console.log(`Private IP:  ${config.privateIp}`)
       console.log(`Prometheus metrics available at http://localhost:${config.port}/metrics`)
     })
   })

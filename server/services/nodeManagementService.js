@@ -1,383 +1,270 @@
+'use strict';
 const WorkerNode = require('../models/WorkerNode');
+
+// How long without a heartbeat before a node is considered inactive (ms)
+const HEARTBEAT_TIMEOUT_MS = 45000; // 45 s — workers send every 10 s
+// Max containers per node before it is excluded from scheduling
+const MAX_CONTAINERS_PER_NODE = 10;
 
 class NodeManagementService {
     constructor() {
-        this.heartbeatTimeout = 30000; // 30 seconds
         this.healthCheckInterval = null;
     }
 
+    // ── Registration ──────────────────────────────────────────────────────────
+
     /**
-     * Register a new worker node
+     * Register or re-register a worker node.
+     * Payload must include: nodeId, hostname, privateIp, publicIp, region, totalCapacity
      */
     async registerNode(nodeData) {
-        try {
-            const {
+        const {
+            nodeId,
+            hostname,
+            privateIp = '',
+            publicIp  = '',
+            region    = 'us-east-1',
+            availabilityZone = '',
+            totalCapacity = { cpu: 2, memory: 2048, storage: 10240 }
+        } = nodeData;
+
+        let node = await WorkerNode.findOne({ nodeId });
+
+        if (node) {
+            node.status           = 'active';
+            node.lastHeartbeat    = new Date();
+            node.hostname         = hostname;
+            node.privateIp        = privateIp;
+            node.publicIp         = publicIp;
+            node.region           = region;
+            node.availabilityZone = availabilityZone;
+            node.totalCapacity    = totalCapacity;
+            await node.save();
+        } else {
+            node = await WorkerNode.create({
                 nodeId,
                 hostname,
-                region = 'us-east-1',
-                totalCapacity = {
-                    cpu: 2,
-                    memory: 2048, // MB
-                    storage: 10240 // MB
-                }
-            } = nodeData;
-
-            // Check if node already exists
-            let node = await WorkerNode.findOne({ nodeId });
-            
-            if (node) {
-                // Update existing node
-                node.status = 'active';
-                node.lastHeartbeat = new Date();
-                node.hostname = hostname;
-                node.region = region;
-                node.totalCapacity = totalCapacity;
-            } else {
-                // Create new node
-                node = await WorkerNode.create({
-                    nodeId,
-                    hostname,
-                    region,
-                    status: 'active',
-                    lastHeartbeat: new Date(),
-                    cpuUsage: 0,
-                    memoryUsage: 0,
-                    diskUsage: 0,
-                    activeContainers: 0,
-                    totalCapacity,
-                    registeredAt: new Date()
-                });
-            }
-
-            console.log(`[v0] Node registered: ${nodeId} (${region})`);
-            return node;
-        } catch (error) {
-            console.error('[v0] Error registering node:', error);
-            throw error;
+                privateIp,
+                publicIp,
+                region,
+                availabilityZone,
+                status: 'active',
+                lastHeartbeat: new Date(),
+                cpuUsage: 0,
+                memoryUsage: 0,
+                diskUsage: 0,
+                activeContainers: 0,
+                totalCapacity,
+                registeredAt: new Date()
+            });
         }
+
+        console.log(`[nodes] Registered: ${nodeId} private=${privateIp} public=${publicIp} region=${region}`);
+        return node;
     }
 
-    /**
-     * Update node heartbeat and metrics
-     */
+    // ── Heartbeat ─────────────────────────────────────────────────────────────
+
     async updateNodeHeartbeat(nodeId, metrics = {}) {
-        try {
-            const node = await WorkerNode.findOne({ nodeId });
-            if (!node) {
-                throw new Error(`Node ${nodeId} not found`);
-            }
+        const node = await WorkerNode.findOne({ nodeId });
+        if (!node) throw new Error(`Node ${nodeId} not found`);
 
-            // Update metrics
-            node.lastHeartbeat = new Date();
-            node.cpuUsage = metrics.cpuUsage || 0;
-            node.memoryUsage = metrics.memoryUsage || 0;
-            node.diskUsage = metrics.diskUsage || 0;
-            node.activeContainers = metrics.activeContainers || 0;
-            
-            // Node is healthy if recent heartbeat
-            if (node.status === 'inactive' || node.status === 'failed') {
-                node.status = 'active';
-            }
+        node.lastHeartbeat    = new Date();
+        node.cpuUsage         = metrics.cpuUsage         ?? node.cpuUsage;
+        node.memoryUsage      = metrics.memoryUsage      ?? node.memoryUsage;
+        node.diskUsage        = metrics.diskUsage        ?? node.diskUsage;
+        node.activeContainers = metrics.activeContainers ?? node.activeContainers;
 
-            await node.save();
+        // Recover from inactive/failed if heartbeat arrives
+        if (node.status !== 'active') node.status = 'active';
 
-            console.log(`[v0] Heartbeat received from ${nodeId}: CPU=${node.cpuUsage}%, Memory=${node.memoryUsage}%`);
-            return node;
-        } catch (error) {
-            console.error('[v0] Error updating node heartbeat:', error);
-            throw error;
-        }
+        await node.save();
+        return node;
     }
 
-    /**
-     * Get a specific node
-     */
+    // ── Queries ───────────────────────────────────────────────────────────────
+
     async getNode(nodeId) {
-        try {
-            const node = await WorkerNode.findOne({ nodeId });
-            if (!node) return null;
-
-            // Check if node is still active based on heartbeat
-            const timeSinceHeartbeat = Date.now() - node.lastHeartbeat.getTime();
-            if (timeSinceHeartbeat > this.heartbeatTimeout && node.status === 'active') {
-                node.status = 'inactive';
-                await node.save();
-                console.log(`[v0] Node marked inactive: ${nodeId} (no heartbeat for ${timeSinceHeartbeat}ms)`);
-            }
-
-            return node;
-        } catch (error) {
-            console.error('[v0] Error getting node:', error);
-            return null;
-        }
+        const node = await WorkerNode.findOne({ nodeId });
+        if (!node) return null;
+        await this._checkHeartbeat(node);
+        return node;
     }
 
-    /**
-     * Get all nodes with optional status filter
-     */
     async getAllNodes(status = null) {
-        try {
-            const query = status ? { status } : {};
-            const nodes = await WorkerNode.find(query).sort({ createdAt: -1 });
+        const query = status ? { status } : {};
+        const nodes = await WorkerNode.find(query).sort({ createdAt: -1 });
+        await Promise.all(nodes.map(n => this._checkHeartbeat(n)));
+        return nodes;
+    }
 
-            // Check heartbeats for all nodes
-            const updatedNodes = await Promise.all(
-                nodes.map(async (node) => {
-                    const timeSinceHeartbeat = Date.now() - node.lastHeartbeat.getTime();
-                    if (timeSinceHeartbeat > this.heartbeatTimeout && node.status === 'active') {
-                        node.status = 'inactive';
-                        await node.save();
-                    }
-                    return node;
-                })
-            );
+    async getAvailableNodes(preferredRegion = null) {
+        const nodes = await this.getAllNodes('active');
+        const available = nodes.filter(n => n.activeContainers < MAX_CONTAINERS_PER_NODE);
 
-            return updatedNodes;
-        } catch (error) {
-            console.error('[v0] Error getting all nodes:', error);
-            return [];
+        // Prefer same-region nodes first (AWS AZ-aware scheduling)
+        if (preferredRegion) {
+            const sameRegion = available.filter(n => n.region === preferredRegion);
+            if (sameRegion.length > 0) return sameRegion;
         }
+        return available;
+    }
+
+    // ── URL helpers ───────────────────────────────────────────────────────────
+
+    /**
+     * Returns the URL a user's browser can reach for a deployed container.
+     * Uses publicIp (AWS EC2 public IP) + the allocated port.
+     */
+    getAppUrl(node, port) {
+        const host = node.publicIp || node.privateIp || 'localhost';
+        return `http://${host}:${port}`;
     }
 
     /**
-     * Get available (active) nodes
+     * Returns the URL the backend uses to communicate with the worker.
+     * Uses privateIp (AWS VPC internal) for all internal traffic.
      */
-    async getAvailableNodes() {
-        try {
-            const nodes = await this.getAllNodes('active');
-            return nodes.filter(node => {
-                // Node is available if not at capacity
-                return node.activeContainers < 10; // Max 10 containers per node
-            });
-        } catch (error) {
-            console.error('[v0] Error getting available nodes:', error);
-            return [];
-        }
+    getWorkerUrl(node) {
+        const host = node.privateIp || node.publicIp || 'localhost';
+        return `http://${host}`;
     }
 
-    /**
-     * Increment active container count
-     */
+    // ── Capacity tracking ─────────────────────────────────────────────────────
+
     async incrementActiveContainers(nodeId) {
-        try {
-            const node = await WorkerNode.findOne({ nodeId });
-            if (!node) throw new Error(`Node ${nodeId} not found`);
-
-            node.activeContainers += 1;
-            await node.save();
-
-            console.log(`[v0] Node ${nodeId} active containers: ${node.activeContainers}`);
-            return node;
-        } catch (error) {
-            console.error('[v0] Error incrementing active containers:', error);
-            throw error;
-        }
+        const node = await WorkerNode.findOneAndUpdate(
+            { nodeId },
+            { $inc: { activeContainers: 1 } },
+            { new: true }
+        );
+        if (!node) throw new Error(`Node ${nodeId} not found`);
+        return node;
     }
 
-    /**
-     * Decrement active container count
-     */
     async decrementActiveContainers(nodeId) {
-        try {
-            const node = await WorkerNode.findOne({ nodeId });
-            if (!node) throw new Error(`Node ${nodeId} not found`);
-
-            if (node.activeContainers > 0) {
-                node.activeContainers -= 1;
-            }
-            await node.save();
-
-            console.log(`[v0] Node ${nodeId} active containers: ${node.activeContainers}`);
-            return node;
-        } catch (error) {
-            console.error('[v0] Error decrementing active containers:', error);
-            throw error;
+        const node = await WorkerNode.findOneAndUpdate(
+            { nodeId },
+            { $inc: { activeContainers: -1 } },
+            { new: true }
+        );
+        if (!node) throw new Error(`Node ${nodeId} not found`);
+        // Guard against going negative
+        if (node.activeContainers < 0) {
+            await WorkerNode.findOneAndUpdate({ nodeId }, { $set: { activeContainers: 0 } });
         }
+        return node;
     }
 
-    /**
-     * Record an error on a node
-     */
-    async recordNodeError(nodeId, errorMessage) {
-        try {
-            const node = await WorkerNode.findOne({ nodeId });
-            if (!node) return;
-
-            // Store error in database or log
-            console.warn(`[v0] Node ${nodeId} error: ${errorMessage}`);
-            
-            // If too many consecutive errors, mark as failed
-            // This is simplified - in production, implement proper error tracking
-            if (!node.errors) {
-                node.errors = [];
-            }
-            node.errors.push({
-                timestamp: new Date(),
-                message: errorMessage
-            });
-
-            // Keep only recent errors
-            if (node.errors.length > 10) {
-                node.errors = node.errors.slice(-10);
-            }
-
-            // If 5+ errors in last 5 minutes, mark as failed
-            const recentErrors = node.errors.filter(e => {
-                const age = Date.now() - e.timestamp.getTime();
-                return age < 300000; // 5 minutes
-            });
-
-            if (recentErrors.length >= 5) {
-                node.status = 'failed';
-                console.error(`[v0] Node ${nodeId} marked as failed due to repeated errors`);
-            }
-
-            await node.save();
-        } catch (error) {
-            console.error('[v0] Error recording node error:', error);
-        }
-    }
-
-    /**
-     * Get node capacity information
-     */
     async getNodeCapacity(nodeId) {
-        try {
-            const node = await this.getNode(nodeId);
-            if (!node) return null;
+        const node = await this.getNode(nodeId);
+        if (!node) return null;
 
-            const cpuCapacity = node.totalCapacity?.cpu || 2;
-            const memoryCapacity = node.totalCapacity?.memory || 2048;
-            const storageCapacity = node.totalCapacity?.storage || 10240;
+        const cpu    = node.totalCapacity?.cpu    || 2;
+        const memory = node.totalCapacity?.memory || 2048;
+        const storage= node.totalCapacity?.storage|| 10240;
 
-            return {
-                nodeId,
-                status: node.status,
-                cpu: {
-                    total: cpuCapacity,
-                    used: (node.cpuUsage / 100) * cpuCapacity,
-                    available: ((100 - node.cpuUsage) / 100) * cpuCapacity,
-                    percentUsed: node.cpuUsage
-                },
-                memory: {
-                    total: memoryCapacity,
-                    used: (node.memoryUsage / 100) * memoryCapacity,
-                    available: ((100 - node.memoryUsage) / 100) * memoryCapacity,
-                    percentUsed: node.memoryUsage
-                },
-                storage: {
-                    total: storageCapacity,
-                    used: (node.diskUsage / 100) * storageCapacity,
-                    available: ((100 - node.diskUsage) / 100) * storageCapacity,
-                    percentUsed: node.diskUsage
-                },
-                activeContainers: node.activeContainers,
-                containerCapacity: 10
-            };
-        } catch (error) {
-            console.error('[v0] Error getting node capacity:', error);
-            return null;
-        }
+        return {
+            nodeId,
+            status: node.status,
+            privateIp: node.privateIp,
+            publicIp:  node.publicIp,
+            cpu:     { total: cpu,     percentUsed: node.cpuUsage },
+            memory:  { total: memory,  percentUsed: node.memoryUsage },
+            storage: { total: storage, percentUsed: node.diskUsage },
+            activeContainers: node.activeContainers,
+            containerCapacity: MAX_CONTAINERS_PER_NODE
+        };
     }
 
-    /**
-     * Get statistics for all nodes
-     */
+    // ── Error tracking ────────────────────────────────────────────────────────
+
+    async recordNodeError(nodeId, errorMessage) {
+        const node = await WorkerNode.findOne({ nodeId });
+        if (!node) return;
+
+        node.errors = node.errors || [];
+        node.errors.push({ timestamp: new Date(), message: errorMessage });
+        if (node.errors.length > 20) node.errors = node.errors.slice(-20);
+
+        // 5+ errors in 5 minutes → mark failed
+        const fiveMinAgo = Date.now() - 300000;
+        const recentErrors = node.errors.filter(e => e.timestamp.getTime() > fiveMinAgo);
+        if (recentErrors.length >= 5) {
+            node.status = 'failed';
+            console.error(`[nodes] Node ${nodeId} marked FAILED (${recentErrors.length} recent errors)`);
+        }
+
+        await node.save();
+    }
+
+    // ── Stats ─────────────────────────────────────────────────────────────────
+
     async getNodeStats() {
-        try {
-            const nodes = await this.getAllNodes();
-            
-            const stats = {
-                totalNodes: nodes.length,
-                activeNodes: nodes.filter(n => n.status === 'active').length,
-                inactiveNodes: nodes.filter(n => n.status === 'inactive').length,
-                failedNodes: nodes.filter(n => n.status === 'failed').length,
-                totalCapacity: {
-                    cpu: 0,
-                    memory: 0,
-                    storage: 0
-                },
-                avgCpuUsage: 0,
-                avgMemoryUsage: 0,
-                totalActiveContainers: 0
-            };
+        const nodes = await this.getAllNodes();
+        const stats = {
+            totalNodes:      nodes.length,
+            activeNodes:     nodes.filter(n => n.status === 'active').length,
+            inactiveNodes:   nodes.filter(n => n.status === 'inactive').length,
+            failedNodes:     nodes.filter(n => n.status === 'failed').length,
+            totalActiveContainers: 0,
+            avgCpuUsage:    0,
+            avgMemoryUsage: 0,
+            byRegion: {}
+        };
 
-            let totalCpuUsage = 0;
-            let totalMemoryUsage = 0;
-
-            for (const node of nodes) {
-                stats.totalCapacity.cpu += node.totalCapacity?.cpu || 0;
-                stats.totalCapacity.memory += node.totalCapacity?.memory || 0;
-                stats.totalCapacity.storage += node.totalCapacity?.storage || 0;
-                totalCpuUsage += node.cpuUsage || 0;
-                totalMemoryUsage += node.memoryUsage || 0;
-                stats.totalActiveContainers += node.activeContainers || 0;
-            }
-
-            if (nodes.length > 0) {
-                stats.avgCpuUsage = totalCpuUsage / nodes.length;
-                stats.avgMemoryUsage = totalMemoryUsage / nodes.length;
-            }
-
-            return stats;
-        } catch (error) {
-            console.error('[v0] Error getting node stats:', error);
-            return null;
+        let totalCpu = 0, totalMem = 0;
+        for (const n of nodes) {
+            stats.totalActiveContainers += n.activeContainers || 0;
+            totalCpu += n.cpuUsage    || 0;
+            totalMem += n.memoryUsage || 0;
+            stats.byRegion[n.region] = (stats.byRegion[n.region] || 0) + 1;
         }
+        if (nodes.length > 0) {
+            stats.avgCpuUsage    = totalCpu / nodes.length;
+            stats.avgMemoryUsage = totalMem / nodes.length;
+        }
+        return stats;
     }
 
-    /**
-     * Start health check monitoring
-     */
+    // ── Health monitoring ─────────────────────────────────────────────────────
+
     startHealthCheck(interval = 30000) {
         if (this.healthCheckInterval) return;
-
-        console.log('[v0] Starting node health check monitoring...');
-        
+        console.log('[nodes] Health check monitor started');
         this.healthCheckInterval = setInterval(async () => {
             try {
-                const nodes = await this.getAllNodes();
-                const now = Date.now();
-
+                const nodes = await WorkerNode.find({ status: 'active' });
                 for (const node of nodes) {
-                    const timeSinceHeartbeat = now - node.lastHeartbeat.getTime();
-                    
-                    if (timeSinceHeartbeat > this.heartbeatTimeout && node.status === 'active') {
-                        node.status = 'inactive';
-                        await node.save();
-                        console.warn(`[v0] Node ${node.nodeId} marked inactive (no heartbeat)`);
-                    }
+                    await this._checkHeartbeat(node);
                 }
-            } catch (error) {
-                console.error('[v0] Error in health check:', error);
+            } catch (err) {
+                console.error('[nodes] Health check error:', err.message);
             }
         }, interval);
     }
 
-    /**
-     * Stop health check monitoring
-     */
     stopHealthCheck() {
         if (this.healthCheckInterval) {
             clearInterval(this.healthCheckInterval);
             this.healthCheckInterval = null;
         }
-        console.log('[v0] Node health check monitoring stopped');
     }
 
-    /**
-     * Delete a node
-     */
     async deleteNode(nodeId) {
-        try {
-            const result = await WorkerNode.deleteOne({ nodeId });
-            if (result.deletedCount > 0) {
-                console.log(`[v0] Node ${nodeId} deleted`);
-            }
-            return result;
-        } catch (error) {
-            console.error('[v0] Error deleting node:', error);
-            throw error;
+        const result = await WorkerNode.deleteOne({ nodeId });
+        console.log(`[nodes] Deleted node: ${nodeId}`);
+        return result;
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    async _checkHeartbeat(node) {
+        const age = Date.now() - node.lastHeartbeat.getTime();
+        if (age > HEARTBEAT_TIMEOUT_MS && node.status === 'active') {
+            node.status = 'inactive';
+            await node.save();
+            console.warn(`[nodes] Node ${node.nodeId} marked INACTIVE (no heartbeat for ${Math.round(age / 1000)}s)`);
         }
     }
 }
