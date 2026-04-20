@@ -67,10 +67,11 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
-// Index for email
-userSchema.index({ email: 1 })
-userSchema.index({ "oauth.google.id": 1 })
-userSchema.index({ "oauth.github.id": 1 })
+// Indexes — email must be unique (case-insensitive enforced via lowercase: true above)
+userSchema.index({ email: 1 }, { unique: true })
+// Sparse so documents without these fields don't conflict on null
+userSchema.index({ "oauth.google.id": 1 }, { unique: true, sparse: true })
+userSchema.index({ "oauth.github.id": 1 }, { unique: true, sparse: true })
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {

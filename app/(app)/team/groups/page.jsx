@@ -9,8 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Plus, Edit2, Trash2, Users, RefreshCw } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+import { useAppStore } from '@/store/use-app-store';
 
 export default function TeamGroupsPage() {
+  const { projects } = useAppStore();
+  const teamId = projects[0]?.id || projects[0]?._id || '';
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,76 +28,43 @@ export default function TeamGroupsPage() {
     parentGroup: null
   });
 
-  // Mock team groups
-  const mockGroups = [
-    {
-      id: 'group-1',
-      name: 'Engineering',
-      description: 'All engineering team members',
-      memberCount: 12,
-      subGroups: 2,
-      parentGroup: null,
-      createdAt: '2024-01-10T09:00:00Z',
-      members: [
-        { id: 'user-1', name: 'John Doe', email: 'john@company.com', role: 'manager' },
-        { id: 'user-2', name: 'Sarah Lee', email: 'sarah@company.com', role: 'member' },
-        { id: 'user-3', name: 'Mike Johnson', email: 'mike@company.com', role: 'member' }
-      ]
-    },
-    {
-      id: 'group-2',
-      name: 'Frontend Team',
-      description: 'Frontend development team',
-      memberCount: 5,
-      subGroups: 0,
-      parentGroup: 'group-1',
-      createdAt: '2024-02-15T14:30:00Z',
-      members: [
-        { id: 'user-4', name: 'Jane Smith', email: 'jane@company.com', role: 'lead' },
-        { id: 'user-5', name: 'Tom Williams', email: 'tom@company.com', role: 'member' }
-      ]
-    },
-    {
-      id: 'group-3',
-      name: 'Backend Team',
-      description: 'Backend development team',
-      memberCount: 7,
-      subGroups: 0,
-      parentGroup: 'group-1',
-      createdAt: '2024-02-15T14:35:00Z',
-      members: [
-        { id: 'user-6', name: 'Emily Davis', email: 'emily@company.com', role: 'lead' }
-      ]
-    },
-    {
-      id: 'group-4',
-      name: 'DevOps',
-      description: 'Infrastructure and DevOps team',
-      memberCount: 4,
-      subGroups: 0,
-      parentGroup: null,
-      createdAt: '2024-01-20T11:00:00Z',
-      members: [
-        { id: 'user-7', name: 'Chris Brown', email: 'chris@company.com', role: 'manager' }
-      ]
-    },
-    {
-      id: 'group-5',
-      name: 'Product',
-      description: 'Product management team',
-      memberCount: 3,
-      subGroups: 0,
-      parentGroup: null,
-      createdAt: '2024-03-01T10:15:00Z',
-      members: [
-        { id: 'user-8', name: 'Lisa Anderson', email: 'lisa@company.com', role: 'manager' }
-      ]
-    }
-  ];
+  const normalizeGroup = (group) => ({
+    id: group._id || group.id,
+    name: group.name,
+    description: group.description || '',
+    memberCount: group.members?.length || group.memberCount || 0,
+    subGroups: group.subGroups || 0,
+    parentGroup: group.parentGroup || null,
+    createdAt: group.createdAt || new Date().toISOString(),
+    members: (group.members || []).map((member) => ({
+      id: member._id || member.id,
+      name: member.name,
+      email: member.email,
+      role: member.role || 'member'
+    }))
+  });
 
   useEffect(() => {
-    setGroups(mockGroups);
-    setLoading(false);
+    const loadGroups = async () => {
+      try {
+        setLoading(true);
+        if (!teamId) {
+          setGroups([]);
+          return;
+        }
+
+        const response = await apiClient.getTeamGroups(teamId);
+        const records = response?.data || response || [];
+        setGroups(records.map(normalizeGroup));
+      } catch (err) {
+        setError(err.message || 'Failed to load groups');
+        setGroups([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadGroups();
   }, []);
 
   const handleInputChange = (field, value) => {
@@ -109,27 +79,18 @@ export default function TeamGroupsPage() {
 
     try {
       setError('');
-      const response = await apiClient.createGroup(formData);
+      const response = await apiClient.createTeamGroup({
+        ...formData,
+        teamId,
+        createdBy: undefined,
+      });
 
-      if (response.success) {
-        const newGroup = {
-          id: `group-${groups.length + 1}`,
-          name: formData.name,
-          description: formData.description,
-          memberCount: 0,
-          subGroups: 0,
-          parentGroup: formData.parentGroup,
-          createdAt: new Date().toISOString(),
-          members: []
-        };
-        setGroups([...groups, newGroup]);
+      const newGroup = normalizeGroup(response?.data || response);
+      setGroups([...groups, newGroup]);
         setSuccessMessage('Group created successfully');
         setFormData({ name: '', description: '', parentGroup: null });
         setShowCreateForm(false);
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to create group');
-      }
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -142,15 +103,10 @@ export default function TeamGroupsPage() {
 
     try {
       setError('');
-      const response = await apiClient.deleteGroup(groupId);
-
-      if (response.success) {
-        setGroups(groups.filter(g => g.id !== groupId));
-        setSuccessMessage('Group deleted successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to delete group');
-      }
+      await apiClient.deleteTeamGroup(groupId);
+      setGroups(groups.filter(g => g.id !== groupId));
+      setSuccessMessage('Group deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -159,17 +115,13 @@ export default function TeamGroupsPage() {
   const handleUpdateGroup = async (groupId, updates) => {
     try {
       setError('');
-      const response = await apiClient.updateGroup(groupId, updates);
-
-      if (response.success) {
-        setGroups(groups.map(g => 
-          g.id === groupId ? {...g, ...updates} : g
-        ));
+      const response = await apiClient.updateTeamGroup(groupId, updates);
+      const updatedGroup = normalizeGroup(response?.data || response);
+      setGroups(groups.map(g => 
+        g.id === groupId ? {...g, ...updatedGroup} : g
+      ));
         setSuccessMessage('Group updated successfully');
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to update group');
-      }
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -178,14 +130,9 @@ export default function TeamGroupsPage() {
   const handleAddMember = async (groupId, memberId) => {
     try {
       setError('');
-      const response = await apiClient.addGroupMember(groupId, memberId);
-
-      if (response.success) {
+      await apiClient.addTeamGroupMembers(groupId, [memberId]);
         setSuccessMessage('Member added to group');
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to add member');
-      }
     } catch (err) {
       setError(err.message || 'An error occurred');
     }

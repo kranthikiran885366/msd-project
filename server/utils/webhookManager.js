@@ -150,3 +150,9 @@ class WebhookManager {
 }
 
 module.exports = new WebhookManager();
+module.exports.createWebhook = (provider, repoDetails, webhookUrl) =>
+  new WebhookManager().createWebhook(provider, repoDetails, webhookUrl);
+module.exports.removeWebhook = (provider, repoDetails, webhookId) =>
+  new WebhookManager().removeWebhook(provider, repoDetails, webhookId);
+module.exports.validateGitSignature = (provider, payload, signature) =>
+  new WebhookManager().validateGitSignature(provider, payload, signature);

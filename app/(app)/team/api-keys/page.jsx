@@ -9,8 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Copy, Eye, EyeOff, Trash2, Plus, RefreshCw, RotateCw } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+import { useAppStore } from '@/store/use-app-store';
 
 export default function APIKeysPage() {
+  const { projects } = useAppStore();
+  const projectId = projects[0]?.id || projects[0]?._id || '';
   const [apiKeys, setApiKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,68 +39,39 @@ export default function APIKeysPage() {
     { id: 'settings:write', label: 'Manage Settings' }
   ];
 
-  // Mock API keys
-  const mockApiKeys = [
-    {
-      id: 'key-1',
-      name: 'GitHub Actions',
-      prefix: 'df_live_',
-      secret: 'df_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-      scopes: ['deployments:read', 'deployments:write', 'logs:read'],
-      status: 'active',
-      createdAt: '2024-11-15T10:00:00Z',
-      lastUsed: '2024-12-20T15:45:30Z',
-      expiresAt: '2025-11-15T10:00:00Z'
-    },
-    {
-      id: 'key-2',
-      name: 'Monitoring System',
-      prefix: 'sk_live_',
-      secret: 'df_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-      scopes: ['deployments:read', 'logs:read', 'alerts:read'],
-      status: 'active',
-      createdAt: '2024-10-01T08:30:00Z',
-      lastUsed: '2024-12-20T14:20:00Z',
-      expiresAt: '2025-10-01T08:30:00Z'
-    },
-    {
-      id: 'key-3',
-      name: 'Backup Service',
-      prefix: 'sk_live_',
-      secret: 'df_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-      scopes: ['databases:read', 'logs:read'],
-      status: 'active',
-      createdAt: '2024-09-20T14:15:00Z',
-      lastUsed: '2024-12-19T23:00:00Z',
-      expiresAt: '2025-03-20T14:15:00Z'
-    },
-    {
-      id: 'key-4',
-      name: 'Legacy Integration',
-      prefix: 'sk_live_',
-      secret: 'df_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-      scopes: ['deployments:read'],
-      status: 'revoked',
-      createdAt: '2024-08-10T09:00:00Z',
-      lastUsed: '2024-12-10T10:00:00Z',
-      expiresAt: '2024-12-10T09:00:00Z'
-    },
-    {
-      id: 'key-5',
-      name: 'Development Testing',
-      prefix: 'sk_test_',
-      secret: 'df_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-      scopes: ['deployments:read', 'deployments:write', 'logs:read', 'alerts:write'],
-      status: 'active',
-      createdAt: '2024-12-01T11:30:00Z',
-      lastUsed: null,
-      expiresAt: '2025-06-01T11:30:00Z'
-    }
-  ];
+  const normalizeToken = (token, secret) => ({
+    id: token._id || token.id,
+    name: token.name,
+    prefix: token.prefix,
+    secret: secret || token.token || token.secret || '',
+    scopes: token.scopes || [],
+    status: token.isActive === false || token.revoked ? 'revoked' : 'active',
+    createdAt: token.createdAt,
+    lastUsed: token.lastUsedAt || token.lastUsed || null,
+    expiresAt: token.expiresAt || null
+  });
 
   useEffect(() => {
-    setApiKeys(mockApiKeys);
-    setLoading(false);
+    const loadKeys = async () => {
+      try {
+        setLoading(true);
+        if (!projectId) {
+          setApiKeys([]);
+          return;
+        }
+
+        const response = await apiClient.getApiTokens(projectId);
+        const tokens = response?.tokens || response?.data || response || [];
+        setApiKeys(tokens.map((token) => normalizeToken(token)));
+      } catch (err) {
+        setError(err.message || 'Failed to load API keys');
+        setApiKeys([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadKeys();
   }, []);
 
   const handleScopeToggle = (scopeId) => {
@@ -122,28 +96,18 @@ export default function APIKeysPage() {
 
     try {
       setError('');
-      const response = await apiClient.createAPIKey(newKey);
+      const response = await apiClient.createApiToken({
+        projectId,
+        name: newKey.name,
+        scopes: newKey.scopes,
+      });
 
-      if (response.success) {
-        const createdKey = {
-          id: `key-${apiKeys.length + 1}`,
-          name: newKey.name,
-          prefix: 'df_live_',
-          secret: 'df_live_' + Math.random().toString(36).substring(2, 35),
-          scopes: newKey.scopes,
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          lastUsed: null,
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
-        };
-        setApiKeys([...apiKeys, createdKey]);
+      const createdKey = normalizeToken(response?.data || response, response?.token || response?.data?.token);
+      setApiKeys([...apiKeys, createdKey]);
         setSuccessMessage('API key created successfully');
         setNewKey({ name: '', scopes: [] });
         setShowCreateForm(false);
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to create API key');
-      }
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -156,17 +120,12 @@ export default function APIKeysPage() {
 
     try {
       setError('');
-      const response = await apiClient.revokeAPIKey(keyId);
-
-      if (response.success) {
-        setApiKeys(apiKeys.map(k =>
-          k.id === keyId ? {...k, status: 'revoked'} : k
-        ));
+      await apiClient.revokeApiToken(keyId);
+      setApiKeys(apiKeys.map(k =>
+        k.id === keyId ? {...k, status: 'revoked'} : k
+      ));
         setSuccessMessage('API key revoked successfully');
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to revoke key');
-      }
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -179,18 +138,14 @@ export default function APIKeysPage() {
 
     try {
       setError('');
-      const response = await apiClient.rotateAPIKey(keyId);
-
-      if (response.success) {
-        setApiKeys(apiKeys.map(k =>
-          k.id === keyId ? {...k, secret: 'df_live_' + Math.random().toString(36).substring(2, 35)} : k
-        ));
+      const response = await apiClient.rotateApiToken(keyId);
+      const rotatedSecret = response?.token || response?.data?.token || '';
+      setApiKeys(apiKeys.map(k =>
+        k.id === keyId ? {...k, secret: rotatedSecret || k.secret} : k
+      ));
         setSuccessMessage('API key rotated successfully');
         setShowSecrets({});
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to rotate key');
-      }
     } catch (err) {
       setError(err.message || 'An error occurred');
     }

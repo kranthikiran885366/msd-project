@@ -74,81 +74,29 @@ export default function RolesPermissionsPage() {
     }
   ];
 
-  // Mock roles with default and custom
-  const mockRoles = [
-    {
-      id: 'admin',
-      name: 'Administrator',
-      description: 'Full access to all features and settings',
-      type: 'default',
-      memberCount: 2,
-      permissions: permissionCategories.flatMap(cat => cat.permissions).map(p => p.id),
-      createdAt: '2024-01-15T10:00:00Z'
-    },
-    {
-      id: 'manager',
-      name: 'Manager',
-      description: 'Can manage projects, deployments, and team members',
-      type: 'default',
-      memberCount: 5,
-      permissions: [
-        'projects.view', 'projects.create', 'projects.edit',
-        'deployments.view', 'deployments.create', 'deployments.rollback',
-        'databases.view', 'databases.backup',
-        'team.view', 'team.invite',
-        'billing.view'
-      ],
-      createdAt: '2024-01-15T10:00:00Z'
-    },
-    {
-      id: 'member',
-      name: 'Member',
-      description: 'Can view and contribute to projects and deployments',
-      type: 'default',
-      memberCount: 12,
-      permissions: [
-        'projects.view', 'projects.edit',
-        'deployments.view', 'deployments.create',
-        'databases.view', 'databases.query',
-        'team.view',
-        'billing.view'
-      ],
-      createdAt: '2024-01-15T10:00:00Z'
-    },
-    {
-      id: 'viewer',
-      name: 'Viewer',
-      description: 'Read-only access to projects and deployments',
-      type: 'default',
-      memberCount: 8,
-      permissions: [
-        'projects.view',
-        'deployments.view',
-        'databases.view',
-        'team.view',
-        'billing.view'
-      ],
-      createdAt: '2024-01-15T10:00:00Z'
-    },
-    {
-      id: 'custom-1',
-      name: 'Deployment Engineer',
-      description: 'Focused on deployments and infrastructure',
-      type: 'custom',
-      memberCount: 3,
-      permissions: [
-        'projects.view', 'projects.edit',
-        'deployments.view', 'deployments.create', 'deployments.rollback',
-        'databases.view', 'databases.backup', 'databases.delete',
-        'team.view'
-      ],
-      createdAt: '2024-10-20T14:30:00Z'
-    }
-  ];
-
   useEffect(() => {
-    setRoles(mockRoles);
-    setLoading(false);
+    const loadRoles = async () => {
+      try {
+        setLoading(true);
+        const projects = await apiClient.getProjects();
+        const projectId = projects?.[0]?._id || projects?.[0]?.id;
+
+        if (!projectId) {
+          setRoles([]);
+          return;
+        }
+
+        const data = await apiClient.getTeamRoles(projectId);
+        setRoles(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setError(err.message || 'Failed to load roles');
+        setRoles([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRoles();
   }, []);
 
   const handleInputChange = (field, value) => {
@@ -170,50 +118,11 @@ export default function RolesPermissionsPage() {
       return;
     }
 
-    try {
-      setError('');
-      const response = await apiClient.createRole(formData);
-
-      if (response.success) {
-        const newRole = {
-          id: `custom-${roles.length}`,
-          ...formData,
-          type: 'custom',
-          memberCount: 0,
-          createdAt: new Date().toISOString()
-        };
-        setRoles([...roles, newRole]);
-        setSuccessMessage('Role created successfully');
-        setFormData({
-          name: '',
-          description: '',
-          permissions: []
-        });
-        setShowCreateForm(false);
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to create role');
-      }
-    } catch (err) {
-      setError(err.message || 'An error occurred');
-    }
+    setError('Role creation is not exposed by the current backend API.');
   };
 
   const handleDeleteRole = async (roleId) => {
-    try {
-      setError('');
-      const response = await apiClient.deleteRole(roleId);
-
-      if (response.success) {
-        setRoles(roles.filter(r => r.id !== roleId));
-        setSuccessMessage('Role deleted successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to delete role');
-      }
-    } catch (err) {
-      setError(err.message || 'An error occurred');
-    }
+    setError('Role deletion is not exposed by the current backend API.');
   };
 
   if (loading) {

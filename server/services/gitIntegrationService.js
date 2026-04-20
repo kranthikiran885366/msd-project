@@ -127,7 +127,7 @@ class GitIntegrationService {
     return project;
   }
 
-  _extractCommitInfo(provider, payload) {
+  extractCommitInfo(provider, payload) {
     switch (provider) {
       case 'github':
         return {
@@ -155,7 +155,7 @@ class GitIntegrationService {
     }
   }
 
-  _isPreviewDeploy(provider, payload) {
+  isPreviewDeploy(provider, payload) {
     switch (provider) {
       case 'github':
         return payload.pull_request ? true : false;
@@ -168,12 +168,12 @@ class GitIntegrationService {
     }
   }
 
-  _isValidCronExpression(cron) {
+  isValidCronExpression(cron) {
     const cronRegex = /^(\*|([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])|(\*\/([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9]))) (\*|([0-9]|1[0-9]|2[0-3])|(\*\/([0-9]|1[0-9]|2[0-3]))) (\*|([1-9]|1[0-9]|2[0-9]|3[0-1])|(\*\/([1-9]|1[0-9]|2[0-9]|3[0-1]))) (\*|([1-9]|1[0-2])|(\*\/([1-9]|1[0-2]))) (\*|([0-6])|(\*\/([0-6])))$/;
     return cronRegex.test(cron);
   }
 
-  _getNextRunTime(cronExpression) {
+  getNextRunTime(cronExpression) {
     const parser = require('cron-parser');
     return parser.parseExpression(cronExpression).next().toDate();
   }

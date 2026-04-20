@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken")
 const User = require("../models/User")
 const AuditLog = require("../models/AuditLog")
+const AuthService = require("../services/authService")
 const crypto = require("crypto")
 const emailService = require("../utils/emailService")
 
@@ -197,94 +198,32 @@ exports.refreshToken = async (req, res) => {
 
 // Google OAuth Callback
 exports.googleCallback = async (req, res) => {
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
   try {
-    const { profile } = req.user
+    const { profile, refreshToken: googleRefreshToken } = req.user
     const { id, displayName, emails, photos } = profile
 
     const googleEmail = emails?.[0]?.value
-    if (!googleEmail) {
-      throw new Error("Google account does not have an email address")
-    }
+    if (!googleEmail) throw new Error("Google account does not have an email address")
 
-    let user = await User.findByGoogleId(id)
-    let isNewUser = false
-    let isLinked = false
-
-    if (!user) {
-      // Google ID not found, check if user exists by email
-      user = await User.findByEmail(googleEmail)
-      
-      if (!user) {
-        // Create new user with Google provider
-        isNewUser = true
-        user = new User({
-          email: googleEmail,
-          name: displayName,
-          avatar: photos?.[0]?.value,
-          emailVerified: true,
-          oauth: {
-            google: {
-              id,
-              email: googleEmail,
-              picture: photos?.[0]?.value,
-            },
-            github: {},
-          },
-        })
-        await user.save()
-
-        console.log("[v0] New user created via Google:", user._id)
-
-        await AuditLog.create({
-          userId: user._id,
-          action: "USER_SIGNED_UP_GOOGLE",
-          resourceType: "User",
-          resourceId: user._id,
-          metadata: { email: googleEmail, name: displayName },
-        })
-      } else {
-        // Link Google to existing user with matching email
-        isLinked = true
-        user.linkProvider("google", {
-          id,
-          email: googleEmail,
-          picture: photos?.[0]?.value,
-        })
-        user.lastLogin = new Date()
-        user.avatar = user.avatar || photos?.[0]?.value // Update avatar if not set
-        await user.save()
-
-        console.log("[v0] Google linked to existing user:", user._id)
-
-        await AuditLog.create({
-          userId: user._id,
-          action: "USER_LINKED_GOOGLE",
-          resourceType: "User",
-          resourceId: user._id,
-          metadata: { email: googleEmail },
-        })
+    const { user, isNewUser, isLinked } = await AuthService.findOrCreateUser(
+      googleEmail,
+      "google",
+      {
+        id,
+        email: googleEmail,
+        picture: photos?.[0]?.value,
+        name: displayName,
+        refreshToken: googleRefreshToken,
       }
-    } else {
-      // Google ID already exists, update last login
-      user.lastLogin = new Date()
-      await user.save()
+    )
 
-      console.log("[v0] Google login for existing user:", user._id)
-
-      await AuditLog.create({
-        userId: user._id,
-        action: "USER_LOGGED_IN_GOOGLE",
-        resourceType: "User",
-        resourceId: user._id,
-        metadata: { email: googleEmail },
-      })
-    }
+    const action = isNewUser ? "USER_SIGNED_UP_GOOGLE" : isLinked ? "USER_LINKED_GOOGLE" : "USER_LOGGED_IN_GOOGLE"
+    await AuthService.createAuthAuditLog(user._id, action, { email: googleEmail })
 
     const token = generateToken(user._id)
     const refreshToken = generateRefreshToken(user._id)
 
-    // Redirect to frontend with tokens in URL
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
     const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
     redirectUrl.searchParams.append("token", token)
     redirectUrl.searchParams.append("refreshToken", refreshToken)
@@ -294,169 +233,63 @@ exports.googleCallback = async (req, res) => {
     redirectUrl.searchParams.append("avatar", user.avatar || "")
     redirectUrl.searchParams.append("isNew", isNewUser ? "true" : "false")
     redirectUrl.searchParams.append("isLinked", isLinked ? "true" : "false")
-
     res.redirect(redirectUrl.toString())
   } catch (error) {
-    console.error("[v0] Google callback error:", error)
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
+    console.error("[auth] Google callback error:", error)
     res.redirect(`${clientUrl}/login/error?message=${encodeURIComponent(error.message)}`)
   }
 }
 
 // GitHub OAuth Callback
 exports.githubCallback = async (req, res) => {
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
   try {
     const { profile, accessToken } = req.user
     const { id, displayName, username, photos, emails } = profile
 
-    let user = await User.findByGithubId(id)
-    let isNewUser = false
-    let isLinked = false
+    const githubEmail = emails?.[0]?.value
 
-    if (!user) {
-      const githubEmail = emails?.[0]?.value
-      
-      // Check if user exists by email (if GitHub provided one)
-      if (githubEmail) {
-        user = await User.findByEmail(githubEmail)
+    const { user, isNewUser, isLinked } = await AuthService.findOrCreateUser(
+      githubEmail || `${username}@github.local`,
+      "github",
+      {
+        id,
+        login: username,
+        avatar_url: photos?.[0]?.value,
+        name: displayName || username,
+        accessToken,
+        emailVerified: !!githubEmail,
       }
-      
-      if (!user) {
-        // Create new user with GitHub provider
-        isNewUser = true
-        user = new User({
-          email: githubEmail || `${username}@github.local`,
-          name: displayName || username,
-          avatar: photos?.[0]?.value,
-          emailVerified: !!githubEmail,
-          oauth: {
-            github: {
-              id,
-              login: username,
-              avatar_url: photos?.[0]?.value,
-              accessToken,
-            },
-            google: {},
-          },
-        })
-        await user.save()
+    )
 
-        console.log("[v0] New user created via GitHub:", user._id)
+    const action = isNewUser ? "USER_SIGNED_UP_GITHUB" : isLinked ? "USER_LINKED_GITHUB" : "USER_LOGGED_IN_GITHUB"
+    await AuthService.createAuthAuditLog(user._id, action, { username })
 
-        await AuditLog.create({
-          userId: user._id,
-          action: "USER_SIGNED_UP_GITHUB",
-          resourceType: "User",
-          resourceId: user._id,
-          metadata: { username, name: displayName },
-        })
-      } else {
-        // Link GitHub to existing user with matching email
-        isLinked = true
-        user.linkProvider("github", {
-          id,
-          login: username,
-          avatar_url: photos?.[0]?.value,
-          accessToken,
-        })
-        user.lastLogin = new Date()
-        user.avatar = user.avatar || photos?.[0]?.value // Update avatar if not set
-        await user.save()
-
-        console.log("[v0] GitHub linked to existing user:", user._id)
-
-        await AuditLog.create({
-          userId: user._id,
-          action: "USER_LINKED_GITHUB",
-          resourceType: "User",
-          resourceId: user._id,
-          metadata: { username },
-        })
-      }
-    } else {
-      // GitHub ID already exists, update last login
-      user.lastLogin = new Date()
-      // Update GitHub access token
-      if (user.oauth?.github) {
-        user.oauth.github.accessToken = accessToken
-      }
-      await user.save()
-
-      console.log("[v0] GitHub login for existing user:", user._id)
-
-      await AuditLog.create({
-        userId: user._id,
-        action: "USER_LOGGED_IN_GITHUB",
-        resourceType: "User",
-        resourceId: user._id,
-        metadata: { username },
-      })
-    }
-
-    // Save GitHub integration with access token for repository access
+    // Persist GitHub integration for repo access
     const GitHubIntegration = require("../models/GitHubIntegration")
-    console.log('[v0] Saving GitHub integration for user:', user._id)
-    
     await GitHubIntegration.findOneAndUpdate(
       { userId: user._id },
-      {
-        userId: user._id,
-        githubUsername: username,
-        accessToken: accessToken,
-        connectedAt: new Date(),
-      },
+      { userId: user._id, githubUsername: username, accessToken, connectedAt: new Date() },
       { upsert: true, new: true }
     )
-    
-    console.log('[v0] GitHub integration saved successfully')
 
     const token = generateToken(user._id)
     const refreshToken = generateRefreshToken(user._id)
 
-    // Try to get return URL from multiple sources
-    let returnUrl = null;
-    
-    // Check 1: URL query parameter (state)
-    if (req.query.state) {
+    // Honour returnUrl from session (set in route handler)
+    let returnUrl = req.session?.githubReturnUrl
+    if (returnUrl) delete req.session.githubReturnUrl
+
+    if (returnUrl) {
       try {
-        const stateData = JSON.parse(Buffer.from(decodeURIComponent(req.query.state), 'base64').toString());
-        returnUrl = stateData.returnUrl;
-        console.log('[v0] Got returnUrl from state parameter:', returnUrl);
-      } catch (e) {
-        console.log('[v0] Could not parse state parameter:', e.message);
-      }
+        const redirectUrl = new URL(returnUrl)
+        redirectUrl.searchParams.append("token", token)
+        redirectUrl.searchParams.append("refreshToken", refreshToken)
+        redirectUrl.searchParams.append("github-connected", "true")
+        return res.redirect(redirectUrl.toString())
+      } catch (_) { /* fall through */ }
     }
 
-    // Check 2: Session variable
-    if (!returnUrl && req.session?.githubReturnUrl) {
-      returnUrl = req.session.githubReturnUrl;
-      console.log('[v0] Got returnUrl from session:', returnUrl);
-      delete req.session.githubReturnUrl;
-    }
-
-    // Check 3: Referer header
-    if (!returnUrl && req.get('referer')) {
-      returnUrl = req.get('referer');
-      console.log('[v0] Got returnUrl from referer:', returnUrl);
-    }
-
-    // If we have a return URL, redirect there with tokens
-    if (returnUrl && (returnUrl.includes('localhost') || returnUrl.includes('http'))) {
-      try {
-        console.log('[v0] Redirecting to returnUrl with tokens');
-        const redirectUrl = new URL(returnUrl);
-        redirectUrl.searchParams.append('token', token);
-        redirectUrl.searchParams.append('refreshToken', refreshToken);
-        redirectUrl.searchParams.append('github-connected', 'true');
-        return res.redirect(redirectUrl.toString());
-      } catch (e) {
-        console.error('[v0] Invalid return URL:', e.message);
-      }
-    }
-
-    // Fallback: redirect to standard auth-callback
-    console.log('[v0] Using standard auth-callback redirect');
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
     const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
     redirectUrl.searchParams.append("token", token)
     redirectUrl.searchParams.append("refreshToken", refreshToken)
@@ -467,11 +300,9 @@ exports.githubCallback = async (req, res) => {
     redirectUrl.searchParams.append("isNew", isNewUser ? "true" : "false")
     redirectUrl.searchParams.append("isLinked", isLinked ? "true" : "false")
     redirectUrl.searchParams.append("provider", "github")
-
     res.redirect(redirectUrl.toString())
   } catch (error) {
-    console.error('[v0] GitHub callback error:', error)
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
+    console.error("[auth] GitHub callback error:", error)
     res.redirect(`${clientUrl}/login/error?message=${encodeURIComponent(error.message)}`)
   }
 }

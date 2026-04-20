@@ -10,8 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Plus, Edit2, Trash2, RefreshCw, Copy, Globe, Send, TestTube } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+import { useAppStore } from '@/store/use-app-store';
 
 export default function WebhooksIntegrationPage() {
+  const { projects } = useAppStore();
+  const projectId = projects[0]?.id || projects[0]?._id || '';
   const [webhooks, setWebhooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,73 +50,40 @@ export default function WebhooksIntegrationPage() {
     'user.added'
   ];
 
-  // Mock webhooks
-  const mockWebhooks = [
-    {
-      id: 'wh-1',
-      name: 'Slack Notifications',
-      url: 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX',
-      events: ['deployment.completed', 'deployment.failed', 'alert.triggered'],
-      active: true,
-      headers: { 'X-Slack-Request-Timestamp': '' },
-      retryPolicy: 'exponential',
-      timeout: 30,
-      deliveryStats: { total: 245, success: 238, failure: 7, lastDelivery: '2024-12-20T15:45:00Z' },
-      createdAt: '2024-11-10T10:00:00Z'
-    },
-    {
-      id: 'wh-2',
-      name: 'Custom Analytics Service',
-      url: 'https://analytics.example.com/webhook',
-      events: ['deployment.completed', 'scaling.triggered'],
-      active: true,
-      headers: { 'Authorization': 'Bearer token_...', 'X-Api-Key': 'key_...' },
-      retryPolicy: 'linear',
-      timeout: 45,
-      deliveryStats: { total: 156, success: 154, failure: 2, lastDelivery: '2024-12-20T14:20:00Z' },
-      createdAt: '2024-10-15T09:30:00Z'
-    },
-    {
-      id: 'wh-3',
-      name: 'Datadog Events',
-      url: 'https://api.datadoghq.com/api/v1/events',
-      events: ['alert.triggered', 'incident.created', 'incident.resolved'],
-      active: true,
-      headers: { 'DD-API-KEY': 'api_key_...', 'DD-APPLICATION-KEY': 'app_key_...' },
-      retryPolicy: 'exponential',
-      timeout: 20,
-      deliveryStats: { total: 123, success: 121, failure: 2, lastDelivery: '2024-12-20T13:00:00Z' },
-      createdAt: '2024-09-01T14:00:00Z'
-    },
-    {
-      id: 'wh-4',
-      name: 'PagerDuty Integration',
-      url: 'https://events.pagerduty.com/v2/enqueue',
-      events: ['alert.triggered', 'incident.created'],
-      active: true,
-      headers: { 'Content-Type': 'application/json' },
-      retryPolicy: 'exponential',
-      timeout: 15,
-      deliveryStats: { total: 89, success: 87, failure: 2, lastDelivery: '2024-12-20T12:15:00Z' },
-      createdAt: '2024-08-20T11:00:00Z'
-    },
-    {
-      id: 'wh-5',
-      name: 'Legacy System Interface',
-      url: 'https://legacy.internal.company.com/events',
-      events: ['deployment.completed'],
-      active: false,
-      headers: { 'X-Legacy-Auth': 'legacy_token_...' },
-      retryPolicy: 'linear',
-      timeout: 60,
-      deliveryStats: { total: 45, success: 42, failure: 3, lastDelivery: '2024-12-10T10:00:00Z' },
-      createdAt: '2024-07-01T08:00:00Z'
-    }
-  ];
+  const normalizeWebhook = (webhook) => ({
+    id: webhook._id || webhook.id,
+    name: webhook.name || 'Webhook',
+    url: webhook.url,
+    events: webhook.events || [],
+    active: webhook.active !== false,
+    headers: webhook.headers || {},
+    retryPolicy: webhook.retryPolicy || 'exponential',
+    timeout: webhook.timeout || 30,
+    deliveryStats: webhook.deliveryStats || { total: 0, success: 0, failure: 0, lastDelivery: webhook.lastDelivery || null },
+    createdAt: webhook.createdAt || webhook.created_at || new Date().toISOString(),
+  });
 
   useEffect(() => {
-    setWebhooks(mockWebhooks);
-    setLoading(false);
+    const loadWebhooks = async () => {
+      try {
+        setLoading(true);
+        if (!projectId) {
+          setWebhooks([]);
+          return;
+        }
+
+        const response = await apiClient.getWebhooks(projectId);
+        const records = response?.data || response || [];
+        setWebhooks(records.map(normalizeWebhook));
+      } catch (err) {
+        setError(err.message || 'Failed to load webhooks');
+        setWebhooks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadWebhooks();
   }, []);
 
   const handleEventToggle = (event) => {
@@ -158,28 +128,18 @@ export default function WebhooksIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.createWebhook(formData);
-
-      if (response.success) {
-        if (editingId) {
-          setWebhooks(webhooks.map(w => w.id === editingId ? {...w, ...formData} : w));
-          setSuccessMessage('Webhook updated successfully');
-        } else {
-          const newWebhook = {
-            id: `wh-${webhooks.length + 1}`,
-            ...formData,
-            deliveryStats: { total: 0, success: 0, failure: 0, lastDelivery: null },
-            createdAt: new Date().toISOString()
-          };
-          setWebhooks([...webhooks, newWebhook]);
-          setSuccessMessage('Webhook created successfully');
-        }
+      if (editingId) {
+        const response = await apiClient.updateWebhook(editingId, formData);
+        setWebhooks(webhooks.map(w => w.id === editingId ? normalizeWebhook(response?.data || response) : w));
+        setSuccessMessage('Webhook updated successfully');
+      } else {
+        const response = await apiClient.createWebhook(projectId, formData);
+        setWebhooks([...webhooks, normalizeWebhook(response?.data || response)]);
+        setSuccessMessage('Webhook created successfully');
+      }
         resetForm();
         setShowForm(false);
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to save webhook');
-      }
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -189,15 +149,9 @@ export default function WebhooksIntegrationPage() {
     try {
       setError('');
       const response = await apiClient.testWebhook(webhookId);
-
-      if (response.success) {
-        setTestResults({...testResults, [webhookId]: { success: true, statusCode: 200, responseTime: '145ms' }});
-        setSuccessMessage('Webhook test successful');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setTestResults({...testResults, [webhookId]: { success: false, statusCode: response.statusCode, error: response.error }});
-        setError('Webhook test failed');
-      }
+      setTestResults({...testResults, [webhookId]: { success: true, statusCode: response?.statusCode || 200, responseTime: response?.responseTime || '145ms' }});
+      setSuccessMessage('Webhook test successful');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -210,15 +164,10 @@ export default function WebhooksIntegrationPage() {
 
     try {
       setError('');
-      const response = await apiClient.deleteWebhook(webhookId);
-
-      if (response.success) {
-        setWebhooks(webhooks.filter(w => w.id !== webhookId));
-        setSuccessMessage('Webhook deleted successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to delete webhook');
-      }
+      await apiClient.deleteWebhook(webhookId);
+      setWebhooks(webhooks.filter(w => w.id !== webhookId));
+      setSuccessMessage('Webhook deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }

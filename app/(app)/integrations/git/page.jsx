@@ -12,6 +12,8 @@ import apiClient from '@/lib/api-client';
 
 export default function GitRepositoriesPage() {
   const [repos, setRepos] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -25,94 +27,58 @@ export default function GitRepositoriesPage() {
     deployOnPush: false
   });
 
-  // Mock repositories
-  const mockRepos = [
-    {
-      id: 'repo-1',
-      name: 'acme-app-api',
-      provider: 'github',
-      owner: 'acme-corp',
-      url: 'https://github.com/acme-corp/acme-app-api',
-      branch: 'main',
-      autoSync: true,
-      deployOnPush: true,
-      connected: true,
-      lastSync: '2024-12-20T15:30:00Z',
-      commitCount: 342,
-      branches: ['main', 'develop', 'staging'],
-      webhook: { id: 'wh-gh-1', status: 'active' },
-      createdAt: '2024-09-15T10:00:00Z'
-    },
-    {
-      id: 'repo-2',
-      name: 'acme-frontend',
-      provider: 'github',
-      owner: 'acme-corp',
-      url: 'https://github.com/acme-corp/acme-frontend',
-      branch: 'main',
-      autoSync: true,
-      deployOnPush: false,
-      connected: true,
-      lastSync: '2024-12-20T14:15:00Z',
-      commitCount: 567,
-      branches: ['main', 'develop', 'feature/*'],
-      webhook: { id: 'wh-gh-2', status: 'active' },
-      createdAt: '2024-08-20T09:00:00Z'
-    },
-    {
-      id: 'repo-3',
-      name: 'platform-services',
-      provider: 'gitlab',
-      owner: 'internal',
-      url: 'https://gitlab.com/internal/platform-services',
-      branch: 'develop',
-      autoSync: true,
-      deployOnPush: false,
-      connected: true,
-      lastSync: '2024-12-19T10:00:00Z',
-      commitCount: 234,
-      branches: ['develop', 'main', 'staging'],
-      webhook: { id: 'wh-gl-1', status: 'active' },
-      createdAt: '2024-10-01T14:30:00Z'
-    },
-    {
-      id: 'repo-4',
-      name: 'legacy-monolith',
-      provider: 'github',
-      owner: 'acme-corp',
-      url: 'https://github.com/acme-corp/legacy-monolith',
-      branch: 'master',
-      autoSync: false,
-      deployOnPush: false,
-      connected: false,
-      lastSync: '2024-11-15T08:00:00Z',
-      commitCount: 1203,
-      branches: ['master', 'develop'],
-      webhook: { id: 'wh-gh-3', status: 'disconnected' },
-      createdAt: '2024-07-10T11:00:00Z'
-    },
-    {
-      id: 'repo-5',
-      name: 'microservices-auth',
-      provider: 'github',
-      owner: 'acme-corp',
-      url: 'https://github.com/acme-corp/microservices-auth',
-      branch: 'main',
-      autoSync: true,
-      deployOnPush: true,
-      connected: true,
-      lastSync: '2024-12-20T16:00:00Z',
-      commitCount: 89,
-      branches: ['main', 'develop'],
-      webhook: { id: 'wh-gh-4', status: 'active' },
-      createdAt: '2024-11-05T13:00:00Z'
-    }
-  ];
-
   useEffect(() => {
-    setRepos(mockRepos);
-    setLoading(false);
+    const loadRepositories = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const [projects, connectionStatusResponse, repositories] = await Promise.all([
+          apiClient.getProjects(),
+          apiClient.getGitHubConnectionStatus().catch(() => null),
+          apiClient.getGitHubRepositories().catch(() => []),
+        ]);
+
+        const normalizedProjects = Array.isArray(projects) ? projects : [];
+        if (!selectedProjectId && normalizedProjects.length > 0) {
+          setSelectedProjectId(normalizedProjects[0]._id || normalizedProjects[0].id || '');
+        }
+
+        setConnectionStatus(connectionStatusResponse);
+        setRepos((Array.isArray(repositories) ? repositories : []).map(normalizeRepository));
+      } catch (err) {
+        setError(err.message || 'Failed to load repositories');
+        setRepos([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRepositories();
   }, []);
+
+  const normalizeRepository = (repo) => {
+    const owner = repo.owner?.login || repo.owner || repo.namespace || '';
+    const name = repo.name || repo.repo || repo.full_name?.split('/')?.[1] || 'repository';
+    const branches = Array.isArray(repo.branches) ? repo.branches : [repo.default_branch || repo.branch || 'main'];
+
+    return {
+      id: repo.id || repo._id || `${owner}/${name}`,
+      name,
+      provider: repo.provider || 'github',
+      owner,
+      url: repo.html_url || repo.url || `https://github.com/${owner}/${name}`,
+      branch: repo.default_branch || repo.branch || branches[0] || 'main',
+      autoSync: repo.autoSync ?? repo.auto_sync ?? true,
+      deployOnPush: repo.deployOnPush ?? repo.deploy_on_push ?? false,
+      connected: repo.connected ?? true,
+      lastSync: repo.updated_at || repo.lastSync || repo.last_sync || new Date().toISOString(),
+      commitCount: repo.commitCount ?? repo.commits ?? 0,
+      branches,
+      webhook: repo.webhook || { status: repo.connected === false ? 'disconnected' : 'active' },
+      createdAt: repo.created_at || repo.createdAt || new Date().toISOString()
+    };
+  };
 
   const handleAddRepository = async () => {
     if (!formData.repoUrl.trim()) {
@@ -120,30 +86,35 @@ export default function GitRepositoriesPage() {
       return;
     }
 
+    if (!selectedProjectId) {
+      setError('Select a project before connecting a repository');
+      return;
+    }
+
     try {
       setError('');
-      const response = await apiClient.connectGitRepository(formData);
+      const parsedUrl = new URL(formData.repoUrl);
+      const [owner, repository] = parsedUrl.pathname.replace(/^\//, '').replace(/\.git$/, '').split('/');
 
-      if (response.success) {
-        const newRepo = {
-          id: `repo-${repos.length + 1}`,
-          name: formData.repoUrl.split('/').pop().replace('.git', ''),
-          ...formData,
-          connected: true,
-          lastSync: new Date().toISOString(),
-          commitCount: 0,
-          branches: [formData.branch],
-          webhook: { id: 'wh-new', status: 'active' },
-          createdAt: new Date().toISOString()
-        };
-        setRepos([...repos, newRepo]);
-        setSuccessMessage('Repository connected successfully');
-        setFormData({ provider: 'github', repoUrl: '', branch: 'main', autoSync: true, deployOnPush: false });
-        setShowForm(false);
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to connect repository');
+      if (!owner || !repository) {
+        setError('Enter a valid GitHub repository URL');
+        return;
       }
+
+      await apiClient.configureRepository(selectedProjectId, 'github', {
+        owner,
+        repo: repository,
+        branch: formData.branch,
+        autoSync: formData.autoSync,
+        deployOnPush: formData.deployOnPush,
+      });
+
+      const refreshed = await apiClient.getGitHubRepositories();
+      setRepos((Array.isArray(refreshed) ? refreshed : []).map(normalizeRepository));
+      setSuccessMessage('Repository connected successfully');
+      setFormData({ provider: 'github', repoUrl: '', branch: 'main', autoSync: true, deployOnPush: false });
+      setShowForm(false);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -156,15 +127,7 @@ export default function GitRepositoriesPage() {
 
     try {
       setError('');
-      const response = await apiClient.disconnectGitRepository(repoId);
-
-      if (response.success) {
-        setRepos(repos.filter(r => r.id !== repoId));
-        setSuccessMessage('Repository disconnected successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to disconnect repository');
-      }
+      setError('Per-repository disconnect is not exposed by the backend. Use the GitHub provider disconnect endpoint if you need to revoke access.');
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -173,17 +136,10 @@ export default function GitRepositoriesPage() {
   const handleSyncRepository = async (repoId) => {
     try {
       setError('');
-      const response = await apiClient.syncGitRepository(repoId);
-
-      if (response.success) {
-        setRepos(repos.map(r =>
-          r.id === repoId ? {...r, lastSync: new Date().toISOString()} : r
-        ));
-        setSuccessMessage('Repository synced successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to sync repository');
-      }
+      const refreshed = await apiClient.getGitHubRepositories();
+      setRepos((Array.isArray(refreshed) ? refreshed : []).map(normalizeRepository));
+      setSuccessMessage('Repository list refreshed successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -213,6 +169,11 @@ export default function GitRepositoriesPage() {
         <div>
           <h1 className="text-3xl font-bold">Git Repositories</h1>
           <p className="text-muted-foreground">Connect and manage Git repositories for deployments</p>
+          {connectionStatus && (
+            <p className="text-xs text-muted-foreground mt-1">
+              GitHub provider: {connectionStatus.connected ? 'connected' : 'disconnected'}
+            </p>
+          )}
         </div>
         <Button onClick={() => setShowForm(!showForm)} className="gap-2">
           <Plus className="w-4 h-4" />
@@ -288,8 +249,6 @@ export default function GitRepositoriesPage() {
                   className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
                   <option value="github">GitHub</option>
-                  <option value="gitlab">GitLab</option>
-                  <option value="gitea">Gitea</option>
                 </select>
               </div>
 

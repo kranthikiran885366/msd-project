@@ -11,6 +11,7 @@ export default function StatusPage() {
   const [incidents, setIncidents] = useState([]);
   const [services, setServices] = useState([]);
   const [statusHistory, setStatusHistory] = useState([]);
+  const [summary, setSummary] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [overallStatus, setOverallStatus] = useState('operational');
   const { toast } = useToast();
@@ -34,6 +35,7 @@ export default function StatusPage() {
         setIncidents(incidentsData);
         setOverallStatus(statusData.overallStatus);
         setStatusHistory(statusData.uptime || []);
+        setSummary(statusData.metrics || {});
       } catch (error) {
         console.error('Error fetching status:', error);
         toast({
@@ -51,139 +53,6 @@ export default function StatusPage() {
 
     return () => clearInterval(statusInterval);
   }, [toast]);
-
-  const [oldIncidents] = useState([
-    {
-      id: 1,
-      title: 'US East Region Degradation',
-      severity: 'warning',
-      status: 'resolved',
-      startTime: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      endTime: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
-      duration: '45 minutes',
-      impact: 'Some deployments experienced slow build times',
-      description: 'Database connection pool exhaustion caused temporary build delays. Resolved with pool scaling.'
-    },
-    {
-      id: 2,
-      title: 'Planned Maintenance - EU West Database',
-      severity: 'info',
-      status: 'completed',
-      startTime: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-      endTime: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000),
-      duration: '30 minutes',
-      impact: 'No impact - performed during maintenance window',
-      description: 'Database upgrade to improve query performance. Completed successfully.'
-    },
-  ]);
-
-  const [mockServices] = useState([
-    {
-      name: 'API Servers',
-      status: 'operational',
-      uptime: '99.98%',
-      regions: ['US East', 'US West', 'EU West', 'Asia Pacific'],
-      metrics: {
-        latency: '45ms',
-        errorRate: '0.02%',
-        requests: '2.5M/min'
-      }
-    },
-    {
-      name: 'Build Infrastructure',
-      status: 'operational',
-      uptime: '99.95%',
-      regions: ['US East', 'US West', 'EU West'],
-      metrics: {
-        avgBuildTime: '4.2min',
-        successRate: '99.7%',
-        concurrent: '1,250/1,000'
-      }
-    },
-    {
-      name: 'CDN & Storage',
-      status: 'operational',
-      uptime: '99.99%',
-      regions: ['Global'],
-      metrics: {
-        latency: '20ms',
-        throughput: '850Gbps',
-        cacheHit: '98.5%'
-      }
-    },
-    {
-      name: 'Database Cluster',
-      status: 'operational',
-      uptime: '99.97%',
-      regions: ['US East', 'EU West', 'Asia Pacific'],
-      metrics: {
-        queryTime: '12ms',
-        connections: '45K/50K',
-        replication: 'In sync'
-      }
-    },
-    {
-      name: 'SSL/TLS Services',
-      status: 'operational',
-      uptime: '100%',
-      regions: ['Global'],
-      metrics: {
-        certIssue: '100ms',
-        renewal: 'Automated',
-        renewal: '99.2%'
-      }
-    },
-    {
-      name: 'Dashboard & Control Panel',
-      status: 'operational',
-      uptime: '99.96%',
-      regions: ['US East', 'EU West'],
-      metrics: {
-        pageLoad: '1.2s',
-        errorRate: '0.04%',
-        availability: '99.96%'
-      }
-    },
-  ]);
-
-  const [mockStatusHistory] = useState([
-    {
-      date: 'Nov 15, 2024',
-      uptime: '99.98%',
-      events: 2,
-      downtime: '1m'
-    },
-    {
-      date: 'Nov 14, 2024',
-      uptime: '100%',
-      events: 0,
-      downtime: '0m'
-    },
-    {
-      date: 'Nov 13, 2024',
-      uptime: '99.99%',
-      events: 1,
-      downtime: '2m'
-    },
-    {
-      date: 'Nov 12, 2024',
-      uptime: '99.96%',
-      events: 3,
-      downtime: '5m'
-    },
-    {
-      date: 'Nov 11, 2024',
-      uptime: '99.97%',
-      events: 1,
-      downtime: '3m'
-    },
-    {
-      date: 'Nov 10, 2024',
-      uptime: '100%',
-      events: 0,
-      downtime: '0m'
-    },
-  ]);
 
   const getStatusColor = (status) => {
     switch(status) {
@@ -205,7 +74,13 @@ export default function StatusPage() {
     }
   };
 
-  const currentStatus = services.every(s => s.status === 'operational') ? 'operational' : 'degraded';
+  const currentStatus = services.length > 0 && services.every(s => s.status === 'operational') ? 'operational' : overallStatus;
+  const currentUptime = statusHistory[statusHistory.length - 1]?.uptime || '100%';
+  const avgUptime = statusHistory.length
+    ? `${(statusHistory.reduce((sum, day) => sum + Number(String(day.uptime).replace('%', '')), 0) / statusHistory.length).toFixed(2)}%`
+    : '100.00%';
+  const lastIncidentLabel = incidents.length > 0 ? `${new Date(incidents[0].createdAt || Date.now()).toLocaleDateString()}` : 'No recent incidents';
+  const responseTime = summary.responseTime ? `${summary.responseTime}ms` : 'n/a';
 
   return (
     <div className="space-y-6 p-6">
@@ -236,19 +111,19 @@ export default function StatusPage() {
           <div className="mt-4 grid grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-gray-600">Current Uptime</p>
-              <p className="text-2xl font-bold">99.98%</p>
+              <p className="text-2xl font-bold">{currentUptime}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">30-Day Uptime</p>
-              <p className="text-2xl font-bold">99.96%</p>
+              <p className="text-2xl font-bold">{avgUptime}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Last Incident</p>
-              <p className="text-2xl font-bold">7 days ago</p>
+              <p className="text-2xl font-bold">{lastIncidentLabel}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Avg Response Time</p>
-              <p className="text-2xl font-bold">42ms</p>
+              <p className="text-2xl font-bold">{responseTime}</p>
             </div>
           </div>
         </CardContent>
@@ -263,7 +138,11 @@ export default function StatusPage() {
 
         {/* Services Tab */}
         <TabsContent value="services" className="space-y-3">
-          {services.map((service, idx) => (
+          {services.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6 text-center text-gray-500">No service telemetry available yet.</CardContent>
+            </Card>
+          ) : services.map((service, idx) => (
             <Card key={idx}>
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-4">
@@ -347,7 +226,11 @@ export default function StatusPage() {
 
         {/* History Tab */}
         <TabsContent value="history" className="space-y-3">
-          {statusHistory.map((day, idx) => (
+          {statusHistory.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6 text-center text-gray-500">No status history available yet.</CardContent>
+            </Card>
+          ) : statusHistory.map((day, idx) => (
             <Card key={idx}>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">

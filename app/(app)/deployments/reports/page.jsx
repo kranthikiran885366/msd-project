@@ -13,117 +13,21 @@ export default function MonitoringReportsPage() {
   const [deployments, setDeployments] = useState([]);
   const [selectedDeployment, setSelectedDeployment] = useState('');
   const [reports, setReports] = useState([]);
+  const [selectedReport, setSelectedReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [selectedReport, setSelectedReport] = useState(null);
   const [reportType, setReportType] = useState('incident');
   const [timeRange, setTimeRange] = useState('30d');
-
-  // Mock incident reports
-  const mockIncidentReport = {
-    period: 'Last 30 Days',
-    startDate: '2024-11-20',
-    endDate: '2024-12-20',
-    totalIncidents: 12,
-    criticalIncidents: 3,
-    warningIncidents: 5,
-    infoIncidents: 4,
-    averageResolutionTime: 45,
-    mttr: 38, // Mean Time To Resolution (minutes)
-    mtbf: 168, // Mean Time Between Failures (hours)
-    totalDowntime: 158,
-    data: [
-      { week: 'Week 1', incidents: 2, critical: 0, warning: 1, info: 1 },
-      { week: 'Week 2', incidents: 3, critical: 1, warning: 1, info: 1 },
-      { week: 'Week 3', incidents: 4, critical: 1, warning: 2, info: 1 },
-      { week: 'Week 4', incidents: 3, critical: 1, warning: 1, info: 1 }
-    ],
-    severityBreakdown: [
-      { name: 'Critical', value: 3, incidents: 'database-crash, deployment-failure, api-outage' },
-      { name: 'Warning', value: 5, incidents: '5 different warnings' },
-      { name: 'Info', value: 4, incidents: '4 informational alerts' }
-    ],
-    topIncidents: [
-      { title: 'Database Connection Pool Exhaustion', count: 4, lastOccurred: '2024-12-20' },
-      { title: 'High Memory Usage', count: 3, lastOccurred: '2024-12-18' },
-      { title: 'Deployment Failures', count: 3, lastOccurred: '2024-12-15' },
-      { title: 'API Timeout Errors', count: 2, lastOccurred: '2024-12-10' }
-    ]
-  };
-
-  const mockSlaReport = {
-    period: 'Last 30 Days',
-    startDate: '2024-11-20',
-    endDate: '2024-12-20',
-    targetUptime: 99.95,
-    actualUptime: 99.89,
-    compliant: false,
-    creditIssued: 850,
-    slaBreaches: 1,
-    breachDates: ['2024-12-18 to 2024-12-19'],
-    data: [
-      { date: 'Nov 20-26', uptime: 99.92, target: 99.95 },
-      { date: 'Nov 27-Dec 3', uptime: 99.88, target: 99.95 },
-      { date: 'Dec 4-10', uptime: 99.91, target: 99.95 },
-      { date: 'Dec 11-17', uptime: 99.90, target: 99.95 },
-      { date: 'Dec 18-20', uptime: 99.78, target: 99.95 }
-    ]
-  };
-
-  const mockMetricsReport = {
-    period: 'Last 30 Days',
-    averageResponseTime: 145,
-    p95ResponseTime: 284,
-    p99ResponseTime: 512,
-    errorRate: 0.23,
-    requestsPerSecond: 2456,
-    cacheHitRatio: 85.2,
-    databaseQueryTime: 142,
-    data: [
-      { day: 'Dec 15', responseTime: 138, errors: 0.2, rps: 2200 },
-      { day: 'Dec 16', responseTime: 145, errors: 0.22, rps: 2350 },
-      { day: 'Dec 17', responseTime: 152, errors: 0.25, rps: 2400 },
-      { day: 'Dec 18', responseTime: 148, errors: 0.24, rps: 2380 },
-      { day: 'Dec 19', responseTime: 142, errors: 0.21, rps: 2500 },
-      { day: 'Dec 20', responseTime: 145, errors: 0.23, rps: 2456 }
-    ]
-  };
-
-  const mockTrendReport = {
-    period: 'Last 90 Days',
-    incidentTrend: 'increasing',
-    downTimeTrend: 'stable',
-    performanceTrend: 'improving',
-    data: [
-      { month: 'October', incidents: 15, downtime: 245, avgResponseTime: 165, uptime: 99.82 },
-      { month: 'November', incidents: 18, downtime: 189, avgResponseTime: 152, uptime: 99.88 },
-      { month: 'December', incidents: 12, downtime: 158, avgResponseTime: 145, uptime: 99.89 }
-    ]
-  };
-
-  const mockAlertReport = {
-    period: 'Last 30 Days',
-    totalAlerts: 456,
-    triggeredAlerts: 98,
-    falsePositives: 12,
-    silencedAlerts: 34,
-    topAlerts: [
-      { name: 'High CPU Usage', triggered: 23, falsePositive: 2 },
-      { name: 'Memory Warning', triggered: 18, falsePositive: 1 },
-      { name: 'Deployment Failure', triggered: 15, falsePositive: 3 },
-      { name: 'Low Disk Space', triggered: 12, falsePositive: 1 },
-      { name: 'Response Time High', triggered: 30, falsePositive: 5 }
-    ]
-  };
 
   const fetchDeployments = useCallback(async () => {
     try {
       setError('');
       const projects = await apiClient.getProjects();
-      setDeployments(projects || []);
-      if (projects?.length > 0 && !selectedDeployment) {
-        setSelectedDeployment(projects[0]._id);
+      const normalizedProjects = Array.isArray(projects) ? projects : [];
+      setDeployments(normalizedProjects);
+      if (normalizedProjects.length > 0 && !selectedDeployment) {
+        setSelectedDeployment(normalizedProjects[0]._id || normalizedProjects[0].id);
       }
     } catch (err) {
       setError(err.message || 'An error occurred');
@@ -141,7 +45,7 @@ export default function MonitoringReportsPage() {
       setError('');
       setLoading(true);
       const reportsData = await apiClient.getReports(selectedDeployment);
-      setReports(reportsData || []);
+      setReports(Array.isArray(reportsData) ? reportsData : []);
     } catch (err) {
       setError(err.message || 'Failed to fetch reports');
     } finally {
@@ -152,6 +56,11 @@ export default function MonitoringReportsPage() {
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
+
+  useEffect(() => {
+    const matchingReports = reports.filter((report) => report.type === reportType);
+    setSelectedReport(matchingReports[0] || reports[0] || null);
+  }, [reports, reportType]);
 
   const handleGenerateReport = async () => {
     try {
@@ -191,19 +100,150 @@ export default function MonitoringReportsPage() {
     );
   }
 
-  const getSelectedReportData = () => {
-    switch(reportType) {
-      case 'incident': return mockIncidentReport;
-      case 'sla': return mockSlaReport;
-      case 'metrics': return mockMetricsReport;
-      case 'trend': return mockTrendReport;
-      case 'alert': return mockAlertReport;
-      default: return mockIncidentReport;
+  const summary = selectedReport?.summary || {};
+
+  function normalizeReport(report, reportSummary) {
+    if (!report) {
+      return null;
     }
+
+    const data = report.data || {};
+
+    if (report.type === 'incident') {
+      const incidents = Array.isArray(data.incidents) ? data.incidents : [];
+      const bySeverity = data.bySeverity || {};
+      const weeklyData = buildWeeklyIncidentData(incidents);
+
+      return {
+        period: data.period || 'Live report',
+        totalIncidents: data.totalIncidents ?? reportSummary.totalIncidents ?? incidents.length,
+        averageResolutionTime: reportSummary.averageResolutionTime ?? 0,
+        mttr: reportSummary.averageResolutionTime ?? 0,
+        mtbf: incidents.length > 1 ? Math.max(1, Math.round((parseTimeSpanToMinutes(weeklyData) || 1) / incidents.length)) : 0,
+        totalDowntime: reportSummary.totalDowntime ?? 0,
+        data: weeklyData,
+        severityBreakdown: Object.entries(bySeverity).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value })),
+        topIncidents: buildTopIncidents(incidents),
+      };
+    }
+
+    if (report.type === 'sla') {
+      return {
+        period: data.period || 'Live report',
+        targetUptime: data.targetUptime ?? 99.95,
+        actualUptime: data.actualUptime ?? summary.uptime ?? 0,
+        compliant: Boolean(data.slaCompliant ?? summary.slaCompliance),
+        creditIssued: summary.totalDowntime ? Math.max(0, Math.round(summary.totalDowntime * 5)) : 0,
+        slaBreaches: data.breaches ?? 0,
+        breachDates: [],
+        data: Array.isArray(data.uptimeHistory) ? data.uptimeHistory.map((point) => ({
+          date: point.date || point.label || new Date(point.timestamp || Date.now()).toLocaleDateString(),
+          uptime: point.uptime ?? point.value ?? 0,
+          target: data.targetUptime ?? 99.95,
+        })) : [],
+      };
+    }
+
+    if (report.type === 'metrics') {
+      const responseTime = data.responseTime || {};
+      const metricsByType = data.metricsByType || {};
+
+      return {
+        period: data.period || 'Live report',
+        averageResponseTime: responseTime.average ?? summary.averageResponseTime ?? 0,
+        p95ResponseTime: responseTime.p95 ?? summary.p95ResponseTime ?? 0,
+        p99ResponseTime: responseTime.p99 ?? 0,
+        errorRate: responseTime.errorRate ?? 0,
+        requestsPerSecond: responseTime.requestsPerSecond ?? 0,
+        cacheHitRatio: responseTime.cacheHitRatio ?? 0,
+        databaseQueryTime: responseTime.databaseQueryTime ?? 0,
+        data: buildMetricTrend(metricsByType),
+      };
+    }
+
+    if (report.type === 'trend') {
+      return {
+        period: data.period || 'Live report',
+        incidentTrend: reportSummary.trendDirection || 'stable',
+        downTimeTrend: reportSummary.trendDirection || 'stable',
+        performanceTrend: reportSummary.trendDirection || 'stable',
+        data: Array.isArray(data.trendData) ? data.trendData : [],
+      };
+    }
+
+    if (report.type === 'alert') {
+      const alertsByType = data.alertsByType || {};
+      const topAlerts = Object.entries(alertsByType).map(([name, value]) => ({
+        name,
+        triggered: value,
+        falsePositive: 0,
+      }));
+
+      return {
+        period: data.period || 'Live report',
+        totalAlerts: reportSummary.totalAlerts ?? data.totalAlerts ?? 0,
+        triggeredAlerts: reportSummary.triggerRate ? Math.round((reportSummary.triggerRate / 100) * (reportSummary.totalAlerts ?? data.totalAlerts ?? 0)) : data.triggeredAlerts ?? 0,
+        falsePositives: 0,
+        silencedAlerts: 0,
+        topAlerts,
+      };
+    }
+
+    return data;
   };
 
-  const reportData = getSelectedReportData();
   const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'];
+
+  const buildWeeklyIncidentData = (incidents) => {
+    const buckets = new Map();
+
+    incidents.forEach((incident) => {
+      const date = new Date(incident.createdAt || incident.timestamp || Date.now());
+      const week = `Week ${Math.min(4, Math.max(1, Math.ceil(date.getDate() / 7)))}`;
+      const current = buckets.get(week) || { week, incidents: 0, critical: 0, warning: 0, info: 0 };
+      current.incidents += 1;
+      current[normalizeSeverity(incident.severity)] += 1;
+      buckets.set(week, current);
+    });
+
+    return Array.from(buckets.values());
+  };
+
+  const buildTopIncidents = (incidents) => {
+    const grouped = incidents.reduce((acc, incident) => {
+      const title = incident.title || incident.component || 'Incident';
+      const entry = acc.get(title) || { title, count: 0, lastOccurred: incident.createdAt || incident.timestamp || new Date().toISOString() };
+      entry.count += 1;
+      entry.lastOccurred = incident.createdAt || incident.timestamp || entry.lastOccurred;
+      acc.set(title, entry);
+      return acc;
+    }, new Map());
+
+    return Array.from(grouped.values()).sort((a, b) => b.count - a.count).slice(0, 4);
+  };
+
+  const buildMetricTrend = (metricsByType) => {
+    const entries = Object.entries(metricsByType);
+    return entries.map(([day, metrics]) => ({
+      day,
+      responseTime: metrics?.average ?? 0,
+      errors: metrics?.errorRate ?? 0,
+      rps: metrics?.requestsPerSecond ?? 0,
+    }));
+  };
+
+  const normalizeSeverity = (severity) => {
+    const value = String(severity || '').toLowerCase();
+    if (value.includes('critical')) return 'critical';
+    if (value.includes('warn')) return 'warning';
+    return 'info';
+  };
+
+  const parseTimeSpanToMinutes = (series) => {
+    return series.reduce((total, item) => total + (item.incidents || 0), 0);
+  };
+
+  const reportData = normalizeReport(selectedReport, summary);
 
   return (
     <div className="p-6 space-y-6">
@@ -446,7 +486,7 @@ export default function MonitoringReportsPage() {
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">Compliant</p>
                       <Badge className={reportData.compliant ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                        {reportData.compliant ? 'Yes' : 'No'}
+                                  {reportData.compliant ? 'Yes' : 'No'}
                       </Badge>
                     </div>
                   </CardContent>

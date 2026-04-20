@@ -1,4 +1,3 @@
-const redis = require('redis');
 const { Queue, Worker, QueueEvents } = require('bullmq');
 
 class JobQueueService {
@@ -12,46 +11,31 @@ class JobQueueService {
 
     async initialize() {
         try {
-            // Initialize Redis client
-            this.client = redis.createClient({
+            // BullMQ requires ioredis-compatible connection config (host/port object)
+            const redisConnection = {
                 host: process.env.REDIS_HOST || 'localhost',
-                port: process.env.REDIS_PORT || 6379,
+                port: parseInt(process.env.REDIS_PORT || '6379', 10),
                 password: process.env.REDIS_PASSWORD || undefined,
                 maxRetriesPerRequest: null,
                 enableReadyCheck: false,
-                enableOfflineQueue: false
-            });
+            };
 
-            this.client.on('error', (err) => {
-                console.error('[v0] Redis client error:', err);
-                this.isConnected = false;
-            });
-
-            this.client.on('connect', () => {
-                console.log('[v0] Redis connected');
-                this.isConnected = true;
-            });
-
-            // Initialize job queue
+            // Initialize job queue with ioredis-style connection
             this.queue = new Queue('deployments', {
-                connection: this.client,
+                connection: redisConnection,
                 defaultJobOptions: {
                     attempts: 3,
                     backoff: {
                         type: 'exponential',
                         delay: 2000
                     },
-                    removeOnComplete: {
-                        age: 3600 // Keep completed jobs for 1 hour
-                    },
-                    removeOnFail: {
-                        age: 86400 // Keep failed jobs for 24 hours
-                    }
+                    removeOnComplete: { age: 3600 },
+                    removeOnFail: { age: 86400 }
                 }
             });
 
             // Initialize queue events
-            this.queueEvents = new QueueEvents('deployments', { connection: this.client });
+            this.queueEvents = new QueueEvents('deployments', { connection: redisConnection });
 
             console.log('[v0] Job queue service initialized');
             this.isConnected = true;

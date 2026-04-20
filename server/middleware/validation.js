@@ -1,4 +1,22 @@
 // Request Validation Middleware
+const validateRequest = (requiredFields) => (req, res, next) => {
+  const missingFields = requiredFields.filter((field) => {
+    const bodyValue = req.body?.[field]
+    const queryValue = req.query?.[field]
+    const paramValue = req.params?.[field]
+
+    return bodyValue === undefined && queryValue === undefined && paramValue === undefined
+  })
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      error: `${missingFields.join(', ')} are required`,
+    })
+  }
+
+  next()
+}
+
 const validateDeploymentRequest = (req, res, next) => {
   const { projectId, gitCommit } = req.body
   if (!projectId || !gitCommit) {
@@ -48,6 +66,7 @@ const validateUpdateSettings = (req, res, next) => {
 }
 
 module.exports = {
+  validateRequest,
   validateDeploymentRequest,
   validateProjectRequest,
   validateFunctionRequest,

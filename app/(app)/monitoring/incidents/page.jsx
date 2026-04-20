@@ -10,8 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle, AlertCircle, CheckCircle, Clock, Plus, Search, Eye, MessageSquare, Users, Activity, TrendingUp, Calendar, Filter } from "lucide-react"
 import apiClient from "@/lib/api-client"
+import { useAppStore } from "@/store/use-app-store"
 
 export default function IncidentsPage() {
+  const { projects } = useAppStore()
+  const projectId = projects[0]?.id || projects[0]?._id || ""
   const [incidents, setIncidents] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -26,6 +29,31 @@ export default function IncidentsPage() {
     affectedServices: []
   })
 
+  const normalizeStatus = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'investigating'
+      case 'acknowledged':
+        return 'monitoring'
+      case 'in-progress':
+        return 'monitoring'
+      case 'resolved':
+        return 'resolved'
+      default:
+        return status || 'investigating'
+    }
+  }
+
+  const normalizeIncident = (incident) => ({
+    ...incident,
+    id: incident._id || incident.id,
+    status: normalizeStatus(incident.status),
+    severity: incident.severity === 'critical' ? 'critical' : incident.severity === 'warning' ? 'medium' : incident.severity || 'medium',
+    affectedServices: incident.component ? [incident.component] : incident.affectedServices || [],
+    assignedTo: incident.assignee?.name || incident.assignedTo || incident.assignee || '',
+    updates: incident.timeline || incident.updates || [],
+  })
+
   useEffect(() => {
     loadIncidents()
   }, [])
@@ -33,53 +61,17 @@ export default function IncidentsPage() {
   const loadIncidents = async () => {
     try {
       setLoading(true)
-      const data = await apiClient.get('/incidents')
-      setIncidents(data.incidents || [])
+      if (!projectId) {
+        setIncidents([])
+        return
+      }
+
+      const data = await apiClient.getIncidents(projectId)
+      const incidentsData = data?.data || data?.incidents || data || []
+      setIncidents(incidentsData.map(normalizeIncident))
     } catch (error) {
       console.error('Failed to load incidents:', error)
-      // Mock data fallback
-      setIncidents([
-        {
-          id: "inc_1",
-          title: "Database Connection Issues",
-          description: "Users experiencing intermittent connection timeouts",
-          severity: "high",
-          status: "investigating",
-          affectedServices: ["Database", "API"],
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-          updatedAt: new Date(Date.now() - 30 * 60 * 1000),
-          resolvedAt: null,
-          assignedTo: "DevOps Team",
-          updates: [
-            {
-              id: "upd_1",
-              message: "Initial investigation started",
-              timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-              author: "System"
-            }
-          ]
-        },
-        {
-          id: "inc_2",
-          title: "High Response Times",
-          description: "API response times elevated across all endpoints",
-          severity: "medium",
-          status: "monitoring",
-          affectedServices: ["API", "Frontend"],
-          createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
-          updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
-          resolvedAt: null,
-          assignedTo: "Backend Team",
-          updates: [
-            {
-              id: "upd_2",
-              message: "Scaling up backend instances",
-              timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-              author: "DevOps"
-            }
-          ]
-        }
-      ])
+      setIncidents([])
     } finally {
       setLoading(false)
     }
@@ -87,16 +79,17 @@ export default function IncidentsPage() {
 
   const createIncident = async () => {
     try {
-      const incident = {
-        ...newIncident,
-        id: `inc_${Date.now()}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        updates: []
-      }
-      
-      await apiClient.post('/incidents', incident)
-      setIncidents(prev => [incident, ...prev])
+      if (!projectId) return
+
+      const incident = await apiClient.createIncident(projectId, {
+        title: newIncident.title,
+        description: newIncident.description,
+        severity: newIncident.severity === 'high' ? 'critical' : newIncident.severity,
+        component: newIncident.affectedServices[0] || 'General',
+        assignee: newIncident.assignedTo || undefined,
+      })
+
+      setIncidents(prev => [normalizeIncident(incident?.data || incident), ...prev])
       setNewIncident({
         title: "",
         description: "",
@@ -112,7 +105,12 @@ export default function IncidentsPage() {
 
   const updateIncidentStatus = async (incidentId, status) => {
     try {
-      await apiClient.patch(`/incidents/${incidentId}`, { status })
+      const backendStatus = status === 'monitoring' ? 'in-progress' : status === 'investigating' ? 'pending' : status
+      if (backendStatus === 'resolved') {
+        await apiClient.resolveIncident(incidentId, { resolution: 'Resolved from dashboard' })
+      } else {
+        await apiClient.updateIncidentStatus(incidentId, backendStatus)
+      }
       setIncidents(prev => prev.map(inc => 
         inc.id === incidentId 
           ? { ...inc, status, updatedAt: new Date(), resolvedAt: status === 'resolved' ? new Date() : null }

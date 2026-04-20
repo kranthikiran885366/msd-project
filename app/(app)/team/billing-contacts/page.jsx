@@ -9,8 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Plus, Edit2, Trash2, RefreshCw, Mail, Phone, User } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+import { useAppStore } from '@/store/use-app-store';
 
 export default function BillingContactsPage() {
+  const { projects } = useAppStore();
+  const organizationId = projects[0]?.id || projects[0]?._id || '';
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,73 +30,40 @@ export default function BillingContactsPage() {
     department: 'finance'
   });
 
-  // Mock billing contacts
-  const mockContacts = [
-    {
-      id: 'bc-1',
-      name: 'Rachel Martinez',
-      email: 'rachel.martinez@acme-corp.com',
-      phone: '+1-555-123-4567',
-      title: 'CFO',
-      role: 'primary',
-      department: 'finance',
-      notificationPreferences: ['invoices', 'payment_issues', 'upgrade_notifications'],
-      lastNotified: '2024-12-20T10:00:00Z',
-      createdAt: '2024-01-15T09:00:00Z'
-    },
-    {
-      id: 'bc-2',
-      name: 'David Chen',
-      email: 'david.chen@acme-corp.com',
-      phone: '+1-555-234-5678',
-      title: 'Senior Accountant',
-      role: 'secondary',
-      department: 'finance',
-      notificationPreferences: ['invoices', 'payment_issues'],
-      lastNotified: '2024-12-19T14:30:00Z',
-      createdAt: '2024-02-10T10:15:00Z'
-    },
-    {
-      id: 'bc-3',
-      name: 'Jennifer Lee',
-      email: 'jennifer.lee@acme-corp.com',
-      phone: '+1-555-345-6789',
-      title: 'IT Operations Manager',
-      role: 'technical',
-      department: 'it',
-      notificationPreferences: ['technical_issues', 'subscription_updates', 'billing_updates'],
-      lastNotified: '2024-12-18T09:15:00Z',
-      createdAt: '2024-03-05T11:30:00Z'
-    },
-    {
-      id: 'bc-4',
-      name: 'Mark Thompson',
-      email: 'mark.thompson@acme-corp.com',
-      phone: '+1-555-456-7890',
-      title: 'Procurement Officer',
-      role: 'secondary',
-      department: 'procurement',
-      notificationPreferences: ['invoices', 'contract_updates'],
-      lastNotified: '2024-12-17T16:00:00Z',
-      createdAt: '2024-04-12T09:00:00Z'
-    },
-    {
-      id: 'bc-5',
-      name: 'Sarah Anderson',
-      email: 'sarah.anderson@acme-corp.com',
-      phone: '+1-555-567-8901',
-      title: 'Legal Compliance Officer',
-      role: 'legal',
-      department: 'legal',
-      notificationPreferences: ['contract_updates', 'compliance_updates'],
-      lastNotified: '2024-12-15T10:30:00Z',
-      createdAt: '2024-05-20T13:45:00Z'
-    }
-  ];
+  const normalizeContact = (contact) => ({
+    id: contact._id || contact.id,
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone || '',
+    title: contact.role || contact.title || '',
+    role: contact.isPrimary ? 'primary' : contact.role || 'secondary',
+    department: contact.department || 'finance',
+    notificationPreferences: Object.entries(contact.preferences || {}).filter(([, enabled]) => enabled).map(([key]) => key),
+    lastNotified: contact.updatedAt || contact.createdAt || new Date().toISOString(),
+    createdAt: contact.createdAt || new Date().toISOString(),
+  });
 
   useEffect(() => {
-    setContacts(mockContacts);
-    setLoading(false);
+    const loadContacts = async () => {
+      try {
+        setLoading(true);
+        if (!organizationId) {
+          setContacts([]);
+          return;
+        }
+
+        const response = await apiClient.getBillingContacts(organizationId);
+        const records = response?.data || response || [];
+        setContacts(records.map(normalizeContact));
+      } catch (err) {
+        setError(err.message || 'Failed to load billing contacts');
+        setContacts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadContacts();
   }, []);
 
   const handleInputChange = (field, value) => {
@@ -120,24 +90,12 @@ export default function BillingContactsPage() {
 
     try {
       setError('');
-      const response = await apiClient.addBillingContact(formData);
-
-      if (response.success) {
-        const newContact = {
-          id: `bc-${contacts.length + 1}`,
-          ...formData,
-          notificationPreferences: ['invoices'],
-          lastNotified: new Date().toISOString(),
-          createdAt: new Date().toISOString()
-        };
-        setContacts([...contacts, newContact]);
+      const response = await apiClient.createBillingContact(organizationId, formData);
+      setContacts([...contacts, normalizeContact(response?.data || response)]);
         setSuccessMessage('Billing contact added successfully');
         resetForm();
         setShowForm(false);
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to add contact');
-      }
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -159,19 +117,15 @@ export default function BillingContactsPage() {
   const handleUpdateContact = async () => {
     try {
       setError('');
-      const response = await apiClient.updateBillingContact(editingId, formData);
-
-      if (response.success) {
-        setContacts(contacts.map(c =>
-          c.id === editingId ? {...c, ...formData} : c
-        ));
+      const response = await apiClient.updateBillingContact(organizationId, editingId, formData);
+      const updatedContact = normalizeContact(response?.data || response);
+      setContacts(contacts.map(c =>
+        c.id === editingId ? {...c, ...updatedContact} : c
+      ));
         setSuccessMessage('Billing contact updated successfully');
         resetForm();
         setShowForm(false);
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to update contact');
-      }
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -184,15 +138,10 @@ export default function BillingContactsPage() {
 
     try {
       setError('');
-      const response = await apiClient.removeBillingContact(contactId);
-
-      if (response.success) {
-        setContacts(contacts.filter(c => c.id !== contactId));
-        setSuccessMessage('Billing contact removed successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to remove contact');
-      }
+      await apiClient.deleteBillingContact(organizationId, contactId);
+      setContacts(contacts.filter(c => c.id !== contactId));
+      setSuccessMessage('Billing contact removed successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }

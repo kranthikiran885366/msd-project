@@ -23,170 +23,104 @@ export default function TeamActivityPage() {
     searchQuery: ''
   });
 
-  // Mock activity data
-  const mockActivities = [
-    {
-      id: 'activity-1',
-      timestamp: '2024-12-20T15:45:30Z',
-      user: { id: 'user-1', name: 'John Doe', email: 'john.doe@company.com' },
-      type: 'deployment_created',
-      title: 'Created Production Deployment',
-      description: 'Deployed v2.1.0 to production',
-      metadata: {
-        deploymentId: 'deploy-123',
-        environment: 'production',
-        version: 'v2.1.0'
-      },
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    },
-    {
-      id: 'activity-2',
-      timestamp: '2024-12-20T14:30:15Z',
-      user: { id: 'user-2', name: 'Sarah Lee', email: 'sarah.lee@company.com' },
-      type: 'login',
-      title: 'User Login',
-      description: 'Logged in via email',
-      metadata: {
-        mfaEnabled: true,
-        sessionDuration: '8h 45m'
-      },
-      ipAddress: '192.168.1.101',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
-    },
-    {
-      id: 'activity-3',
-      timestamp: '2024-12-20T13:15:45Z',
-      user: { id: 'user-3', name: 'Mike Johnson', email: 'mike.johnson@company.com' },
-      type: 'database_backup',
-      title: 'Database Backup Completed',
-      description: 'Automatic backup of production database',
-      metadata: {
-        databaseId: 'db-456',
-        backupSize: '2.4 GB',
-        duration: '12 minutes'
-      },
-      ipAddress: '10.0.0.50',
-      userAgent: 'Backup System v1.2.3'
-    },
-    {
-      id: 'activity-4',
-      timestamp: '2024-12-20T12:00:00Z',
-      user: { id: 'user-1', name: 'John Doe', email: 'john.doe@company.com' },
-      type: 'config_change',
-      title: 'Configuration Updated',
-      description: 'Updated environment variables',
-      metadata: {
-        configName: 'Production Env',
-        changes: 5,
-        appliedTo: 'production'
-      },
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    },
-    {
-      id: 'activity-5',
-      timestamp: '2024-12-20T11:30:22Z',
-      user: { id: 'user-4', name: 'Jane Smith', email: 'jane.smith@company.com' },
-      type: 'alert_triggered',
-      title: 'Alert Triggered',
-      description: 'High CPU usage detected',
-      metadata: {
-        alertName: 'CPU > 85%',
-        threshold: '85%',
-        current: '92%'
-      },
-      ipAddress: '10.0.0.51',
-      userAgent: 'Alert System v2.1.0'
-    },
-    {
-      id: 'activity-6',
-      timestamp: '2024-12-20T10:45:10Z',
-      user: { id: 'user-2', name: 'Sarah Lee', email: 'sarah.lee@company.com' },
-      type: 'api_key_generated',
-      title: 'API Key Generated',
-      description: 'New API key created for CI/CD pipeline',
-      metadata: {
-        keyName: 'GitHub Actions',
-        scopes: ['deployments:write', 'logs:read'],
-        expiresIn: '90 days'
-      },
-      ipAddress: '192.168.1.101',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
-    },
-    {
-      id: 'activity-7',
-      timestamp: '2024-12-20T09:20:35Z',
-      user: { id: 'user-3', name: 'Mike Johnson', email: 'mike.johnson@company.com' },
-      type: 'logout',
-      title: 'User Logout',
-      description: 'User logged out of the platform',
-      metadata: {
-        sessionDuration: '4h 23m',
-        reason: 'manual_logout'
-      },
-      ipAddress: '192.168.1.102',
-      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)'
-    },
-    {
-      id: 'activity-8',
-      timestamp: '2024-12-20T08:15:50Z',
-      user: { id: 'user-1', name: 'John Doe', email: 'john.doe@company.com' },
-      type: 'scaling_triggered',
-      title: 'Auto-scaling Triggered',
-      description: 'Application scaled up automatically',
-      metadata: {
-        serviceName: 'API Server',
-        fromReplicas: 3,
-        toReplicas: 5,
-        reason: 'High load detected'
-      },
-      ipAddress: '10.0.0.52',
-      userAgent: 'Scaling Manager v1.5.0'
-    },
-    {
-      id: 'activity-9',
-      timestamp: '2024-12-19T16:30:20Z',
-      user: { id: 'user-4', name: 'Jane Smith', email: 'jane.smith@company.com' },
-      type: 'report_generated',
-      title: 'Report Generated',
-      description: 'Monthly compliance report generated',
-      metadata: {
-        reportType: 'Compliance',
-        period: 'November 2024',
-        pageCount: 24
-      },
-      ipAddress: '192.168.1.103',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    },
-    {
-      id: 'activity-10',
-      timestamp: '2024-12-19T15:45:00Z',
-      user: { id: 'user-2', name: 'Sarah Lee', email: 'sarah.lee@company.com' },
-      type: 'incident_resolved',
-      title: 'Incident Resolved',
-      description: 'Production incident successfully resolved',
-      metadata: {
-        incidentId: 'INC-2024-001',
-        severity: 'critical',
-        duration: '1h 15m'
-      },
-      ipAddress: '192.168.1.101',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
-    }
-  ];
-
   useEffect(() => {
-    setActivities(mockActivities);
-    setLoading(false);
+    const loadActivityLogs = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const projects = await apiClient.getProjects();
+        const projectId = projects?.[0]?._id || projects?.[0]?.id;
+
+        if (!projectId) {
+          setActivities([]);
+          return;
+        }
+
+        const response = await apiClient.getTeamActivityLogs({ projectId, limit: 100 });
+        const normalized = Array.isArray(response) ? response.map(normalizeActivityLog) : [];
+        setActivities(normalized);
+      } catch (err) {
+        setError(err.message || 'Failed to load activity logs');
+        setActivities([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadActivityLogs();
   }, []);
+
+  const normalizeActivityLog = (activity) => {
+    const metadata = activity?.metadata && typeof activity.metadata === 'object' ? activity.metadata : {};
+    const type = normalizeActivityType(activity?.action, activity?.resourceType);
+
+    return {
+      id: activity?._id || activity?.id || `${activity?.action || 'activity'}-${activity?.createdAt || Date.now()}`,
+      timestamp: activity?.createdAt || activity?.timestamp || new Date().toISOString(),
+      user: {
+        id: activity?.userId?._id || activity?.userId || 'unknown',
+        name: activity?.userId?.name || activity?.userId?.email || 'Unknown user',
+        email: activity?.userId?.email || ''
+      },
+      type,
+      title: formatActivityTitle(type, activity?.resourceType, activity?.action),
+      description: formatActivityDescription(activity?.action, activity?.resourceType, metadata),
+      metadata,
+      ipAddress: activity?.ipAddress || 'Unknown',
+      userAgent: activity?.userAgent || 'Unknown'
+    };
+  };
+
+  const normalizeActivityType = (action, resourceType) => {
+    const normalizedAction = String(action || '').toUpperCase();
+    const normalizedResource = String(resourceType || '').toUpperCase();
+
+    if (normalizedAction.includes('LOGIN')) return 'login';
+    if (normalizedAction.includes('LOGOUT')) return 'logout';
+    if (normalizedAction.includes('TEAM_INVITATION')) return 'config_change';
+    if (normalizedAction.includes('TEAM_MEMBER')) return 'config_change';
+    if (normalizedAction.includes('WEBHOOK')) return 'deployment_created';
+    if (normalizedAction.includes('BACKUP')) return 'database_backup';
+    if (normalizedAction.includes('ROLE') || normalizedAction.includes('PERMISSION')) return 'config_change';
+    if (normalizedResource.includes('DEPLOY')) return 'deployment_created';
+    if (normalizedAction.includes('ALERT')) return 'alert_triggered';
+    return 'config_change';
+  };
+
+  const formatActivityTitle = (type, resourceType, action) => {
+    const typeTitles = {
+      login: 'User Login',
+      logout: 'User Logout',
+      deployment_created: 'Deployment Activity',
+      database_backup: 'Backup Activity',
+      config_change: 'Configuration Updated',
+      alert_triggered: 'Alert Triggered',
+      api_key_generated: 'API Key Activity',
+      scaling_triggered: 'Scaling Activity',
+      report_generated: 'Report Activity',
+      incident_resolved: 'Incident Resolved'
+    };
+
+    return typeTitles[type] || `${resourceType || 'Resource'} ${action || 'Activity'}`;
+  };
+
+  const formatActivityDescription = (action, resourceType, metadata) => {
+    const details = Object.entries(metadata || {})
+      .slice(0, 2)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(', ');
+
+    const base = `${action || 'Activity'} on ${resourceType || 'resource'}`;
+    return details ? `${base} (${details})` : base;
+  };
 
   const handleFilterChange = (field, value) => {
     setFilters({...filters, [field]: value});
   };
 
   const applyFilters = () => {
-    let filtered = mockActivities;
+    let filtered = activities;
 
     if (filters.user) {
       filtered = filtered.filter(activity =>
@@ -234,17 +168,87 @@ export default function TeamActivityPage() {
     return filtered;
   };
 
-  const handleExport = async (format) => {
-    try {
-      const filtered = applyFilters();
-      const response = await apiClient.exportActivity(filtered, format);
+  const buildCsv = (rows) => {
+    const columns = ['timestamp', 'user', 'type', 'title', 'description', 'ipAddress', 'userAgent'];
+    const escapeValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
-      if (response.success) {
-        setSuccessMessage(`Activity data exported as ${format.toUpperCase()}`);
+    return [
+      columns.join(','),
+      ...rows.map((row) => columns.map((column) => {
+        if (column === 'user') {
+          return escapeValue(`${row.user.name} <${row.user.email || 'unknown'}>`);
+        }
+
+        return escapeValue(row[column]);
+      }).join(','))
+    ].join('\n');
+  };
+
+  const handleExport = async (format) => {
+    const filtered = applyFilters();
+
+    if (filtered.length === 0) {
+      setError('No activity data available to export');
+      return;
+    }
+
+    try {
+      if (format === 'csv') {
+        const blob = new Blob([buildCsv(filtered)], { type: 'text/csv;charset=utf-8' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `team-activity-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        setSuccessMessage('Activity data exported as CSV');
         setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to export');
+        return;
       }
+
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
+      if (!printWindow) {
+        setError('Unable to open print dialog');
+        return;
+      }
+
+      const rows = filtered.map((activity) => `
+        <tr>
+          <td>${new Date(activity.timestamp).toLocaleString()}</td>
+          <td>${activity.user.name}${activity.user.email ? ` (${activity.user.email})` : ''}</td>
+          <td>${activity.type.replace(/_/g, ' ')}</td>
+          <td>${activity.title}</td>
+        </tr>
+      `).join('');
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Team Activity</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+              h1 { margin: 0 0 16px; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
+              th { background: #f5f5f5; }
+            </style>
+          </head>
+          <body>
+            <h1>Team Activity</h1>
+            <table>
+              <thead>
+                <tr><th>Timestamp</th><th>User</th><th>Type</th><th>Title</th></tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      setSuccessMessage('Activity preview opened for PDF export');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -286,8 +290,8 @@ export default function TeamActivityPage() {
     incident_resolved: <CheckCircle className="w-4 h-4" />
   };
 
-  const uniqueUsers = [...new Set(mockActivities.map(a => a.user.name))];
-  const uniqueActivityTypes = [...new Set(mockActivities.map(a => a.type))];
+  const uniqueUsers = [...new Set(activities.map(a => a.user.name))];
+  const uniqueActivityTypes = [...new Set(activities.map(a => a.type))];
 
   return (
     <div className="p-6 space-y-6">

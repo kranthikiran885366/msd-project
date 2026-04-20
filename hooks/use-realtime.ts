@@ -20,18 +20,20 @@ export function useRealTimeMetrics(projectId: string) {
     socketService.on('connection_lost', handleDisconnect);
     socketService.on('socket_error', handleError);
 
+    const handleMetricUpdate = (data: any) => {
+      setMetrics(data);
+      setError(null);
+    };
+
     // Subscribe to metrics
     if (projectId) {
-      socketService.subscribeToMetrics(projectId, (data: any) => {
-        setMetrics(data);
-        setError(null);
-      });
+      socketService.subscribeToMetrics(projectId, handleMetricUpdate);
     }
 
     // Cleanup
     return () => {
       if (projectId) {
-        socketService.unsubscribeFromMetrics(projectId, (data: any) => setMetrics(data));
+        socketService.unsubscribeFromMetrics(projectId, handleMetricUpdate);
       }
       socketService.off('connection_established', handleConnect);
       socketService.off('connection_lost', handleDisconnect);
@@ -59,18 +61,18 @@ export function useRealTimeLogs(deploymentId: string) {
     socketService.on('connection_lost', handleDisconnect);
     socketService.on('socket_error', handleError);
 
-    if (deploymentId) {
-      socketService.subscribeToLogs(deploymentId, (logEntry: any) => {
+    const handleLogEntry = (logEntry: any) => {
         setLogs((prev) => [logEntry, ...prev].slice(0, 1000));
         setError(null);
-      });
+    };
+
+    if (deploymentId) {
+      socketService.subscribeToLogs(deploymentId, handleLogEntry);
     }
 
     return () => {
       if (deploymentId) {
-        socketService.unsubscribeFromLogs(deploymentId, (logEntry: any) => {
-          setLogs((prev) => [logEntry, ...prev].slice(0, 1000));
-        });
+        socketService.unsubscribeFromLogs(deploymentId, handleLogEntry);
       }
       socketService.off('connection_established', handleConnect);
       socketService.off('connection_lost', handleDisconnect);
@@ -100,15 +102,15 @@ export function useRealTimeAlerts() {
     socketService.on('connection_lost', handleDisconnect);
     socketService.on('socket_error', handleError);
 
-    socketService.subscribeToAlerts((alert: any) => {
+    const handleAlert = (alert: any) => {
       setAlerts((prev) => [alert, ...prev].slice(0, 100));
       setError(null);
-    });
+    };
+
+    socketService.subscribeToAlerts(handleAlert);
 
     return () => {
-      socketService.unsubscribeFromAlerts((alert: any) => {
-        setAlerts((prev) => [alert, ...prev].slice(0, 100));
-      });
+      socketService.unsubscribeFromAlerts(handleAlert);
       socketService.off('connection_established', handleConnect);
       socketService.off('connection_lost', handleDisconnect);
       socketService.off('socket_error', handleError);
@@ -140,7 +142,7 @@ export function useRealTimeDeployments() {
     socketService.on('connection_lost', handleDisconnect);
     socketService.on('socket_error', handleError);
 
-    socketService.subscribeToDeployments((deployment: any) => {
+    const handleDeployment = (deployment: any) => {
       setDeployments((prev) => {
         const updated = [...prev];
         const index = updated.findIndex((d) => d.id === deployment.id);
@@ -152,21 +154,12 @@ export function useRealTimeDeployments() {
         return updated.slice(0, 50);
       });
       setError(null);
-    });
+    };
+
+    socketService.subscribeToDeployments(handleDeployment);
 
     return () => {
-      socketService.unsubscribeFromDeployments((deployment: any) => {
-        setDeployments((prev) => {
-          const updated = [...prev];
-          const index = updated.findIndex((d) => d.id === deployment.id);
-          if (index > -1) {
-            updated[index] = deployment;
-          } else {
-            updated.unshift(deployment);
-          }
-          return updated.slice(0, 50);
-        });
-      });
+      socketService.unsubscribeFromDeployments(handleDeployment);
       socketService.off('connection_established', handleConnect);
       socketService.off('connection_lost', handleDisconnect);
       socketService.off('socket_error', handleError);
@@ -193,15 +186,15 @@ export function useSystemStatus() {
     socketService.on('connection_lost', handleDisconnect);
     socketService.on('socket_error', handleError);
 
-    socketService.subscribeToSystemStatus((systemStatus: any) => {
+    const handleSystemStatus = (systemStatus: any) => {
       setStatus(systemStatus);
       setError(null);
-    });
+    };
+
+    socketService.subscribeToSystemStatus(handleSystemStatus);
 
     return () => {
-      socketService.unsubscribeFromSystemStatus((systemStatus: any) => {
-        setStatus(systemStatus);
-      });
+      socketService.unsubscribeFromSystemStatus(handleSystemStatus);
       socketService.off('connection_established', handleConnect);
       socketService.off('connection_lost', handleDisconnect);
       socketService.off('socket_error', handleError);

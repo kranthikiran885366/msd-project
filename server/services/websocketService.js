@@ -35,7 +35,8 @@ class WebSocketService {
 
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        socket.userId = decoded.id;
+        // FIX: tokens are signed with { userId } not { id }
+        socket.userId = decoded.userId || decoded.id;
         socket.userEmail = decoded.email;
         next();
       } catch (error) {

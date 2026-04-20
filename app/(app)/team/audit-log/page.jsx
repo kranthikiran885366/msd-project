@@ -27,175 +27,51 @@ export default function AuditLogPage() {
     searchQuery: ''
   });
 
-  // Mock audit logs
-  const mockAuditLogs = [
-    {
-      id: 'audit-1',
-      timestamp: '2024-12-20T15:45:30Z',
-      user: { id: 'user-1', name: 'John Doe', email: 'john.doe@company.com' },
-      action: 'created',
-      resource: 'deployment',
-      resourceId: 'deploy-123',
-      resourceName: 'Production Deploy v2.1.0',
-      status: 'success',
-      details: {
-        description: 'Created new deployment for production environment',
-        changes: ['version: v2.0.9 → v2.1.0', 'replicas: 3 → 5'],
-        ipAddress: '192.168.1.100'
-      }
-    },
-    {
-      id: 'audit-2',
-      timestamp: '2024-12-20T14:30:15Z',
-      user: { id: 'user-2', name: 'Sarah Lee', email: 'sarah.lee@company.com' },
-      action: 'updated',
-      resource: 'database',
-      resourceId: 'db-456',
-      resourceName: 'Production Database',
-      status: 'success',
-      details: {
-        description: 'Updated database scaling policy',
-        changes: ['maxReplicas: 10 → 15', 'cpuThreshold: 70% → 65%'],
-        ipAddress: '192.168.1.101'
-      }
-    },
-    {
-      id: 'audit-3',
-      timestamp: '2024-12-20T13:15:45Z',
-      user: { id: 'user-3', name: 'Mike Johnson', email: 'mike.johnson@company.com' },
-      action: 'deleted',
-      resource: 'alert',
-      resourceId: 'alert-789',
-      resourceName: 'High CPU Alert',
-      status: 'success',
-      details: {
-        description: 'Deleted alert rule',
-        reason: 'Rule no longer needed after infrastructure upgrade',
-        ipAddress: '192.168.1.102'
-      }
-    },
-    {
-      id: 'audit-4',
-      timestamp: '2024-12-20T12:00:00Z',
-      user: { id: 'user-1', name: 'John Doe', email: 'john.doe@company.com' },
-      action: 'accessed',
-      resource: 'settings',
-      resourceId: 'settings-001',
-      resourceName: 'Billing Settings',
-      status: 'success',
-      details: {
-        description: 'Accessed billing settings page',
-        duration: '5 minutes',
-        ipAddress: '192.168.1.100'
-      }
-    },
-    {
-      id: 'audit-5',
-      timestamp: '2024-12-20T11:30:22Z',
-      user: { id: 'user-4', name: 'Jane Smith', email: 'jane.smith@company.com' },
-      action: 'updated',
-      resource: 'member',
-      resourceId: 'user-5',
-      resourceName: 'Tom Williams - Role Change',
-      status: 'success',
-      details: {
-        description: 'Changed member role',
-        changes: ['role: member → manager', 'permissions updated'],
-        approvedBy: 'John Doe',
-        ipAddress: '192.168.1.103'
-      }
-    },
-    {
-      id: 'audit-6',
-      timestamp: '2024-12-20T10:45:10Z',
-      user: { id: 'user-2', name: 'Sarah Lee', email: 'sarah.lee@company.com' },
-      action: 'created',
-      resource: 'api_key',
-      resourceId: 'key-xyz789',
-      resourceName: 'CI/CD Pipeline Key',
-      status: 'success',
-      details: {
-        description: 'Generated new API key',
-        scopes: ['deployments:create', 'deployments:read', 'logs:read'],
-        ipAddress: '192.168.1.101'
-      }
-    },
-    {
-      id: 'audit-7',
-      timestamp: '2024-12-20T09:20:35Z',
-      user: { id: 'user-3', name: 'Mike Johnson', email: 'mike.johnson@company.com' },
-      action: 'failed',
-      resource: 'deployment',
-      resourceId: 'deploy-124',
-      resourceName: 'Staging Deploy Attempt',
-      status: 'failure',
-      details: {
-        description: 'Deployment failed - insufficient permissions',
-        error: 'User does not have permission to deploy to production',
-        attemptedAt: '2024-12-20T09:20:35Z',
-        ipAddress: '192.168.1.102'
-      }
-    },
-    {
-      id: 'audit-8',
-      timestamp: '2024-12-20T08:15:50Z',
-      user: { id: 'user-1', name: 'John Doe', email: 'john.doe@company.com' },
-      action: 'exported',
-      resource: 'report',
-      resourceId: 'report-001',
-      resourceName: 'Monthly Compliance Report',
-      status: 'success',
-      details: {
-        description: 'Exported compliance report',
-        format: 'PDF',
-        dateRange: '2024-11-01 to 2024-11-30',
-        ipAddress: '192.168.1.100'
-      }
-    },
-    {
-      id: 'audit-9',
-      timestamp: '2024-12-19T16:30:20Z',
-      user: { id: 'user-4', name: 'Jane Smith', email: 'jane.smith@company.com' },
-      action: 'updated',
-      resource: 'team',
-      resourceId: 'team-001',
-      resourceName: 'Engineering Team Settings',
-      status: 'success',
-      details: {
-        description: 'Updated team settings',
-        changes: ['name: Engineering Team → Platform Engineering', 'description updated'],
-        ipAddress: '192.168.1.103'
-      }
-    },
-    {
-      id: 'audit-10',
-      timestamp: '2024-12-19T15:45:00Z',
-      user: { id: 'user-2', name: 'Sarah Lee', email: 'sarah.lee@company.com' },
-      action: 'accessed',
-      resource: 'logs',
-      resourceId: 'logs-all',
-      resourceName: 'System Logs',
-      status: 'success',
-      details: {
-        description: 'Accessed system logs',
-        filters: 'severity: error, timeRange: 24h',
-        recordsViewed: 156,
-        ipAddress: '192.168.1.101'
-      }
-    }
-  ];
-
   useEffect(() => {
-    setAuditLogs(mockAuditLogs);
-    setLoading(false);
+    const loadAuditLogs = async () => {
+      try {
+        setLoading(true);
+        const response = await apiClient.getAuditLogs({ limit: 100 });
+        const records = response?.logs || response?.data || response || [];
+        setAuditLogs(records.map(normalizeAuditLog));
+      } catch (err) {
+        setError(err.message || 'Failed to load audit logs');
+        setAuditLogs([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAuditLogs();
   }, []);
+
+  const normalizeAuditLog = (log) => ({
+    id: log._id || log.id,
+    timestamp: log.createdAt || log.timestamp,
+    user: {
+      id: log.userId?._id || log.userId || log.userId?.id || 'unknown',
+      name: log.userId?.name || log.metadata?.userName || log.metadata?.actorName || 'System',
+      email: log.userId?.email || log.metadata?.userEmail || '',
+    },
+    action: String(log.action || 'unknown').toLowerCase().replace(/_/g, ' '),
+    resource: String(log.resourceType || log.resource || 'resource').toLowerCase(),
+    resourceId: log.resourceId || '',
+    resourceName: log.metadata?.resourceName || log.metadata?.name || log.resourceType || 'Resource',
+    status: log.metadata?.status || (String(log.action || '').includes('FAILED') ? 'failure' : 'success'),
+    details: {
+      description: log.metadata?.description || log.metadata?.message || `${log.action} ${log.resourceType}`,
+      changes: log.metadata?.changes || [],
+      ipAddress: log.ipAddress || log.metadata?.ipAddress || '',
+      ...log.metadata,
+    }
+  });
 
   const handleFilterChange = (field, value) => {
     setFilters({...filters, [field]: value});
   };
 
   const applyFilters = () => {
-    let filtered = mockAuditLogs;
+    let filtered = auditLogs;
 
     if (filters.user) {
       filtered = filtered.filter(log => 
@@ -233,14 +109,29 @@ export default function AuditLogPage() {
   const handleExport = async (format) => {
     try {
       const filtered = applyFilters();
-      const response = await apiClient.exportAuditLog(filtered, format);
-      
-      if (response.success) {
-        setSuccessMessage(`Audit log exported as ${format.toUpperCase()}`);
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to export');
-      }
+      const content = format === 'csv'
+        ? [
+            ['timestamp', 'user', 'action', 'resource', 'resourceId', 'description'].join(','),
+            ...filtered.map((log) => [
+              new Date(log.timestamp).toISOString(),
+              JSON.stringify(log.user.name || ''),
+              JSON.stringify(log.action || ''),
+              JSON.stringify(log.resource || ''),
+              JSON.stringify(log.resourceId || ''),
+              JSON.stringify(log.details?.description || ''),
+            ].join(','))
+          ].join('\n')
+        : JSON.stringify(filtered, null, 2);
+
+      const blob = new Blob([content], { type: format === 'csv' ? 'text/csv' : 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `audit-log.${format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setSuccessMessage(`Audit log exported as ${format.toUpperCase()}`);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.message || 'An error occurred');
     }
@@ -277,9 +168,9 @@ export default function AuditLogPage() {
     report: 'bg-orange-50'
   };
 
-  const uniqueUsers = [...new Set(mockAuditLogs.map(log => log.user.name))];
-  const uniqueResources = [...new Set(mockAuditLogs.map(log => log.resource))];
-  const uniqueActions = [...new Set(mockAuditLogs.map(log => log.action))];
+  const uniqueUsers = [...new Set(auditLogs.map(log => log.user.name))];
+  const uniqueResources = [...new Set(auditLogs.map(log => log.resource))];
+  const uniqueActions = [...new Set(auditLogs.map(log => log.action))];
 
   return (
     <div className="p-6 space-y-6">

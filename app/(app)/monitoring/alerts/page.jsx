@@ -10,10 +10,12 @@ import { Select } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { AlertTriangle, AlertCircle, CheckCircle, Bell, BellOff, Plus, Search, Filter, Clock, Zap, Server, Database, Globe, Activity, Settings, Trash2, Edit, Eye, MoreHorizontal } from "lucide-react"
+import apiClient from "@/lib/api-client"
 import { useAppStore } from "@/store/use-app-store"
 
 export default function AlertsPage() {
   const { projects } = useAppStore()
+  const projectId = projects[0]?.id || projects[0]?._id || ""
   const [alerts, setAlerts] = useState([])
   const [alertRules, setAlertRules] = useState([])
   const [loading, setLoading] = useState(true)
@@ -63,112 +65,53 @@ export default function AlertsPage() {
     { value: "sms", label: "SMS", icon: <AlertCircle className="w-4 h-4" /> }
   ]
 
+  const normalizeAlertRule = (alert) => ({
+    id: alert._id || alert.id,
+    ruleId: alert._id || alert.id,
+    ruleName: alert.name,
+    severity: alert.severity || "info",
+    status: alert.resolvedAt ? "resolved" : alert.acknowledged ? "acknowledged" : alert.active ? "active" : "resolved",
+    message: alert.message || `${alert.name} alert triggered`,
+    value: alert.lastTriggered ? alert.threshold : alert.threshold,
+    threshold: alert.threshold,
+    metric: alert.metricType,
+    projectId: alert.projectId,
+    projectName: projects.find((project) => String(project.id || project._id) === String(alert.projectId))?.name || "Project",
+    triggeredAt: alert.lastTriggered || alert.createdAt,
+    acknowledgedAt: alert.acknowledgedAt || null,
+    resolvedAt: alert.resolvedAt || null,
+    active: alert.active,
+    channels: alert.channels || [],
+    createdAt: alert.createdAt,
+    lastTriggered: alert.lastTriggered,
+    triggerCount: alert.triggerCount || 0,
+  })
+
   useEffect(() => {
     loadAlertsData()
   }, [])
 
   const loadAlertsData = async () => {
     setLoading(true)
-    
-    // Simulate API calls
-    setTimeout(() => {
-      const mockAlerts = [
-        {
-          id: "alert_1",
-          ruleId: "rule_1",
-          ruleName: "High Response Time",
-          severity: "warning",
-          status: "active",
-          message: "Response time exceeded 500ms threshold",
-          value: 750,
-          threshold: 500,
-          metric: "response_time",
-          projectId: projects[0]?.id || "proj_1",
-          projectName: projects[0]?.name || "clouddeck-web",
-          triggeredAt: new Date(Date.now() - 15 * 60 * 1000),
-          acknowledgedAt: null,
-          resolvedAt: null
-        },
-        {
-          id: "alert_2",
-          ruleId: "rule_2",
-          ruleName: "High Error Rate",
-          severity: "critical",
-          status: "acknowledged",
-          message: "Error rate exceeded 5% threshold",
-          value: 8.5,
-          threshold: 5,
-          metric: "error_rate",
-          projectId: projects[1]?.id || "proj_2",
-          projectName: projects[1]?.name || "clouddeck-api",
-          triggeredAt: new Date(Date.now() - 45 * 60 * 1000),
-          acknowledgedAt: new Date(Date.now() - 30 * 60 * 1000),
-          resolvedAt: null
-        },
-        {
-          id: "alert_3",
-          ruleId: "rule_3",
-          ruleName: "Low Disk Space",
-          severity: "warning",
-          status: "resolved",
-          message: "Disk usage exceeded 80% threshold",
-          value: 85,
-          threshold: 80,
-          metric: "disk_usage",
-          projectId: projects[0]?.id || "proj_1",
-          projectName: projects[0]?.name || "clouddeck-web",
-          triggeredAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-          acknowledgedAt: new Date(Date.now() - 90 * 60 * 1000),
-          resolvedAt: new Date(Date.now() - 30 * 60 * 1000)
-        }
-      ]
+    try {
+      if (!projectId) {
+        setAlerts([])
+        setAlertRules([])
+        return
+      }
 
-      const mockRules = [
-        {
-          id: "rule_1",
-          name: "High Response Time",
-          metric: "response_time",
-          condition: "greater_than",
-          threshold: 500,
-          severity: "warning",
-          enabled: true,
-          projectId: projects[0]?.id || "proj_1",
-          channels: ["email", "slack"],
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          lastTriggered: new Date(Date.now() - 15 * 60 * 1000)
-        },
-        {
-          id: "rule_2",
-          name: "High Error Rate",
-          metric: "error_rate",
-          condition: "greater_than",
-          threshold: 5,
-          severity: "critical",
-          enabled: true,
-          projectId: projects[1]?.id || "proj_2",
-          channels: ["email", "slack", "sms"],
-          createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-          lastTriggered: new Date(Date.now() - 45 * 60 * 1000)
-        },
-        {
-          id: "rule_3",
-          name: "Low Disk Space",
-          metric: "disk_usage",
-          condition: "greater_than",
-          threshold: 80,
-          severity: "warning",
-          enabled: false,
-          projectId: projects[0]?.id || "proj_1",
-          channels: ["email"],
-          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-          lastTriggered: new Date(Date.now() - 2 * 60 * 60 * 1000)
-        }
-      ]
-
-      setAlerts(mockAlerts)
-      setAlertRules(mockRules)
+      const response = await apiClient.getAlerts(projectId)
+      const records = response?.data || response || []
+      const normalizedRules = records.map(normalizeAlertRule)
+      setAlertRules(normalizedRules)
+      setAlerts(normalizedRules)
+    } catch (error) {
+      console.error("Failed to load alerts:", error)
+      setAlerts([])
+      setAlertRules([])
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   const filteredAlerts = alerts.filter(alert => {
@@ -203,17 +146,27 @@ export default function AlertsPage() {
   }
 
   const handleCreateRule = () => {
-    if (!newRule.name || !newRule.threshold || !newRule.projectId) return
+    if (!newRule.name || !newRule.threshold || !projectId) return
 
-    const rule = {
-      id: `rule_${Date.now()}`,
-      ...newRule,
+    const payload = {
+      name: newRule.name,
+      metric: newRule.metric,
+      operator: newRule.condition,
       threshold: parseFloat(newRule.threshold),
-      createdAt: new Date(),
-      lastTriggered: null
+      severity: newRule.severity,
+      enabled: newRule.enabled,
+      notificationChannels: newRule.channels,
     }
 
-    setAlertRules(prev => [rule, ...prev])
+    apiClient.createAlert(projectId, payload)
+      .then((response) => {
+        const createdRule = normalizeAlertRule(response?.data || response)
+        setAlertRules((prev) => [createdRule, ...prev])
+        setAlerts((prev) => [createdRule, ...prev])
+      })
+      .catch((error) => {
+        console.error("Failed to create alert rule:", error)
+      })
     setNewRule({
       name: "",
       metric: "response_time",
@@ -228,25 +181,44 @@ export default function AlertsPage() {
   }
 
   const toggleRule = (ruleId) => {
-    setAlertRules(prev => prev.map(rule => 
-      rule.id === ruleId ? { ...rule, enabled: !rule.enabled } : rule
-    ))
+    const rule = alertRules.find((item) => item.id === ruleId)
+    if (!rule) return
+    apiClient.updateAlert(ruleId, { active: !rule.active })
+      .then((response) => {
+        const updatedRule = normalizeAlertRule(response?.data || response)
+        setAlertRules((prev) => prev.map((item) => item.id === ruleId ? updatedRule : item))
+        setAlerts((prev) => prev.map((item) => item.id === ruleId ? updatedRule : item))
+      })
+      .catch((error) => console.error("Failed to toggle alert:", error))
   }
 
   const acknowledgeAlert = (alertId) => {
-    setAlerts(prev => prev.map(alert => 
-      alert.id === alertId ? { ...alert, status: "acknowledged", acknowledgedAt: new Date() } : alert
-    ))
+    apiClient.updateAlert(alertId, { acknowledged: true, acknowledgedAt: new Date().toISOString() })
+      .then((response) => {
+        const updatedRule = normalizeAlertRule(response?.data || response)
+        setAlerts((prev) => prev.map((alert) => alert.id === alertId ? updatedRule : alert))
+        setAlertRules((prev) => prev.map((item) => item.id === alertId ? updatedRule : item))
+      })
+      .catch((error) => console.error("Failed to acknowledge alert:", error))
   }
 
   const resolveAlert = (alertId) => {
-    setAlerts(prev => prev.map(alert => 
-      alert.id === alertId ? { ...alert, status: "resolved", resolvedAt: new Date() } : alert
-    ))
+    apiClient.updateAlert(alertId, { resolvedAt: new Date().toISOString(), active: false })
+      .then((response) => {
+        const updatedRule = normalizeAlertRule(response?.data || response)
+        setAlerts((prev) => prev.map((alert) => alert.id === alertId ? updatedRule : alert))
+        setAlertRules((prev) => prev.map((item) => item.id === alertId ? updatedRule : item))
+      })
+      .catch((error) => console.error("Failed to resolve alert:", error))
   }
 
   const deleteRule = (ruleId) => {
-    setAlertRules(prev => prev.filter(rule => rule.id !== ruleId))
+    apiClient.deleteAlert(ruleId)
+      .then(() => {
+        setAlertRules((prev) => prev.filter((rule) => rule.id !== ruleId))
+        setAlerts((prev) => prev.filter((alert) => alert.id !== ruleId))
+      })
+      .catch((error) => console.error("Failed to delete alert rule:", error))
   }
 
   const alertStats = {

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Download, Search, ChevronDown, AlertCircle } from 'lucide-react';
+import apiClient from '@/lib/api-client';
 
 export default function AuditCompliancePage() {
   const [auditData, setAuditData] = useState(null);
@@ -24,18 +25,8 @@ export default function AuditCompliancePage() {
   const fetchAuditData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/audit', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch audit data');
-      }
-      
-      const data = await response.json();
-      setAuditData(data);
+      const response = await apiClient.request('/admin/audit?limit=100');
+      setAuditData(response);
     } catch (error) {
       console.error('Error fetching audit data:', error);
       setError(error.message);
@@ -69,71 +60,7 @@ export default function AuditCompliancePage() {
 
   const { logs = [] } = auditData || {};
 
-  // Fallback data
-  const fallbackLogs = [
-    {
-      id: 1,
-      user: 'Sarah Chen',
-      action: 'Created deployment',
-      resource: 'Production Database',
-      status: 'success',
-      timestamp: '2 hours ago',
-      ipAddress: '192.168.1.100',
-      details: 'Deployed version 2.1.0 to production'
-    },
-    {
-      id: 2,
-      user: 'Alex Rodriguez',
-      action: 'Modified project settings',
-      resource: 'Backend API Project',
-      status: 'success',
-      timestamp: '5 hours ago',
-      ipAddress: '10.0.0.50',
-      details: 'Changed environment variables for staging'
-    },
-    {
-      id: 3,
-      user: 'Jordan Kim',
-      action: 'Failed login attempt',
-      resource: 'Authentication',
-      status: 'failure',
-      timestamp: '1 day ago',
-      ipAddress: '203.0.113.45',
-      details: 'Incorrect password provided'
-    },
-    {
-      id: 4,
-      user: 'Sarah Chen',
-      action: 'Deleted API key',
-      resource: 'API Keys',
-      status: 'success',
-      timestamp: '2 days ago',
-      ipAddress: '192.168.1.100',
-      details: 'Revoked legacy API key sk_old_***'
-    },
-    {
-      id: 5,
-      user: 'Unknown',
-      action: 'Suspicious activity detected',
-      resource: 'Security',
-      status: 'warning',
-      timestamp: '3 days ago',
-      ipAddress: '198.51.100.90',
-      details: 'Multiple failed login attempts from same IP'
-    },
-    {
-      id: 6,
-      user: 'Alex Rodriguez',
-      action: 'Added team member',
-      resource: 'Team Management',
-      status: 'success',
-      timestamp: '5 days ago',
-      ipAddress: '10.0.0.50',
-      details: 'Invited dev@company.com as Developer'
-    },
-  ];
-
-  const auditLogs = logs.length > 0 ? logs : fallbackLogs;
+  const auditLogs = logs.length > 0 ? logs : [];
 
   const complianceStatus = [
     { name: 'GDPR', status: 'compliant', lastAudit: '30 days ago', expiresIn: '90 days' },
