@@ -114,7 +114,7 @@ const navSections = [
   {
     title: "Monitoring & Alerts",
     items: [
-      { href: "/monitoring/logs", label: "Logs", icon: FileText },
+      { href: "/monitoring", label: "Logs", icon: FileText },
       { href: "/monitoring/alerts", label: "Alerts", icon: Activity },
       { href: "/deployments/alerts", label: "Deployment Alerts", icon: Rocket },
       { href: "/deployments/incidents", label: "Incidents", icon: Activity },

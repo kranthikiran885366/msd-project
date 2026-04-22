@@ -1,135 +1,191 @@
-version: '3.9'
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CloudDeck — Full-stack Docker Compose
+# Usage:
+#   docker compose --env-file .env.docker up -d mongodb redis backend worker
+#   docker compose --env-file .env.docker up -d   (all services incl. frontend)
+# ─────────────────────────────────────────────────────────────────────────────
+
+networks:
+  clouddeck-net:
+    driver: bridge
+
+volumes:
+  mongo-data:
+  redis-data:
 
 services:
-  # MongoDB
+
+  # ── MongoDB ──────────────────────────────────────────────────────────────────
   mongodb:
-    image: mongo:6.0
-    container_name: deployment-mongodb
+    image: mongo:7
+    container_name: clouddeck-mongodb
+    restart: unless-stopped
+    networks:
+      - clouddeck-net
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_ROOT_USERNAME: "${MONGO_INITDB_ROOT_USERNAME}"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_INITDB_ROOT_PASSWORD}"
+      MONGO_INITDB_DATABASE: "${MONGO_INITDB_DATABASE}"
     volumes:
-      - mongodb-data:/data/db
-    networks:
-      - deployment-network
+      - mongo-data:/data/db
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost/test --quiet
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 40s
 
-  # Redis (for caching and sessions)
+  # ── Redis ────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: deployment-redis
+    container_name: clouddeck-redis
+    restart: unless-stopped
+    networks:
+      - clouddeck-net
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
-    networks:
-      - deployment-network
+    command: >
+      redis-server
+      --save 60 1
+      --loglevel warning
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
+      start_period: 10s
 
-  # Backend API
+  # ── Backend (Express API) ────────────────────────────────────────────────────
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: deployment-backend
+      context: ./server
+      dockerfile: Dockerfile
+    image: clouddeck-backend:latest
+    container_name: clouddeck-backend
+    restart: unless-stopped
+    networks:
+      - clouddeck-net
     ports:
-      - "5000:5000"
-    environment:
-      NODE_ENV: development
-      MONGODB_URI: mongodb://admin:password@mongodb:27017/deployment?authSource=admin
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: dev-secret-key-change-in-production
-      API_URL: http://localhost:5000
-      CLIENT_URL: http://localhost:3000
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      - "3001:3001"
     depends_on:
       mongodb:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./server:/app/server
-      - /app/server/node_modules
-    networks:
-      - deployment-network
+    environment:
+      NODE_ENV: "${NODE_ENV}"
+      PORT: "${BACKEND_PORT}"
+      BACKEND_PORT: "${BACKEND_PORT}"
+      BACKEND_PUBLIC_URL: "${BACKEND_PUBLIC_URL}"
+      BACKEND_PRIVATE_IP: "${BACKEND_PRIVATE_IP}"
+      CLIENT_URL: "${CLIENT_URL}"
+      EXTRA_ALLOWED_ORIGINS: "${EXTRA_ALLOWED_ORIGINS}"
+      MONGODB_URI: "${MONGODB_URI}"
+      REDIS_HOST: "${REDIS_HOST}"
+      REDIS_PORT: "${REDIS_PORT}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+      REDIS_URL: "${REDIS_URL}"
+      JWT_SECRET: "${JWT_SECRET}"
+      WORKER_SECRET: "${WORKER_SECRET}"
+      GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID}"
+      GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET}"
+      API_URL: "${BACKEND_PUBLIC_URL}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+      DEPLOYMENT_STRATEGY: "${DEPLOYMENT_STRATEGY}"
+      DOCKER_ENABLED: "${DOCKER_ENABLED}"
+      PORT_RANGE_START: "${PORT_RANGE_START}"
+      PORT_RANGE_END: "${PORT_RANGE_END}"
+      MAX_CONCURRENT_JOBS: "${MAX_CONCURRENT_JOBS}"
+      REGION: "${REGION}"
+      NODE_ID: "backend-1"
+      NODE_IP: "backend"
+      METRICS_USERNAME: "${METRICS_USERNAME}"
+      METRICS_PASSWORD: "${METRICS_PASSWORD}"
+      LOG_LEVEL: "${LOG_LEVEL}"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 10s
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
-  # Frontend
+  # ── Worker (Runner Agent) ────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ./runner-agent
+      dockerfile: Dockerfile
+    image: clouddeck-worker:latest
+    container_name: clouddeck-worker
+    restart: unless-stopped
+    networks:
+      - clouddeck-net
+    ports:
+      - "4000:4000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: "production"
+      BACKEND_URL: "${BACKEND_URL}"
+      WORKER_SECRET: "${WORKER_SECRET}"
+      NODE_ID: "${NODE_ID}"
+      NODE_PRIVATE_IP: "${NODE_PRIVATE_IP}"
+      NODE_PUBLIC_IP: "${NODE_PUBLIC_IP}"
+      NODE_IP: "${NODE_PRIVATE_IP}"
+      REGION: "${REGION}"
+      MAX_CONCURRENT_JOBS: "${MAX_CONCURRENT_JOBS}"
+      PORT_RANGE_START: "${PORT_RANGE_START}"
+      PORT_RANGE_END: "${PORT_RANGE_END}"
+      WORKER_AGENT_PORT: "${WORKER_AGENT_PORT}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/msd-builds:/tmp/msd-builds
+      - /tmp/msd-envfiles:/tmp/msd-envfiles
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Frontend (Next.js) ───────────────────────────────────────────────────────
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: deployment-frontend
+      args:
+        NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL}"
+        NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS: "false"
+        INTERNAL_BACKEND_URL: "http://backend:3001"
+    image: clouddeck-frontend:latest
+    container_name: clouddeck-frontend
+    restart: unless-stopped
+    networks:
+      - clouddeck-net
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:5000
-      NODE_ENV: development
     depends_on:
-      - backend
-    volumes:
-      - ./app:/app/app
-      - ./components:/app/components
-      - ./lib:/app/lib
-      - ./styles:/app/styles
-      - /app/node_modules
-    networks:
-      - deployment-network
-
-  # Prometheus (metrics)
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: deployment-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-    networks:
-      - deployment-network
-
-  # Grafana (dashboards)
-  grafana:
-    image: grafana/grafana:latest
-    container_name: deployment-grafana
-    ports:
-      - "3001:3000"
+      backend:
+        condition: service_healthy
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_SECURITY_ADMIN_USER: admin
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards
-      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
-    depends_on:
-      - prometheus
-    networks:
-      - deployment-network
-
-volumes:
-  mongodb-data:
-  redis-data:
-  prometheus-data:
-  grafana-data:
-
-networks:
-  deployment-network:
-    driver: bridge
+      NODE_ENV: "production"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      API_URL: "http://backend:3001"
+      BACKEND_URL: "http://backend:3001"
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000',(r)=>{process.exit(r.statusCode<500?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s

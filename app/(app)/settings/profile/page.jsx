@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [tempProfile, setTempProfile] = useState(null);
+  const [stats, setStats] = useState({ projects: 0, databases: 0, deployments: 0, accountDays: 0 });
 
   useEffect(() => {
     loadProfile();
@@ -24,29 +25,39 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
-      if (user) {
-        setProfile({
-          name: user.name || 'User',
-          email: user.email || '',
-          avatar: user.avatar || '👤',
-          username: user.email?.split('@')[0] || 'user',
-          bio: user.bio || '',
-          location: user.location || '',
-          company: user.company || '',
-          website: user.website || '',
-          createdAt: user.createdAt || new Date().toISOString(),
-        });
-        setTempProfile({
-          name: user.name || 'User',
-          email: user.email || '',
-          avatar: user.avatar || '👤',
-          username: user.email?.split('@')[0] || 'user',
-          bio: user.bio || '',
-          location: user.location || '',
-          company: user.company || '',
-          website: user.website || '',
-        });
-      }
+      const me = await apiClient.getCurrentUser();
+      const [projects, databases, deployments] = await Promise.all([
+        apiClient.getProjects().catch(() => []),
+        apiClient.getDatabases().catch(() => []),
+        apiClient.getAllDeployments().catch(() => []),
+      ]);
+
+      const normalized = {
+        name: me?.name || user?.name || 'User',
+        email: me?.email || user?.email || '',
+        avatar: me?.avatar || user?.avatar || '👤',
+        username: (me?.email || user?.email || '').split('@')[0] || 'user',
+        bio: me?.bio || '',
+        location: me?.location || '',
+        company: me?.company || '',
+        website: me?.website || '',
+        role: me?.role || user?.role || 'user',
+        emailVerified: Boolean(me?.emailVerified),
+        plan: me?.plan || user?.plan || 'free',
+        createdAt: me?.createdAt || user?.createdAt || new Date().toISOString(),
+      };
+
+      setUser({ ...(user || {}), ...normalized });
+      setProfile(normalized);
+      setTempProfile(normalized);
+      const createdAt = new Date(normalized.createdAt);
+      const accountDays = Number.isNaN(createdAt.getTime()) ? 0 : Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 86400000));
+      setStats({
+        projects: Array.isArray(projects) ? projects.length : 0,
+        databases: Array.isArray(databases) ? databases.length : 0,
+        deployments: Array.isArray(deployments) ? deployments.length : 0,
+        accountDays,
+      });
       setIsLoading(false);
     } catch (error) {
       toast({
@@ -66,8 +77,14 @@ export default function ProfilePage() {
     try {
       // Update via API
       const updatedUser = await apiClient.updateProfile(
-        tempProfile.name,
-        tempProfile.avatar
+        {
+          name: tempProfile.name,
+          avatar: tempProfile.avatar,
+          bio: tempProfile.bio,
+          location: tempProfile.location,
+          company: tempProfile.company,
+          website: tempProfile.website,
+        }
       );
 
       // Update store
@@ -144,20 +161,20 @@ export default function ProfilePage() {
           {/* Profile Stats */}
           <div className="grid grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
             <div className="text-center">
-              <p className="text-2xl font-bold">0</p>
-              <p className="text-sm text-gray-600">Profile Views</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold">0</p>
-              <p className="text-sm text-gray-600">Followers</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{stats.projects}</p>
               <p className="text-sm text-gray-600">Projects</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold">0</p>
-              <p className="text-sm text-gray-600">Contributions</p>
+              <p className="text-2xl font-bold">{stats.databases}</p>
+              <p className="text-sm text-gray-600">Databases</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold">{stats.deployments}</p>
+              <p className="text-sm text-gray-600">Deployments</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold">{stats.accountDays}</p>
+              <p className="text-sm text-gray-600">Account Days</p>
             </div>
           </div>
 
@@ -309,15 +326,17 @@ export default function ProfilePage() {
             </div>
             <div className="flex items-center justify-between p-3 border rounded">
               <span className="text-sm text-gray-600">Email Verified</span>
-              <Badge className="bg-green-100 text-green-800">Verified</Badge>
+              <Badge className={profile.emailVerified ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
+                {profile.emailVerified ? "Verified" : "Unverified"}
+              </Badge>
             </div>
             <div className="flex items-center justify-between p-3 border rounded">
               <span className="text-sm text-gray-600">Team Role</span>
-              <Badge>Owner</Badge>
+              <Badge>{profile.role}</Badge>
             </div>
             <div className="flex items-center justify-between p-3 border rounded">
               <span className="text-sm text-gray-600">Plan</span>
-              <Badge className="bg-blue-100 text-blue-800">Professional</Badge>
+              <Badge className="bg-blue-100 text-blue-800 capitalize">{profile.plan}</Badge>
             </div>
           </div>
         </CardContent>

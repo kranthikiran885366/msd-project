@@ -66,6 +66,7 @@ class DeploymentService {
 
                 const jobQueueService       = require('./jobQueueService');
                 const projectConfigService  = require('./projectConfigService');
+                const databaseService = require('./databaseService');
 
                 if (!jobQueueService.isConnected) {
                     throw new Error('Job queue not available — ensure Redis is running');
@@ -76,11 +77,14 @@ class DeploymentService {
 
                 // Decrypt env variables — never logged, only sent to worker over private network
                 const envMap = await projectConfigService.getDecryptedEnvMap(project._id);
+                const databaseEnv = await databaseService.getProjectRuntimeDatabaseEnv(project._id);
+                const mergedEnv = { ...envMap, ...databaseEnv };
 
                 await jobQueueService.queueDeployment(deploymentId.toString(), {
-                    repositoryUrl: project.repository?.name
-                        ? `https://github.com/${project.repository.owner}/${project.repository.name}`
-                        : null,
+                    repositoryUrl: project.repository?.url ||
+                        (project.repository?.owner && project.repository?.name
+                            ? `https://github.com/${project.repository.owner}/${project.repository.name}.git`
+                            : null),
                     branch:          deployment.gitBranch || project.repository?.branch || 'main',
                     // Runtime config
                     runtime:         deployConfig.runtime,
@@ -89,7 +93,7 @@ class DeploymentService {
                     startCommand:    deployConfig.startCommand,
                     appPort:         deployConfig.port,
                     // Env vars (decrypted, sent over private VPC only)
-                    envVariables:    envMap,
+                    envVariables:    mergedEnv,
                     // Routing
                     region:          project.deploymentSettings?.region || 'us-east-1',
                     accessToken:     project.repository?.accessToken,
@@ -179,16 +183,20 @@ class DeploymentService {
     }
 
     async getAllDeployments(limit = 50, filters = {}) {
-        return await Deployment.find(filters)
+        // Sanitize filters: only allow known safe string fields
+        const safeFilters = {};
+        if (filters.status)      safeFilters.status      = String(filters.status);
+        if (filters.environment) safeFilters.environment = String(filters.environment);
+        return await Deployment.find(safeFilters)
             .sort({ createdAt: -1 })
             .limit(limit)
             .populate('projectId', 'name')
             .lean();
     }
 
-    // FIX: was (projectId, options{}) — controller calls (projectId, limit, filters)
     async getDeployments(projectId, limit = 20, filters = {}) {
-        return await Deployment.find({ projectId, ...filters })
+        if (!mongoose.Types.ObjectId.isValid(projectId)) throw new Error('Invalid projectId');
+        return await Deployment.find({ projectId: new mongoose.Types.ObjectId(projectId), ...filters })
             .sort({ createdAt: -1 })
             .limit(limit)
             .lean();
@@ -244,13 +252,14 @@ class DeploymentService {
     }
 
     async rollbackDeployment(deploymentId, reason = 'User initiated rollback') {
+        if (!mongoose.Types.ObjectId.isValid(deploymentId)) throw new Error('Invalid deploymentId');
         const deployment = await Deployment.findById(deploymentId);
         if (!deployment) throw new Error('Deployment not found');
 
         const previous = await Deployment.findOne({
-            projectId: deployment.projectId,
+            projectId: new mongoose.Types.ObjectId(String(deployment.projectId)),
             status: 'running',
-            _id: { $ne: deploymentId },
+            _id: { $ne: new mongoose.Types.ObjectId(String(deploymentId)) },
             createdAt: { $lt: deployment.createdAt }
         }).sort({ createdAt: -1 });
 

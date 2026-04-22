@@ -21,6 +21,7 @@ class Agent {
         this.jobExecutor  = new JobExecutor(this.nodeId, this.backendUrl);
 
         this.isRunning          = false;
+        this.isRegistered       = false;
         this.heartbeatInterval  = null;
         this.jobPollInterval    = null;
         this.maxConcurrentJobs  = parseInt(process.env.MAX_CONCURRENT_JOBS || '2', 10);
@@ -43,6 +44,7 @@ class Agent {
             }
         });
 
+        this.isRegistered = true;
         this.isRunning = true;
         this.startHeartbeat();
         this.startJobPolling();

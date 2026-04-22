@@ -1,5 +1,4 @@
 const databaseService = require("../services/databaseService")
-const DatabaseModel = require("../models/Database")
 const AuditLog = require("../models/AuditLog")
 
 // Database CRUD
@@ -14,6 +13,7 @@ exports.createDatabase = async (req, res) => {
       type,
       config,
       credentials,
+      createdBy: userId,
     })
 
     await AuditLog.create({
@@ -30,17 +30,52 @@ exports.createDatabase = async (req, res) => {
   }
 }
 
+exports.startDatabase = async (req, res) => {
+  try {
+    const { databaseId } = req.params
+    const database = await databaseService.startDatabase(databaseId)
+    res.json(database)
+  } catch (error) {
+    res.status(400).json({ error: error.message })
+  }
+}
+
+exports.stopDatabase = async (req, res) => {
+  try {
+    const { databaseId } = req.params
+    const database = await databaseService.stopDatabase(databaseId)
+    res.json(database)
+  } catch (error) {
+    res.status(400).json({ error: error.message })
+  }
+}
+
+exports.restartDatabase = async (req, res) => {
+  try {
+    const { databaseId } = req.params
+    const database = await databaseService.restartDatabase(databaseId)
+    res.json(database)
+  } catch (error) {
+    res.status(400).json({ error: error.message })
+  }
+}
+
+exports.pauseDatabase = async (req, res) => {
+  try {
+    const { databaseId } = req.params
+    const database = await databaseService.stopDatabase(databaseId)
+    res.json(database)
+  } catch (error) {
+    res.status(400).json({ error: error.message })
+  }
+}
+
 exports.listDatabases = async (req, res) => {
   try {
     const { projectId, type } = req.query
-
-    const query = {}
-    if (projectId) query.projectId = projectId
-    if (type) query.type = type
-
-    const databases = await DatabaseModel.find(query)
-
-    res.json(databases)
+    const databases = await databaseService.getDatabases(projectId)
+    const filtered = type ? databases.filter((d) => d.type === type) : databases
+    res.json(filtered)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }

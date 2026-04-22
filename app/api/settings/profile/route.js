@@ -9,7 +9,7 @@ export async function GET(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const response = await fetch(`${BASE_URL}/api/settings/user/profile`, {
+    const response = await fetch(`${BASE_URL}/auth/profile`, {
       headers: {
         Authorization: authHeader,
       },
@@ -37,7 +37,7 @@ export async function PATCH(req) {
     }
 
     const body = await req.json();
-    const response = await fetch(`${BASE_URL}/api/settings/user/profile`, {
+    const response = await fetch(`${BASE_URL}/auth/profile`, {
       method: 'PATCH',
       headers: {
         'Authorization': authHeader,

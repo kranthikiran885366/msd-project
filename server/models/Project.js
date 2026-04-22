@@ -12,9 +12,13 @@ const deployLockSchema = new mongoose.Schema({
 const repositorySchema = new mongoose.Schema({
     provider:    { type: String, enum: ['github', 'gitlab', 'bitbucket'], required: true },
     name:        { type: String, required: true },
+    fullName:    String,   // owner/repo
     owner:       { type: String, required: true },
     branch:      { type: String, default: 'main' },
+    url:         String,   // https clone URL — used by workers to clone
+    isPrivate:   { type: Boolean, default: false },
     webhookId:   String,
+    webhookSecret: String, // HMAC secret for push-event verification
     deployOnPush:{ type: Boolean, default: true },
     autoBuild:   { type: Boolean, default: true },
     buildCommand:    String,

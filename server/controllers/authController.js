@@ -44,6 +44,9 @@ exports.signup = async (req, res) => {
       email: email.toLowerCase(),
       password,
       name,
+      plan: "free",
+      dbLimit: 1,
+      dbProvider: "auto",
       emailVerified: false,
       verificationToken: crypto.randomBytes(20).toString("hex"),
       oauth: {
@@ -76,6 +79,9 @@ exports.signup = async (req, res) => {
         email: user.email,
         name: user.name,
         avatar: user.avatar,
+        plan: user.plan,
+        dbLimit: user.dbLimit,
+        dbProvider: user.dbProvider,
       },
     })
   } catch (error) {
@@ -146,6 +152,9 @@ exports.login = async (req, res) => {
         email: user.email,
         name: user.name,
         avatar: user.avatar,
+        plan: user.plan,
+        dbLimit: user.dbLimit,
+        dbProvider: user.dbProvider,
       },
     })
   } catch (error) {
@@ -280,12 +289,26 @@ exports.githubCallback = async (req, res) => {
     let returnUrl = req.session?.githubReturnUrl
     if (returnUrl) delete req.session.githubReturnUrl
 
+    // Fallback: recover returnUrl from OAuth state when session is unavailable.
+    if (!returnUrl && req.query?.state) {
+      try {
+        const decodedState = JSON.parse(Buffer.from(String(req.query.state), 'base64').toString('utf8'))
+        if (decodedState?.returnUrl && typeof decodedState.returnUrl === 'string') {
+          returnUrl = decodedState.returnUrl
+        }
+      } catch (_) {
+        // Ignore invalid state and continue with default callback route.
+      }
+    }
+
     if (returnUrl) {
       try {
-        const redirectUrl = new URL(returnUrl)
+        const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
         redirectUrl.searchParams.append("token", token)
         redirectUrl.searchParams.append("refreshToken", refreshToken)
         redirectUrl.searchParams.append("github-connected", "true")
+        redirectUrl.searchParams.append("provider", "github")
+        redirectUrl.searchParams.append("returnUrl", returnUrl)
         return res.redirect(redirectUrl.toString())
       } catch (_) { /* fall through */ }
     }
@@ -321,8 +344,17 @@ exports.me = async (req, res) => {
       email: user.email,
       name: user.name,
       avatar: user.avatar,
+      bio: user.bio || "",
+      location: user.location || "",
+      company: user.company || "",
+      website: user.website || "",
       role: user.role,
       emailVerified: user.emailVerified,
+      plan: user.plan,
+      dbLimit: user.dbLimit,
+      dbProvider: user.dbProvider,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin || null,
     })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -332,12 +364,12 @@ exports.me = async (req, res) => {
 // Update Profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, avatar } = req.body
+    const { name, avatar, bio, location, company, website } = req.body
     const { userId } = req
 
     const user = await User.findByIdAndUpdate(
       userId,
-      { name, avatar },
+      { name, avatar, bio, location, company, website },
       { new: true }
     )
 
@@ -354,6 +386,17 @@ exports.updateProfile = async (req, res) => {
       email: user.email,
       name: user.name,
       avatar: user.avatar,
+      bio: user.bio || "",
+      location: user.location || "",
+      company: user.company || "",
+      website: user.website || "",
+      role: user.role,
+      emailVerified: user.emailVerified,
+      plan: user.plan,
+      dbLimit: user.dbLimit,
+      dbProvider: user.dbProvider,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin || null,
     })
   } catch (error) {
     res.status(500).json({ error: error.message })

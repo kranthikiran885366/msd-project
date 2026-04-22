@@ -450,11 +450,11 @@ class GitHubProviderController {
         framework: framework || 'nextjs',
         repository: {
           provider: 'github',
-          url: repoData.clone_url,
+          url: repoData.clone_url,          // https clone URL used by workers
           owner,
           name: repo,
-          branch: branch || repoData.default_branch,
           fullName: repoFullName,
+          branch: branch || repoData.default_branch,
           isPrivate: repoData.private,
         },
         buildSettings: {

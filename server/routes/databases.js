@@ -7,9 +7,15 @@ const authMiddleware = require("../middleware/auth")
 // Databases
 router.post("/", authMiddleware, databaseController.createDatabase)
 router.get("/", authMiddleware, databaseController.listDatabases)
+router.get("/templates", authMiddleware, databaseController.getTemplates)
+router.post("/templates/:templateId/create", authMiddleware, databaseController.createFromTemplate)
 router.get("/:databaseId", authMiddleware, databaseController.getDatabase)
 router.patch("/:databaseId", authMiddleware, databaseController.updateDatabase)
 router.delete("/:databaseId", authMiddleware, databaseController.deleteDatabase)
+router.post("/:databaseId/start", authMiddleware, databaseController.startDatabase)
+router.post("/:databaseId/stop", authMiddleware, databaseController.stopDatabase)
+router.post("/:databaseId/restart", authMiddleware, databaseController.restartDatabase)
+router.post("/:databaseId/pause", authMiddleware, databaseController.pauseDatabase)
 
 // Query operations
 router.post("/:databaseId/query", authMiddleware, databaseController.executeQuery)
@@ -32,10 +38,6 @@ router.get("/:databaseId/connections", authMiddleware, databaseController.getCon
 // Database users
 router.post("/:databaseId/users", authMiddleware, databaseController.createDatabaseUser)
 router.get("/:databaseId/users", authMiddleware, databaseController.listDatabaseUsers)
-
-// Templates
-router.get("/templates", authMiddleware, databaseController.getTemplates)
-router.post("/templates/:templateId/create", authMiddleware, databaseController.createFromTemplate)
 
 // Migrations
 router.get("/:databaseId/migrations", authMiddleware, databaseController.getMigrations)

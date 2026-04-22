@@ -5,17 +5,15 @@ export async function GET(request) {
   const path = pathname.replace('/api/help/', '')
 
   try {
-    const response = await fetch(`${process.env.BACKEND_URL}/api/help/${path}`, {
+    const backendUrl = (process.env.BACKEND_URL || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://backend:3001').replace(/\/$/, '')
+    const response = await fetch(`${backendUrl}/api/help/${path}`, {
       method: request.method,
       headers: {
         'Content-Type': 'application/json',
-      },
-      // Forward auth headers if present
-      ...(request.headers.get('authorization') && {
-        headers: {
+        ...(request.headers.get('authorization') && {
           'Authorization': request.headers.get('authorization'),
-        },
-      }),
+        }),
+      },
     })
 
     const data = await response.json()
@@ -35,7 +33,8 @@ export async function POST(request) {
 
   try {
     const body = await request.json()
-    const response = await fetch(`${process.env.BACKEND_URL}/api/help/${path}`, {
+    const backendUrl = (process.env.BACKEND_URL || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://backend:3001').replace(/\/$/, '')
+    const response = await fetch(`${backendUrl}/api/help/${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

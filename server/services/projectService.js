@@ -6,18 +6,15 @@ const Environment = require("../models/Environment")
 
 class ProjectService {
   async createProject(userId, data) {
+    const slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const project = new Project({
       userId,
       name: data.name,
+      slug,
       description: data.description,
-      framework: data.framework,
-      region: data.region || "iad1",
-      githubRepo: data.githubRepo,
-      gitlabRepo: data.gitlabRepo,
-      buildCommand: data.buildCommand,
-      startCommand: data.startCommand,
-      rootDirectory: data.rootDirectory || "/",
-      autoDeploy: data.autoDeploy !== false,
+      framework: data.framework || 'Next.js',
+      repository: data.repository,
+      buildSettings: data.buildSettings,
     })
 
     await project.save()

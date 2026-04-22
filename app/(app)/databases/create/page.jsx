@@ -42,21 +42,31 @@ export default function CreateDatabasePage() {
       setError('');
       setLoading(true);
 
+      const userStr = localStorage.getItem('user');
+      let user = null;
+      try {
+        user = userStr ? JSON.parse(userStr) : null;
+      } catch {
+        user = null;
+      }
+      const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+      if (!projectId) {
+        throw new Error('Please select a project first');
+      }
+
       const databaseData = {
+        projectId,
         name: formData.name,
         displayName: formData.name,
         type: formData.type,
-        size: formData.size,
-        region: 'iad1', // Default region
-        projectId: '507f1f77bcf86cd799439011', // Default project ID
-        backupEnabled: true,
-        backupSchedule: formData.backupFrequency,
-        sslEnabled: true,
-        host: `${formData.name}-${formData.type}.db.example.com`,
-        port: formData.type === 'postgresql' ? 5432 : formData.type === 'mysql' ? 3306 : formData.type === 'mongodb' ? 27017 : 6379,
-        database: formData.name,
-        username: 'admin',
-        password: 'generated_password_123'
+        config: {
+          size: formData.size,
+          region: 'iad1',
+          backupEnabled: true,
+          backupSchedule: formData.backupFrequency,
+          sslEnabled: true,
+          displayName: formData.name,
+        },
       };
 
       const response = await apiClient.createDatabase(databaseData);

@@ -13,6 +13,8 @@ export const metadata = {
 }
 
 export default function RootLayout({ children }) {
+  const enableVercelAnalytics = process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === "true"
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
@@ -20,7 +22,7 @@ export default function RootLayout({ children }) {
           <Suspense fallback={null}>
             {children}
             <Toaster />
-            <Analytics />
+            {enableVercelAnalytics ? <Analytics /> : null}
           </Suspense>
         </ThemeProvider>
       </body>

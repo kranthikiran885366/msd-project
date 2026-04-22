@@ -1,11 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Home, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function AuthErrorPage() {
+function AuthErrorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const message = searchParams.get('message') || 'Authentication failed. Please try again.';
@@ -59,5 +60,21 @@ export default function AuthErrorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center px-4">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <p className="text-sm text-gray-600">Loading authentication details...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <AuthErrorContent />
+    </Suspense>
   );
 }

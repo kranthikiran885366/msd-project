@@ -12,8 +12,9 @@ const authMiddleware = (req, res, next) => {
     const decoded = jwt.verify(token, config.jwtSecret || process.env.JWT_SECRET)
 
     // Attach both for compatibility: some controllers expect req.user, others req.userId
-    req.user = decoded
-    req.userId = decoded.userId || decoded.id || decoded.user || decoded.sub
+    const uid = decoded.userId || decoded.id || decoded.user || decoded.sub
+    req.user = { ...decoded, _id: uid }
+    req.userId = uid
 
     next()
   } catch (error) {

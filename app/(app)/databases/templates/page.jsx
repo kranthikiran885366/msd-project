@@ -59,8 +59,20 @@ export default function InfrastructureTemplatesPage() {
   const handleDeployTemplate = async (templateId) => {
     try {
       setError('');
+      const userStr = localStorage.getItem('user');
+      let user = null;
+      try {
+        user = userStr ? JSON.parse(userStr) : null;
+      } catch {
+        user = null;
+      }
+      const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
+      if (!projectId) {
+        throw new Error('Please select a project first');
+      }
+
       const response = await apiClient.createDatabaseFromTemplate(templateId, {
-        projectId: '507f1f77bcf86cd799439011', // Default project ID
+        projectId,
         name: `db-from-template-${Date.now()}`,
         config: {}
       });

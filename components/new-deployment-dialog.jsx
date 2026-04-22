@@ -10,260 +10,246 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { AlertCircle, Github } from 'lucide-react';
+import { AlertCircle, Github, Loader2, CheckCircle2, ExternalLink } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import GitHubImportDialog from './github-import-dialog';
 
 export default function NewDeploymentDialog({ open, onOpenChange, onDeploymentCreated }) {
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [step, setStep]                   = useState('select');   // select | configure | deploying | done
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState(null);
   const [showGitHubImport, setShowGitHubImport] = useState(false);
-  const [deploymentSource, setDeploymentSource] = useState('manual'); // 'manual' or 'github'
-  const [formData, setFormData] = useState({
-    projectId: '',
-    environment: 'staging',
-    branch: 'main',
-    repository: null,
-  });
+  const [selectedRepo, setSelectedRepo]   = useState(null);       // { repository, branch }
+  const [projectName, setProjectName]     = useState('');
+  const [environment, setEnvironment]     = useState('production');
+  const [result, setResult]               = useState(null);       // { project, deployment }
 
+  // Auto-open GitHub picker on mount
   useEffect(() => {
-    if (open) {
-      fetchProjects();
-      
-      // Check if we're returning from GitHub OAuth and should auto-open the import dialog
-      if (typeof window !== 'undefined') {
-        const isPending = sessionStorage.getItem('github-import-pending');
-        if (isPending) {
-          console.log('Auto-opening GitHub import dialog after OAuth return...');
-          sessionStorage.removeItem('github-import-pending');
-          setShowGitHubImport(true);
-          setDeploymentSource('github');
-        }
-      }
+    if (open && step === 'select') {
+      setShowGitHubImport(true);
     }
   }, [open]);
 
-  const fetchProjects = async () => {
-    try {
-      setLoading(true);
-      const data = await apiClient.getProjects();
-      setProjects(data || []);
+  // Reset when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setStep('select');
+      setSelectedRepo(null);
+      setProjectName('');
       setError(null);
-    } catch (err) {
-      console.error('Failed to fetch projects:', err);
-      setError('Failed to load projects');
-    } finally {
-      setLoading(false);
+      setResult(null);
     }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!formData.projectId) {
-      setError('Please select a project');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const deploymentData = {
-        projectId: formData.projectId,
-        environment: formData.environment,
-        branch: deploymentSource === 'github' ? formData.repository?.branch?.name : formData.branch,
-      };
-
-      // Add GitHub info if from GitHub
-      if (deploymentSource === 'github' && formData.repository) {
-        deploymentData.repository = {
-          url: formData.repository.repository.url,
-          fullName: formData.repository.repository.fullName,
-          branch: formData.repository.branch.name,
-          owner: formData.repository.repository.owner,
-        };
-      }
-
-      await apiClient.createDeployment(deploymentData);
-      
-      // Success - notify parent and close dialog
-      onDeploymentCreated();
-      onOpenChange(false);
-    } catch (err) {
-      console.error('Failed to create deployment:', err);
-      setError(err.message || 'Failed to create deployment');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [open]);
 
   const handleRepositorySelected = (repoData) => {
-    setFormData({
-      ...formData,
-      repository: repoData,
-    });
+    setSelectedRepo(repoData);
+    setProjectName(repoData.repository.name);
+    setShowGitHubImport(false);
+    setStep('configure');
   };
+
+  const handleDeploy = async () => {
+    if (!selectedRepo) { setError('Please select a repository'); return; }
+    if (!projectName.trim()) { setError('Project name is required'); return; }
+
+    setLoading(true);
+    setError(null);
+    setStep('deploying');
+
+    try {
+      const repo   = selectedRepo.repository;
+      const branch = selectedRepo.branch;
+
+      // Use importRepository — single endpoint that:
+      // 1. Creates the project with full repo metadata (owner, name, url, branch)
+      // 2. Sets up GitHub push webhook for auto-deploy
+      // 3. Triggers the initial deployment immediately
+      const data = await apiClient.request('/github-provider/import', {
+        method: 'POST',
+        body: JSON.stringify({
+          repoFullName:       repo.fullName,
+          branch:             branch.name,
+          framework:          detectFramework(repo),
+          buildCommand:       'npm run build',
+          outputDirectory:    'out',
+          environmentVariables: [],
+        }),
+      });
+
+      setResult(data);
+      setStep('done');
+
+      // Notify parent — navigate to deployment detail page
+      if (onDeploymentCreated) {
+        onDeploymentCreated(
+          data.project?._id || data.project?.id,
+          data.deployment?._id || data.deployment?.id
+        );
+      }
+    } catch (err) {
+      console.error('Deploy failed:', err);
+      setError(err.message || 'Deployment failed. Please try again.');
+      setStep('configure');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Simple framework detection from repo language / name
+  function detectFramework(repo) {
+    const name = (repo.name || '').toLowerCase();
+    const lang = (repo.language || '').toLowerCase();
+    if (name.includes('next') || lang === 'typescript') return 'nextjs';
+    if (lang === 'python') return 'python';
+    if (lang === 'javascript') return 'node';
+    return 'nextjs';
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>New Deployment</DialogTitle>
+          <DialogTitle className="text-xl font-bold">New Deployment</DialogTitle>
           <DialogDescription>
-            Create a new deployment for your project
+            Deploy from GitHub — like Heroku or Render
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Deployment Source Tabs */}
-          <div className="flex gap-2 border-b">
-            <button
-              type="button"
-              onClick={() => {
-                setDeploymentSource('manual');
-                setFormData({ ...formData, repository: null });
-              }}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
-                deploymentSource === 'manual'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Manual
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeploymentSource('github')}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition flex items-center gap-2 ${
-                deploymentSource === 'github'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Github className="w-4 h-4" />
-              GitHub
-            </button>
-          </div>
-
-          {/* Project Selection */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Project</label>
-            <select
-              value={formData.projectId}
-              onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md bg-white text-sm"
-            >
-              <option value="">Select a project...</option>
-              {projects.map((project) => (
-                <option key={project._id || project.id} value={project._id || project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* GitHub Import */}
-          {deploymentSource === 'github' && (
+        {/* ── Step: configure ─────────────────────────────────────────── */}
+        {(step === 'configure' || step === 'select') && (
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleDeploy(); }}
+            className="space-y-5"
+          >
+            {/* Repo selector */}
             <div>
               <label className="block text-sm font-medium mb-2">GitHub Repository</label>
-              {formData.repository ? (
-                <Card className="p-3 bg-blue-50 border-blue-200">
-                  <div className="flex items-center justify-between">
+              {selectedRepo ? (
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/40">
+                  <div className="flex items-center gap-3">
+                    <Github className="w-5 h-5 text-gray-600" />
                     <div>
-                      <p className="font-medium text-sm">{formData.repository.repository.fullName}</p>
-                      <p className="text-xs text-gray-600">Branch: {formData.repository.branch.name}</p>
+                      <p className="font-semibold text-sm">{selectedRepo.repository.fullName}</p>
+                      <p className="text-xs text-muted-foreground">Branch: {selectedRepo.branch.name}</p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowGitHubImport(true)}
-                    >
-                      Change
-                    </Button>
                   </div>
-                </Card>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowGitHubImport(true)}>
+                    Change
+                  </Button>
+                </div>
               ) : (
-                <Button
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => setShowGitHubImport(true)}
-                  className="w-full"
+                  className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/50 transition text-left"
                 >
-                  <Github className="w-4 h-4 mr-2" />
-                  Select GitHub Repository
-                </Button>
+                  <Github className="w-6 h-6 text-gray-500" />
+                  <div>
+                    <p className="font-medium text-sm">Connect a repository</p>
+                    <p className="text-xs text-muted-foreground">Search and import from your GitHub account</p>
+                  </div>
+                </button>
               )}
             </div>
-          )}
 
-          {/* Manual Branch Input */}
-          {deploymentSource === 'manual' && (
+            {/* Project name */}
             <div>
-              <label className="block text-sm font-medium mb-2">Branch</label>
+              <label className="block text-sm font-medium mb-2">Project Name</label>
               <Input
-                type="text"
-                placeholder="e.g., main, develop, feature/xyz"
-                value={formData.branch}
-                onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
+                placeholder="my-app"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                required
               />
+              <p className="text-xs text-muted-foreground mt-1">Auto-filled from repo name.</p>
             </div>
-          )}
 
-          {/* Environment Selection */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Environment</label>
-            <select
-              value={formData.environment}
-              onChange={(e) => setFormData({ ...formData, environment: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md bg-white text-sm"
-            >
-              <option value="staging">Staging</option>
-              <option value="production">Production</option>
-              <option value="development">Development</option>
-            </select>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <Card className="p-3 bg-red-50 border-red-200">
-              <div className="flex gap-2 items-start">
-                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-red-700">{error}</div>
+            {/* Environment */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Environment</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['production', 'staging', 'development'].map((env) => (
+                  <button
+                    key={env}
+                    type="button"
+                    onClick={() => setEnvironment(env)}
+                    className={`py-2 px-3 rounded-lg border text-sm font-medium capitalize transition ${
+                      environment === env
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                    }`}
+                  >
+                    {env}
+                  </button>
+                ))}
               </div>
-            </Card>
-          )}
+            </div>
 
-          {/* Buttons */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading || !formData.projectId || (deploymentSource === 'github' && !formData.repository)}
-              className="flex-1"
-            >
-              {loading ? 'Creating...' : 'Create Deployment'}
+            {error && (
+              <div className="flex gap-2 items-start p-3 rounded-lg bg-red-50 border border-red-200">
+                <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={!selectedRepo || !projectName.trim()}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Deploy Now
+              </Button>
+            </div>
+          </form>
+        )}
+
+        {/* ── Step: deploying ─────────────────────────────────────────── */}
+        {step === 'deploying' && (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+            <p className="font-semibold text-lg">Deploying {projectName}…</p>
+            <p className="text-sm text-muted-foreground text-center">
+              Cloning repo, building Docker image, starting container.
+            </p>
+          </div>
+        )}
+
+        {/* ── Step: done ──────────────────────────────────────────────── */}
+        {step === 'done' && result && (
+          <div className="flex flex-col items-center gap-4 py-6">
+            <CheckCircle2 className="w-12 h-12 text-green-500" />
+            <p className="font-semibold text-lg">Deployment triggered!</p>
+            <p className="text-sm text-muted-foreground text-center">
+              Your app is building. You'll be redirected to the live deployment log.
+            </p>
+            {result.deployment?.productionUrl && (
+              <a
+                href={result.deployment.productionUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+              >
+                <ExternalLink className="w-4 h-4" />
+                {result.deployment.productionUrl}
+              </a>
+            )}
+            <Button onClick={() => onOpenChange(false)} className="mt-2">
+              Close
             </Button>
           </div>
-        </form>
-
-        {/* GitHub Import Dialog */}
-        <GitHubImportDialog
-          open={showGitHubImport}
-          onOpenChange={setShowGitHubImport}
-          onRepositorySelected={handleRepositorySelected}
-        />
+        )}
       </DialogContent>
+
+      <GitHubImportDialog
+        open={showGitHubImport}
+        onOpenChange={setShowGitHubImport}
+        onRepositorySelected={handleRepositorySelected}
+      />
     </Dialog>
   );
 }

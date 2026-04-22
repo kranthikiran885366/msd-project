@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const backendUrl = (process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const backendUrl = (process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://backend:3001').replace(/\/$/, '');
     const response = await fetch(`${backendUrl}/api/deployments`, { cache: 'no-store' });
     const deployments = response.ok ? await response.json() : [];
 

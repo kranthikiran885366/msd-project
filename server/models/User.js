@@ -21,10 +21,33 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
     avatar: String,
+    bio: { type: String, default: "" },
+    location: { type: String, default: "" },
+    company: { type: String, default: "" },
+    website: { type: String, default: "" },
     role: {
       type: String,
       enum: ["admin", "user", "team-owner"],
       default: "user",
+    },
+    plan: {
+      type: String,
+      enum: ["free", "pro", "enterprise"],
+      default: "free",
+      index: true,
+    },
+    dbLimit: {
+      type: Number,
+      default: 1,
+    },
+    dbProvider: {
+      type: String,
+      enum: ["auto", "docker", "aws", "atlas"],
+      default: "auto",
+    },
+    databaseUsage: {
+      activeCount: { type: Number, default: 0 },
+      lastUpdatedAt: Date,
     },
     isActive: {
       type: Boolean,

@@ -211,6 +211,10 @@ connectDB()
       const nodeManagementService = require('./services/nodeManagementService');
       nodeManagementService.startHealthCheck(30000);
       console.log('[startup] Node health check started');
+
+      const databaseService = require("./services/databaseService")
+      databaseService.startHealthMonitor(30000)
+      console.log("[startup] Database health monitor started")
     } catch (initErr) {
       console.warn('[startup] Infrastructure services init warning (non-fatal):', initErr.message);
     }

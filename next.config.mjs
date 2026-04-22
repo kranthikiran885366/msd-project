@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -10,10 +11,11 @@ const nextConfig = {
     unoptimized: true,
   },
   async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+    const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.API_URL || process.env.BACKEND_URL || 'http://backend:3001'
     const baseBackendUrl = backendUrl.replace(/\/api$/, '')
     return {
-      beforeFiles: [
+      // Keep local Next API routes active; only proxy unresolved API/auth paths.
+      fallback: [
         {
           source: '/api/:path*',
           destination: `${baseBackendUrl}/api/:path*`,

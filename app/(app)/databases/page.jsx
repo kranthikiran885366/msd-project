@@ -49,7 +49,7 @@ export default function DatabasesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [type, setType] = useState('postgresql');
+  const [type, setType] = useState('mongodb');
   const [size, setSize] = useState('small');
   const [region, setRegion] = useState('iad1');
   const [name, setName] = useState('');
@@ -64,7 +64,12 @@ export default function DatabasesPage() {
       setError('');
       setLoading(true);
       const userStr = localStorage.getItem('user');
-      const user = userStr ? JSON.parse(userStr) : null;
+      let user = null;
+      try {
+        user = userStr ? JSON.parse(userStr) : null;
+      } catch {
+        user = null;
+      }
       const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
 
       if (!projectId) {
@@ -94,7 +99,12 @@ export default function DatabasesPage() {
     try {
       setError('');
       const userStr = localStorage.getItem('user');
-      const user = userStr ? JSON.parse(userStr) : null;
+      let user = null;
+      try {
+        user = userStr ? JSON.parse(userStr) : null;
+      } catch {
+        user = null;
+      }
       const projectId = user?.currentProjectId || localStorage.getItem('currentProjectId');
 
       if (!projectId) {
@@ -103,11 +113,14 @@ export default function DatabasesPage() {
         return;
       }
 
-      const response = await apiClient.createDatabase?.(projectId, {
+      const response = await apiClient.createDatabase?.({
+        projectId,
         name: name.trim(),
         type,
-        size,
-        region,
+        config: {
+          size,
+          region,
+        },
       }) || { success: true };
 
       setSuccessMessage('Database created successfully!');
@@ -159,20 +172,6 @@ export default function DatabasesPage() {
       color: 'from-green-500 to-emerald-500',
       features: ['Document DB', 'Flexible schema', 'Aggregation', 'Transactions'],
       badge: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    },
-    mysql: {
-      name: 'MySQL',
-      icon: '🐬',
-      color: 'from-blue-600 to-blue-400',
-      features: ['Relational DB', 'InnoDB', 'Full-text search', 'Partitioning'],
-      badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    },
-    mariadb: {
-      name: 'MariaDB',
-      icon: '🐬',
-      color: 'from-blue-700 to-indigo-500',
-      features: ['MySQL compatible', 'High performance', 'Open source', 'Galera cluster'],
-      badge: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
     },
   };
 
@@ -575,6 +574,10 @@ function DatabaseCard({ database, dbType, onDelete, onCopy }) {
           <div className="p-2 rounded-lg bg-muted/50">
             <p className="text-xs text-muted-foreground">Region</p>
             <p className="font-semibold text-sm">{database.region.toUpperCase()}</p>
+          </div>
+          <div className="p-2 rounded-lg bg-muted/50">
+            <p className="text-xs text-muted-foreground">Provider</p>
+            <p className="font-semibold text-sm uppercase">{database.provider || 'docker'}</p>
           </div>
           <div className="p-2 rounded-lg bg-muted/50">
             <p className="text-xs text-muted-foreground">Size</p>

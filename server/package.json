@@ -10,6 +10,7 @@
     "check-db": "node check-mongodb.js"
   },
   "dependencies": {
+    "@aws-sdk/client-rds": "^3.1033.0",
     "@types/multer": "^2.0.0",
     "archiver": "^7.0.1",
     "axios": "^1.13.1",

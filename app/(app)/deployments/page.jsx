@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import apiClient from '@/lib/api-client';
 import NewDeploymentDialog from '@/components/new-deployment-dialog';
 
 export default function DeploymentsPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [deployments, setDeployments] = useState([
   ]);
@@ -220,7 +222,11 @@ export default function DeploymentsPage() {
       {/* Deployments List */}
       <div className="space-y-3">
         {filteredDeployments.map((deployment) => (
-          <Card key={deployment.id} className="hover:shadow-lg transition cursor-pointer">
+          <Card
+            key={deployment.id}
+            className="hover:shadow-lg transition cursor-pointer"
+            onClick={() => router.push(`/deployments/${deployment.id}`)}
+          >
             <CardContent className="pt-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-4 flex-1">
@@ -299,9 +305,13 @@ export default function DeploymentsPage() {
         <NewDeploymentDialog 
           open={showNewDeploymentDialog}
           onOpenChange={setShowNewDeploymentDialog}
-          onDeploymentCreated={() => {
+          onDeploymentCreated={(projectId, deploymentId) => {
             setShowNewDeploymentDialog(false);
-            fetchDeployments();
+            if (deploymentId) {
+              router.push(`/deployments/${deploymentId}`);
+            } else {
+              fetchDeployments();
+            }
           }}
         />
       )}

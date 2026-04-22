@@ -60,6 +60,11 @@ export default function GitHubImportDialog({ open, onOpenChange, onRepositorySel
 
   const checkConnection = async () => {
     try {
+      // Ensure apiClient has the latest token from storage (important after OAuth redirect)
+      if (typeof window !== 'undefined' && !apiClient.token) {
+        const stored = localStorage.getItem('auth_token');
+        if (stored) apiClient.setToken(stored);
+      }
       const status = await apiClient.getGitHubConnectionStatus();
       setConnectionStatus(status);
       if (status.connected) {

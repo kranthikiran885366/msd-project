@@ -1,13 +1,20 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { AlertCircle } from "lucide-react"
 
-export default function AuthErrorPage() {
+function AuthErrorContent() {
   const searchParams = useSearchParams()
-  const message = searchParams.get("message") || "An authentication error occurred. Please try again."
+  const rawMessage = searchParams.get("message") || "An authentication error occurred. Please try again."
+  let message = rawMessage
+  try {
+    message = decodeURIComponent(rawMessage)
+  } catch {
+    message = rawMessage
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
@@ -17,7 +24,7 @@ export default function AuthErrorPage() {
         </div>
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-white">Authentication Error</h1>
-          <p className="text-slate-400 text-lg">{decodeURIComponent(message)}</p>
+          <p className="text-slate-400 text-lg">{message}</p>
         </div>
         <div className="pt-4 space-y-3">
           <Button asChild className="w-full">
@@ -29,5 +36,22 @@ export default function AuthErrorPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
+        <div className="text-center space-y-4">
+          <div className="animate-spin">
+            <div className="w-12 h-12 border-4 border-slate-600 border-t-blue-500 rounded-full"></div>
+          </div>
+          <h2 className="text-xl font-semibold text-white">Loading...</h2>
+        </div>
+      </div>
+    }>
+      <AuthErrorContent />
+    </Suspense>
   )
 }

@@ -12,20 +12,37 @@
  * POST   /api/projects/:id/config       — update runtime config
  */
 const express = require('express');
-const router  = express.Router({ mergeParams: true }); // gives access to :id from parent
+const router  = express.Router({ mergeParams: true });
 const authMiddleware       = require('../middleware/auth');
 const projectConfigService = require('../services/projectConfigService');
 
-// All routes require authentication
-router.use(authMiddleware);
+// ── CSRF protection for state-changing operations ─────────────────────────────
+// This API is consumed by the SPA via JWT (Authorization header), not cookies,
+// so classic CSRF via cookie hijacking is not applicable. However, we still
+// validate Origin/Referer to block cross-origin form submissions.
+function csrfGuard(req, res, next) {
+    const origin  = req.headers.origin  || '';
+    const referer = req.headers.referer || '';
+    const clientUrl = process.env.CLIENT_URL || '';
+
+    // Allow requests with no origin (server-to-server, curl, Postman)
+    if (!origin && !referer) return next();
+
+    const source = origin || referer;
+    // Allow same-origin and configured client URL
+    if (
+        source.startsWith(clientUrl) ||
+        /localhost|127\.0\.0\.1/.test(source)
+    ) {
+        return next();
+    }
+
+    return res.status(403).json({ success: false, error: 'CSRF check failed: origin not allowed' });
+}
 
 // ── Environment variables ─────────────────────────────────────────────────────
 
-/**
- * GET /api/projects/:id/env
- * Returns all env vars with secrets redacted as "****"
- */
-router.get('/env', async (req, res) => {
+router.get('/env', authMiddleware, async (req, res) => {
     try {
         const vars = await projectConfigService.getEnvVariables(req.params.id, req.userId);
         res.json({ success: true, variables: vars });
@@ -34,12 +51,7 @@ router.get('/env', async (req, res) => {
     }
 });
 
-/**
- * POST /api/projects/:id/env
- * Replace the full set of env variables.
- * Body: { variables: { KEY: "value" | { value: "...", isSecret: true } } }
- */
-router.post('/env', async (req, res) => {
+router.post('/env', authMiddleware, csrfGuard, async (req, res) => {
     try {
         const { variables } = req.body;
         if (!variables || typeof variables !== 'object' || Array.isArray(variables)) {
@@ -58,12 +70,7 @@ router.post('/env', async (req, res) => {
     }
 });
 
-/**
- * PUT /api/projects/:id/env/:key
- * Upsert a single env variable.
- * Body: { value: "...", isSecret: false }
- */
-router.put('/env/:key', async (req, res) => {
+router.put('/env/:key', authMiddleware, csrfGuard, async (req, res) => {
     try {
         const { key } = req.params;
         const { value, isSecret = false } = req.body;
@@ -86,11 +93,7 @@ router.put('/env/:key', async (req, res) => {
     }
 });
 
-/**
- * DELETE /api/projects/:id/env/:key
- * Remove a single env variable.
- */
-router.delete('/env/:key', async (req, res) => {
+router.delete('/env/:key', authMiddleware, csrfGuard, async (req, res) => {
     try {
         const result = await projectConfigService.deleteEnvVariable(
             req.params.id, req.userId, req.params.key
@@ -103,11 +106,7 @@ router.delete('/env/:key', async (req, res) => {
 
 // ── Runtime configuration ─────────────────────────────────────────────────────
 
-/**
- * GET /api/projects/:id/config
- * Returns build/runtime configuration (no secrets).
- */
-router.get('/config', async (req, res) => {
+router.get('/config', authMiddleware, async (req, res) => {
     try {
         const config = await projectConfigService.getRuntimeConfig(req.params.id, req.userId);
         res.json({ success: true, config });
@@ -116,16 +115,10 @@ router.get('/config', async (req, res) => {
     }
 });
 
-/**
- * POST /api/projects/:id/config
- * Update build/runtime configuration.
- * Body: { buildCommand, startCommand, installCommand, port, runtime }
- */
-router.post('/config', async (req, res) => {
+router.post('/config', authMiddleware, csrfGuard, async (req, res) => {
     try {
         const { buildCommand, startCommand, installCommand, port, runtime } = req.body;
 
-        // Validate port if provided
         if (port !== undefined) {
             const p = Number(port);
             if (!Number.isInteger(p) || p < 1 || p > 65535) {
@@ -133,7 +126,6 @@ router.post('/config', async (req, res) => {
             }
         }
 
-        // Validate runtime if provided
         const validRuntimes = ['node', 'python', 'static', 'docker', 'auto'];
         if (runtime !== undefined && !validRuntimes.includes(runtime)) {
             return res.status(400).json({ success: false, error: `runtime must be one of: ${validRuntimes.join(', ')}` });
@@ -148,8 +140,6 @@ router.post('/config', async (req, res) => {
         _handleError(res, err);
     }
 });
-
-// ── Error helper ──────────────────────────────────────────────────────────────
 
 function _handleError(res, err) {
     const status = err.status || 500;

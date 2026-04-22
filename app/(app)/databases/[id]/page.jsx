@@ -66,6 +66,17 @@ export default function DatabaseDetailPage() {
     a.click();
   };
 
+  const handleRestart = async () => {
+    try {
+      setError('');
+      await apiClient.restartDatabase(params.id);
+      const updated = await apiClient.getDatabaseDetail(params.id);
+      setDatabase(updated);
+    } catch (err) {
+      setError(err.message || 'Failed to restart database');
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-screen">
@@ -93,10 +104,14 @@ export default function DatabaseDetailPage() {
           <div>
             <h1 className="text-3xl font-bold">{database.name}</h1>
             <p className="text-muted-foreground capitalize">
-              {database.type} • {database.region}
+              {database.type} • {database.region} • {(database.provider || 'docker').toUpperCase()}
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleRestart}>
+              <RefreshCw className="w-4 h-4 mr-1" />
+              Restart
+            </Button>
             {database.status === 'running' ? (
               <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Running</Badge>
             ) : database.status === 'creating' ? (
