@@ -20,6 +20,8 @@ router.get("/domains", authMiddleware, settingsController.listDomains)
 router.get("/domains/:domainId", authMiddleware, settingsController.getDomain)
 router.patch("/domains/:domainId", authMiddleware, settingsController.updateDomain)
 router.delete("/domains/:domainId", authMiddleware, settingsController.deleteDomain)
+router.post('/domains/:domainId/generate-verification', authMiddleware, settingsController.generateDomainVerification)
+router.post('/domains/:domainId/verify', authMiddleware, settingsController.verifyDomain)
 
 // Build settings
 router.get("/build", authMiddleware, settingsController.getBuildSettings)

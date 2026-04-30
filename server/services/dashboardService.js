@@ -9,13 +9,13 @@ const monitoringService = require('./monitoringService');
 class DashboardService {
   async getDashboardData(userId) {
     try {
-      const [projects, deployments, databases, functions, cronjobs] = await Promise.all([
-        Project.find({ userId }).populate('environments').lean(),
-        Deployment.find({ userId })
-          .sort({ createdAt: -1 })
-          .populate('projectId', 'name')
-          .populate('environmentId', 'name')
-          .lean(),
+      const projects = await Project.find({ userId }).lean();
+      const projectIds = projects.map(p => p._id);
+
+      const [deployments, databases, functions, cronjobs] = await Promise.all([
+        Deployment.find({ projectId: { $in: projectIds } })
+          .sort({ createdAt: -1 }).limit(50)
+          .populate('projectId', 'name').lean(),
         Database.find({ userId }).lean(),
         Function.find({ userId }).lean(),
         CronJob.find({ userId }).lean()
@@ -143,30 +143,29 @@ class DashboardService {
   }
 
   async getStats(userId) {
-    const [projectCount, deploymentCount, databaseCount, functionCount] = await Promise.all([
-      Project.countDocuments({ userId }),
-      Deployment.countDocuments({ userId }),
+    const projects = await Project.find({ userId }).lean();
+    const projectIds = projects.map(p => p._id);
+
+    const [deploymentCount, databaseCount, functionCount] = await Promise.all([
+      Deployment.countDocuments({ projectId: { $in: projectIds } }),
       Database.countDocuments({ userId }),
       Function.countDocuments({ userId })
     ]);
 
-    const successfulDeployments = await Deployment.countDocuments({ 
-      userId, 
-      status: { $in: ['success', 'Running'] } 
+    const successfulDeployments = await Deployment.countDocuments({
+      projectId: { $in: projectIds },
+      status: { $in: ['running', 'success'] }
     });
 
-    const activeFunctions = await Function.countDocuments({ 
-      userId, 
-      enabled: true 
-    });
+    const activeFunctions = await Function.countDocuments({ userId, enabled: true });
 
     return {
-      totalProjects: projectCount,
+      totalProjects: projects.length,
       totalDeployments: deploymentCount,
       totalDatabases: databaseCount,
       successfulDeployments,
-      successRate: deploymentCount > 0 
-        ? Math.round((successfulDeployments / deploymentCount) * 100) 
+      successRate: deploymentCount > 0
+        ? Math.round((successfulDeployments / deploymentCount) * 100)
         : 100,
       activeFunctions,
       uptime: 99.9
@@ -174,15 +173,14 @@ class DashboardService {
   }
 
   async getRecentActivity(userId) {
-    const deployments = await Deployment.find({ userId })
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .populate('projectId', 'name')
-      .lean();
-    
+    const projects = await Project.find({ userId }).lean();
+    const projectIds = projects.map(p => p._id);
+    const deployments = await Deployment.find({ projectId: { $in: projectIds } })
+      .sort({ createdAt: -1 }).limit(20)
+      .populate('projectId', 'name').lean();
     return deployments.map(d => ({
       id: d._id,
-      message: `${d.projectId?.name || 'Project'} deployment ${d.status === 'Failed' || d.status === 'failed' ? 'failed' : 'completed'}`,
+      message: `${d.projectId?.name || 'Project'} deployment ${d.status === 'failed' ? 'failed' : 'completed'}`,
       when: d.createdAt ? new Date(d.createdAt).toLocaleString() : 'Recently',
       status: d.status
     }));

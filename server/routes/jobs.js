@@ -49,15 +49,20 @@ router.get('/pull', internalAuth, validateRequest(['nodeId']), async (req, res) 
         const { nodeId } = req.query;
         const pendingJobs = await jobQueueService.getPendingJobs();
 
-        // Skip jobs already assigned to another node
-        const unassigned = pendingJobs.filter(j => !j.data?.assignedNodeId);
+        // Serve jobs either already assigned to this node or currently unassigned.
+        const candidate = pendingJobs.find((j) => {
+            const assignedNodeId = j.data?.assignedNodeId;
+            return !assignedNodeId || assignedNodeId === nodeId;
+        });
 
-        if (unassigned.length === 0) {
+        if (!candidate) {
             return res.status(404).json({ success: false, message: 'No jobs available' });
         }
 
-        const job = unassigned[0];
-        await job.updateData({ ...job.data, assignedNodeId: nodeId, assignedAt: new Date() }).catch(() => {});
+        const job = candidate;
+        if (!job.data?.assignedNodeId) {
+            await job.updateData({ ...job.data, assignedNodeId: nodeId, assignedAt: new Date() }).catch(() => {});
+        }
 
         res.json({
             success: true,

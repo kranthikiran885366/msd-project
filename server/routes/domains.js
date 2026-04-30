@@ -8,6 +8,8 @@ const authMiddleware = require("../middleware/auth")
 router.post("/project/:projectId", authMiddleware, domainController.createDomain)
 router.get("/project/:projectId", authMiddleware, domainController.getDomains)
 router.post("/:id/verify", authMiddleware, domainController.verifyDomain)
+router.get("/:id/verification-status", authMiddleware, domainController.getVerificationStatus)
+router.post("/:id/regenerate-verification", authMiddleware, domainController.regenerateVerification)
 router.delete("/:id", authMiddleware, domainController.deleteDomain)
 
 // Redirect routes

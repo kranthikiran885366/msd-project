@@ -20,7 +20,7 @@ class ProvidersController {
         providers: providers.map((p) => ({
           name: p,
           displayName: p.charAt(0).toUpperCase() + p.slice(1),
-          description: this._getProviderDescription(p),
+          description: ProvidersController._getProviderDescription(p),
         })),
       })
     } catch (error) {
@@ -277,7 +277,7 @@ class ProvidersController {
   /**
    * Helper: get provider description
    */
-  _getProviderDescription(provider) {
+  static _getProviderDescription(provider) {
     const descriptions = {
       vercel: "Deploy to Vercel for Next.js applications and static sites",
       netlify: "Deploy to Netlify with auto-builds and serverless functions",

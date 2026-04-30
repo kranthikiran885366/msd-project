@@ -9,14 +9,16 @@ class DeploymentController extends BaseController {
     }
   async createDeployment(req, res, next) {
     try {
-      const { projectId, gitCommit, gitBranch, gitAuthor, commitMessage, canaryDeployment } = req.body
+      const { projectId, gitCommit, gitBranch, gitAuthor, commitMessage, environment, canaryDeployment } = req.body
       const deployment = await deploymentService.createDeployment({
         projectId,
         gitCommit,
         gitBranch,
-        gitAuthor: gitAuthor || "system",
-        commitMessage: commitMessage || "No message",
+        gitAuthor: gitAuthor || 'manual',
+        commitMessage: commitMessage || 'Manual deployment',
+        environment: environment || 'production',
         canaryDeployment: canaryDeployment || false,
+        userId: req.userId,
       })
       res.status(201).json(deployment)
     } catch (error) {

@@ -24,6 +24,10 @@ const nextConfig = {
           source: '/auth/:path*',
           destination: `${baseBackendUrl}/auth/:path*`,
         },
+        {
+          source: '/app/:path*',
+          destination: `${baseBackendUrl}/app/:path*`,
+        },
       ],
     }
   },

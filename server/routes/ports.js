@@ -9,10 +9,11 @@ const { validateRequest } = require('../middleware/validation');
  */
 router.post('/allocate', validateRequest(['deploymentId']), async (req, res) => {
     try {
-        const { deploymentId, preferredPort } = req.body;
+        const { deploymentId, preferredPort, subdomain } = req.body;
 
         const mapping = await portManagementService.allocatePort(deploymentId, {
-            preferredPort
+            preferredPort,
+            subdomain,
         });
 
         res.json({

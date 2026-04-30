@@ -29,6 +29,7 @@ class PortManagementService {
     async allocatePort(deploymentId, options = {}) {
         try {
             const preferredPort = options.preferredPort;
+            const subdomain = options.subdomain || null;
             
             // Find an available port
             let port = null;
@@ -54,6 +55,7 @@ class PortManagementService {
             const mapping = await PortMapping.create({
                 deploymentId,
                 containerPort: port,
+                subdomain: subdomain || undefined,
                 status: 'active',
                 allocatedAt: new Date()
             });

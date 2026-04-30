@@ -21,6 +21,10 @@ const deploymentSchema = new mongoose.Schema(
     deploymentSize: Number,
     previewUrl: String,
     productionUrl: String,
+    stagingUrl: String,
+    localUrl: String,
+    // Optional custom domain assigned to this deployment (e.g. example.com)
+    customDomain: String,
     gitCommit: String,
     gitBranch: String,
     gitAuthor: String,

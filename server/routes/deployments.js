@@ -31,6 +31,82 @@ router.patch('/:id/status',            authMiddleware, deploymentController.upda
 router.post('/:id/rollback',           authMiddleware, deploymentController.rollbackDeployment);
 router.get('/:id/logs',                authMiddleware, deploymentController.getDeploymentLogs);
 
+// ── Redeploy / rebuild actions ────────────────────────────────────────────────
+
+/**
+ * POST /api/deployments/:id/redeploy
+ * Trigger a new deployment from the same project + branch (like Render's "Manual Deploy")
+ */
+router.post('/:id/redeploy', authMiddleware, async (req, res, next) => {
+    try {
+        const deploymentService = require('../services/deploymentService');
+        const Deployment = require('../models/Deployment');
+        const orig = await Deployment.findById(req.params.id).lean();
+        if (!orig) return res.status(404).json({ error: 'Deployment not found' });
+
+        const newDep = await deploymentService.createDeployment({
+            projectId:     orig.projectId,
+            gitBranch:     orig.gitBranch || 'main',
+            gitAuthor:     req.body.gitAuthor || orig.gitAuthor || 'manual',
+            commitMessage: 'Manual redeploy',
+            environment:   orig.environment || 'production',
+            triggeredBy:   'manual',
+            userId:        req.userId,
+        });
+        res.status(201).json(newDep);
+    } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/deployments/:id/assign-domain
+ * Assign a verified domain to a deployment
+ */
+router.post('/:id/assign-domain', authMiddleware, async (req, res, next) => {
+    try {
+        const deploymentService = require('../services/deploymentService');
+        const { domainId } = req.body;
+        const result = await deploymentService.assignDomain(req.params.id, domainId, req.userId);
+        res.json(result);
+    } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/deployments/:id/rebuild
+ * Rebuild without cache — sets NO_CACHE=true in job data
+ */
+router.post('/:id/rebuild', authMiddleware, async (req, res, next) => {
+    try {
+        const deploymentService = require('../services/deploymentService');
+        const Deployment = require('../models/Deployment');
+        const orig = await Deployment.findById(req.params.id).lean();
+        if (!orig) return res.status(404).json({ error: 'Deployment not found' });
+
+        const newDep = await deploymentService.createDeployment({
+            projectId:     orig.projectId,
+            gitBranch:     orig.gitBranch || 'main',
+            gitAuthor:     req.body.gitAuthor || orig.gitAuthor || 'manual',
+            commitMessage: 'Rebuild without cache',
+            environment:   orig.environment || 'production',
+            triggeredBy:   'rebuild',
+            noCache:       true,
+            userId:        req.userId,
+        });
+        res.status(201).json(newDep);
+    } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/deployments/:id/cancel
+ * Cancel an in-progress deployment
+ */
+router.post('/:id/cancel', authMiddleware, async (req, res, next) => {
+    try {
+        const deploymentService = require('../services/deploymentService');
+        await deploymentService.cancelDeployment(req.params.id);
+        res.json({ success: true, message: 'Deployment cancelled' });
+    } catch (err) { next(err); }
+});
+
 // ── Worker callbacks (internal — secured by WORKER_SECRET) ───────────────────
 
 /**
@@ -66,12 +142,40 @@ router.post('/:id/status', internalAuth, async (req, res) => {
     try {
         const Deployment = require('../models/Deployment');
         const PortMapping = require('../models/PortMapping');
-        const { status, url, imageTag, port, nodeId, error, completedAt } = req.body;
+        const { status, url, rawUrl, imageTag, port, nodeId, domain, environment: reportedEnv, error, completedAt } = req.body;
+
+        const dep = await Deployment.findById(req.params.id);
+        if (!dep) return res.status(404).json({ success: false, error: 'Deployment not found' });
 
         const updates = { status };
-        if (url)          updates.productionUrl  = url;
-        if (error)        updates.rollbackReason = error;
-        if (completedAt)  updates.deployTime     = new Date(completedAt).getTime();
+
+        // Prefer worker-supplied rawUrl for preview/staging, otherwise map url based on environment
+        const env = reportedEnv || dep.environment || 'production';
+        if (rawUrl) {
+            if (env === 'staging') updates.stagingUrl = rawUrl;
+            if (env === 'preview' || env === 'staging') updates.previewUrl = rawUrl;
+            else updates.productionUrl = rawUrl;
+        } else if (url) {
+            if (env === 'staging') updates.stagingUrl = url;
+            if (env === 'preview' || env === 'staging') updates.previewUrl = url;
+            else updates.productionUrl = url;
+        }
+
+        // Also record local access URL (internal node URL) when provided
+        if (req.body.localUrl) updates.localUrl = req.body.localUrl;
+
+        // Domain information and provider metadata merge
+        const existingMeta = dep.providerMetadata || {};
+        if (domain) {
+            updates.providerMetadata = { ...existingMeta, domain };
+            updates.customDomain = domain;
+            // Prefer custom domain as primary public URL once assigned
+            if (env === 'staging') updates.stagingUrl = `https://${domain}`;
+            else updates.productionUrl = `https://${domain}`;
+        }
+
+        if (error) updates.rollbackReason = error;
+        if (completedAt) updates.deployTime = new Date(completedAt).getTime();
 
         await Deployment.findByIdAndUpdate(req.params.id, updates);
 

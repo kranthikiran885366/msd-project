@@ -4,7 +4,8 @@ const projectService = require("../services/projectService")
 class ProjectController {
   async createProject(req, res, next) {
     try {
-      const project = await projectService.createProject(req.user.userId, req.body)
+      const userId = req.userId || req.user?.userId || req.user?._id;
+      const project = await projectService.createProject(userId, req.body)
       res.status(201).json(project)
     } catch (error) {
       next(error)

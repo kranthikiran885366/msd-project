@@ -26,8 +26,34 @@ class DomainController {
   async verifyDomain(req, res, next) {
     try {
       const { id } = req.params
-      const domain = await domainService.verifyDomain(id)
-      res.json(domain)
+      const result = await domainService.verifyDomain(id)
+      res.json(result)
+    } catch (error) {
+      next(error)
+    }
+  }
+
+  async getVerificationStatus(req, res, next) {
+    try {
+      const { id } = req.params
+      const status = await domainService.getVerificationStatus(id)
+      res.json(status)
+    } catch (error) {
+      next(error)
+    }
+  }
+
+  async regenerateVerification(req, res, next) {
+    try {
+      const { id } = req.params
+      const domain = await domainService.generateVerificationToken(id)
+      if (!domain) return res.status(404).json({ error: 'Domain not found' })
+      res.json({
+        domainId: domain._id,
+        host: domain.host,
+        verificationToken: domain.verificationToken,
+        dnsRecords: domain.dnsRecords || [],
+      })
     } catch (error) {
       next(error)
     }

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const axios = require('axios');
 const Deployment = require('../models/Deployment');
 const Project = require('../models/Project');
 const Build = require('../models/Build');
@@ -14,7 +15,8 @@ class DeploymentService {
         const {
             projectId,
             gitCommit = null,
-            gitBranch = 'main',
+            gitBranch = null,
+            customDomain = null,
             gitAuthor = 'system',
             commitMessage = 'No message',
             environment = 'production',
@@ -22,15 +24,19 @@ class DeploymentService {
             canaryDeployment = false,
             triggeredBy = 'manual',
             userId = null,
+            noCache = false,
         } = options;
 
         const project = await Project.findById(projectId);
         if (!project) throw new Error('Project not found');
 
+        const resolvedBranch = await this.resolveDeploymentBranch(project, gitBranch);
+
         const deployment = await Deployment.create({
             projectId,
             gitCommit,
-            gitBranch,
+            gitBranch: resolvedBranch,
+            customDomain,
             gitAuthor,
             commitMessage,
             status: 'pending',
@@ -40,7 +46,7 @@ class DeploymentService {
             triggeredBy,
             deployedBy: userId,
             provider: options.provider || project.deploymentSettings?.provider || 'custom',
-            providerConfig: options.providerConfig || {},
+            providerConfig: { ...(options.providerConfig || {}), noCache },
             logs: []
         });
 
@@ -50,6 +56,46 @@ class DeploymentService {
         });
 
         return deployment;
+    }
+
+    async resolveDeploymentBranch(project, requestedBranch) {
+        if (requestedBranch && String(requestedBranch).trim()) {
+            return String(requestedBranch).trim();
+        }
+
+        const provider = String(project?.repository?.provider || '').toLowerCase();
+        const owner = project?.repository?.owner;
+        const name = project?.repository?.name;
+
+        if (provider === 'github' && owner && name) {
+            const defaultBranch = await this.fetchGitHubDefaultBranch(owner, name);
+            if (defaultBranch) {
+                return defaultBranch;
+            }
+        }
+
+        const configuredBranch = project?.repository?.branch;
+        if (configuredBranch && String(configuredBranch).trim()) {
+            return String(configuredBranch).trim();
+        }
+
+        return 'main';
+    }
+
+    async fetchGitHubDefaultBranch(owner, repo) {
+        try {
+            const url = `https://api.github.com/repos/${owner}/${repo}`;
+            const response = await axios.get(url, {
+                timeout: 5000,
+                headers: {
+                    Accept: 'application/vnd.github+json',
+                    'User-Agent': 'clouddeck-deployer',
+                },
+            });
+            return response?.data?.default_branch || null;
+        } catch (_) {
+            return null;
+        }
     }
 
     async processDeployment(deploymentId) {
@@ -67,18 +113,34 @@ class DeploymentService {
                 const jobQueueService       = require('./jobQueueService');
                 const projectConfigService  = require('./projectConfigService');
                 const databaseService = require('./databaseService');
+                const GitHubIntegration = require('../models/GitHubIntegration');
 
                 if (!jobQueueService.isConnected) {
                     throw new Error('Job queue not available — ensure Redis is running');
                 }
 
                 // Resolve build/runtime config (with auto-detection fallbacks)
-                const deployConfig = await projectConfigService.resolveDeployConfig(project._id);
+                let deployConfig;
+                try {
+                    deployConfig = await projectConfigService.resolveDeployConfig(project._id);
+                } catch (_) {
+                    deployConfig = { runtime: 'node', installCommand: 'npm install', buildCommand: 'npm run build', startCommand: 'node index.js', port: 3000 };
+                }
 
-                // Decrypt env variables — never logged, only sent to worker over private network
-                const envMap = await projectConfigService.getDecryptedEnvMap(project._id);
-                const databaseEnv = await databaseService.getProjectRuntimeDatabaseEnv(project._id);
-                const mergedEnv = { ...envMap, ...databaseEnv };
+                // Decrypt env variables
+                let mergedEnv = {};
+                try {
+                    const envMap = await projectConfigService.getDecryptedEnvMap(project._id);
+                    const databaseEnv = await databaseService.getProjectRuntimeDatabaseEnv(project._id);
+                    mergedEnv = { ...envMap, ...databaseEnv };
+                } catch (_) {}
+
+                // Get GitHub access token — try by project owner, then repo owner username, then any available
+                const ghIntegration =
+                    await GitHubIntegration.findOne({ userId: project.userId }).lean() ||
+                    await GitHubIntegration.findOne({ githubUsername: project.repository?.owner }).lean() ||
+                    await GitHubIntegration.findOne().sort({ connectedAt: -1 }).lean();
+                const accessToken = ghIntegration?.accessToken || project.repository?.accessToken;
 
                 await jobQueueService.queueDeployment(deploymentId.toString(), {
                     repositoryUrl: project.repository?.url ||
@@ -86,17 +148,22 @@ class DeploymentService {
                             ? `https://github.com/${project.repository.owner}/${project.repository.name}.git`
                             : null),
                     branch:          deployment.gitBranch || project.repository?.branch || 'main',
-                    // Runtime config
+                    environment:     deployment.environment || 'production',
+                    noCache:         Boolean(deployment.providerConfig?.noCache || false),
+                    // Build settings from project
                     runtime:         deployConfig.runtime,
-                    installCommand:  deployConfig.installCommand,
-                    buildCommand:    deployConfig.buildCommand,
-                    startCommand:    deployConfig.startCommand,
+                    installCommand:  project.buildSettings?.installCommand || deployConfig.installCommand,
+                    buildCommand:    project.buildSettings?.buildCommand   || deployConfig.buildCommand,
+                    startCommand:    project.buildSettings?.startCommand   || deployConfig.startCommand,
+                    outputDirectory: project.buildSettings?.outputDirectory|| deployConfig.outputDirectory || '',
+                    rootDirectory:   project.buildSettings?.rootDirectory  || '/',
                     appPort:         deployConfig.port,
-                    // Env vars (decrypted, sent over private VPC only)
                     envVariables:    mergedEnv,
-                    // Routing
                     region:          project.deploymentSettings?.region || 'us-east-1',
-                    accessToken:     project.repository?.accessToken,
+                    accessToken,
+                    // Domain assignment for routing
+                    customDomain: deployment.customDomain || null,
+                    domainVerified: !!(deployment.customDomain),
                 });
 
                 console.log(`[deploy] Deployment ${deploymentId} queued — runtime=${deployConfig.runtime} port=${deployConfig.port}`);
@@ -133,9 +200,10 @@ class DeploymentService {
                 console.warn(`[deploy] Provider adapter error (non-fatal): ${adapterErr.message}`);
             }
 
+            const urlField = (deployment.environment === 'preview' || deployment.environment === 'staging') ? { previewUrl: deployUrl } : { productionUrl: deployUrl };
             await this.updateDeploymentStatus(deploymentId, 'running', {
-                productionUrl: deployUrl,
-                deployTime:    Date.now(),
+                ...urlField,
+                deployTime: Date.now(),
             });
 
             try {
@@ -273,6 +341,26 @@ class DeploymentService {
             commitMessage: `Rollback: ${reason}`,
             triggeredBy: 'rollback',
         });
+    }
+
+    async assignDomain(deploymentId, domainId, userId = null) {
+        if (!mongoose.Types.ObjectId.isValid(deploymentId)) throw new Error('Invalid deploymentId');
+        const deployment = await Deployment.findById(deploymentId).populate('projectId');
+        if (!deployment) throw new Error('Deployment not found');
+
+        const Domain = require('../models/Domain');
+        const domain = await Domain.findById(domainId);
+        if (!domain) throw new Error('Domain not found');
+        if (String(domain.projectId) !== String(deployment.projectId._id)) throw new Error('Domain does not belong to this project');
+        if (domain.status !== 'verified') throw new Error('Domain is not verified');
+
+        deployment.customDomain = domain.host;
+        deployment.providerMetadata = { ...(deployment.providerMetadata || {}), domain: domain.host };
+        await deployment.save();
+
+        await this.addDeploymentLog(deploymentId, `Domain assigned: ${domain.host}`);
+
+        return deployment;
     }
 
     async cancelDeployment(deploymentId) {

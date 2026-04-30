@@ -158,6 +158,50 @@ app.use("/api/nodes", nodesRoutes)
 app.use("/api/jobs", jobsRoutes)
 app.use("/api/ports", portsRoutes)
 
+// ── Deployed app reverse proxy ────────────────────────────────────────────────
+// Proxies browser requests to the actual container running on the worker.
+// URL pattern: /app/:deploymentId  or  /app/:deploymentId/*
+app.use('/app/:deploymentId', async (req, res) => {
+  try {
+    const Deployment = require('./models/Deployment');
+    const dep = await Deployment.findById(req.params.deploymentId).lean();
+    if (!dep) return res.status(404).send('<h2>App not found</h2>');
+
+    // previewUrl stores the raw container URL (http://localhost:PORT)
+    // productionUrl stores the proxy URL (http://localhost:3000/app/ID)
+    const rawUrl = dep.previewUrl || dep.productionUrl;
+    if (!rawUrl) return res.status(404).send('<h2>App not yet deployed</h2>');
+
+    // Resolve any Docker-internal hostname to 127.0.0.1 (force IPv4)
+    let targetBase = rawUrl
+        .replace(/http:\/\/localhost/, 'http://127.0.0.1')
+        .replace(/http:\/\/[a-z_-]+:(\d+)/, 'http://127.0.0.1:$1');
+
+    const subPath = req.params[0] || '/';
+    const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    const targetUrl = `${targetBase}${subPath}${qs}`;
+
+    const axios = require('axios');
+    const response = await axios({
+      method: req.method,
+      url: targetUrl,
+      headers: { ...req.headers, host: new URL(targetBase).host },
+      data: ['GET','HEAD'].includes(req.method) ? undefined : req.body,
+      responseType: 'arraybuffer',
+      timeout: 30000,
+      validateStatus: () => true,
+    });
+
+    res.status(response.status);
+    Object.entries(response.headers).forEach(([k, v]) => {
+      if (!['transfer-encoding','connection'].includes(k.toLowerCase())) res.setHeader(k, v);
+    });
+    res.send(Buffer.from(response.data));
+  } catch (err) {
+    res.status(502).send(`<h2>Bad Gateway</h2><p>The app may still be starting up. Try again in a moment.</p><pre>${err.message}</pre>`);
+  }
+});
+
 // Error handling
 app.use(errorHandler)
 

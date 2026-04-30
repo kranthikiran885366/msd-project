@@ -224,6 +224,31 @@ exports.deleteDomain = async (req, res) => {
   }
 }
 
+exports.generateDomainVerification = async (req, res) => {
+  try {
+    const { domainId } = req.params
+    const domainService = require('../services/domainService')
+    const domain = await domainService.generateVerificationToken(domainId)
+    if (!domain) return res.status(404).json({ error: 'Domain not found' })
+
+    // Provide instructions: add TXT record with verificationToken
+    res.json({ host: domain.host, verificationToken: domain.verificationToken, instructions: `Add a DNS TXT record for ${domain.host} with value ${domain.verificationToken}` })
+  } catch (error) {
+    res.status(400).json({ error: error.message })
+  }
+}
+
+exports.verifyDomain = async (req, res) => {
+  try {
+    const { domainId } = req.params
+    const domainService = require('../services/domainService')
+    const result = await domainService.verifyDomain(domainId)
+    res.json(result)
+  } catch (error) {
+    res.status(400).json({ error: error.message })
+  }
+}
+
 // Build Settings
 exports.getBuildSettings = async (req, res) => {
   try {

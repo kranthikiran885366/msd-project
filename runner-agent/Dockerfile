@@ -1,8 +1,8 @@
 # ── Worker / Runner-Agent Dockerfile ─────────────────────────────────────────
 FROM node:18-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci --only=production --ignore-scripts
+COPY package.json ./
+RUN npm install --only=production --ignore-scripts
 
 # ── Runtime image ─────────────────────────────────────────────────────────────
 FROM node:18-alpine

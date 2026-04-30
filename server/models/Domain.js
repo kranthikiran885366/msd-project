@@ -32,6 +32,8 @@ const domainSchema = new mongoose.Schema(
         },
       },
     ],
+    verificationToken: String,
+    verifiedAt: Date,
     sslCertificate: {
       issued: Date,
       expires: Date,
