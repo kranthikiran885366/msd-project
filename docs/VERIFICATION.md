@@ -32,7 +32,7 @@ node scripts/smoke-frontend.cjs
 MONGOMS_VERSION=7.0.24 npm test --prefix server -- --runInBand
 ```
 
-The GitHub workflow performs clean installs, verification, HTTP checks and actual MongoDB tests. A workflow definition is not a passing run; inspect the PR checks. Historical account billing restrictions may prevent execution and must not be reported as green.
+The GitHub workflow is configured for clean installs, verification, HTTP checks and actual MongoDB tests. Its [first PR run](https://github.com/kranthikiran885366/msd-project/actions/runs/45568930334) failed before any steps ran. The workflow page confirms: “The job was not started because your account is locked due to a billing issue.” GitHub also displays an account payment-method error. This requires the account owner to resolve billing; it is not a passing CI run or evidence of a code-test failure. Local results above remain separate. No billing settings were changed.
 
 The control-plane smoke script is explicitly gated because it creates persistent records. Fresh signup mode is for disposable development configurations; production-mode staging requires a genuinely verified test account and SMTP/provider acceptance. Its optional deployment mode checks actual application HTTP but is only one acceptance case, not isolation/security/recovery certification.
 
