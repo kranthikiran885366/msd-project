@@ -339,64 +339,19 @@ exports.exportMetrics = async (req, res) => {
   }
 }
 
-// Analytics Overview
-exports.getAnalyticsOverview = async (req, res) => {
-  try {
-    const { userId } = req
-    
-    // Get overview metrics for the current user's projects
-    const overview = {
-      success: true,
-      data: {
-        totalDeployments: 0,
-        previousDeployments: 0,
-        activeUsers: 0,
-        previousActiveUsers: 0,
-        successRate: 95,
-        successfulDeployments: 0,
-        failedDeployments: 0,
-        inProgressDeployments: 0,
-        apiCalls: 0,
-        previousApiCalls: 0,
-        avgResponseTime: 150,
-        p95ResponseTime: 250,
-        uptime: 99.95,
-        errorRate: 0.05
-      }
-    }
-    
-    res.json(overview)
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message })
-  }
-}
-
-// Analytics History
-exports.getAnalyticsHistory = async (req, res) => {
-  try {
-    const { days = 7 } = req.query
-    
-    // Generate historical data for charts
-    const history = []
-    for (let i = parseInt(days); i >= 0; i--) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      
-      history.push({
-        date: date.toLocaleDateString(),
-        deployments: Math.floor(Math.random() * 20),
-        activeUsers: Math.floor(Math.random() * 100),
-        newUsers: Math.floor(Math.random() * 50),
-        avgResponseTime: 100 + Math.floor(Math.random() * 200),
-        p95ResponseTime: 200 + Math.floor(Math.random() * 300)
-      })
-    }
-    
-    res.json({ success: true, data: history })
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message })
-  }
-}
+// Observed analytics: scope all aggregates to projects owned by the caller.
+exports.getAnalyticsOverview = async (req, res, next) => {
+ try {
+  const result = await require('../services/observedAnalytics').read(req.userId, req.query.days || 30);
+  res.json({success:true,data:result.overview,window:result.window,observedAt:result.observedAt,unavailableMetrics:result.unavailableMetrics});
+ } catch(error) { next(error); }
+};
+exports.getAnalyticsHistory = async (req, res, next) => {
+ try {
+  const result = await require('../services/observedAnalytics').read(req.userId, req.query.days || 30);
+  res.json({success:true,data:result.history,window:result.window,observedAt:result.observedAt,unavailableMetrics:result.unavailableMetrics});
+ } catch(error) { next(error); }
+};
 
 // Analytics Metrics
 exports.getAnalyticsMetrics = async (req, res) => {

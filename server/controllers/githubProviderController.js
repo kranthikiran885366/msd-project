@@ -318,9 +318,9 @@ class GitHubProviderController {
         });
       } catch (error) {
         console.error('Token validation failed:', error.response?.status, error.response?.data?.message);
-        // Token is invalid, disconnect
-        await GitHubIntegration.deleteOne({ userId });
-        res.json({ connected: false });
+        if (error.response?.status === 401) return res.json({ connected: false, reauthorizationRequired: true });
+        // A rate limit or provider outage is not proof of revoked authorization.
+        return res.status(503).json({ error: 'GitHub connection could not be verified. Try again later.' });
       }
     } catch (error) {
       console.error('Failed to get connection status:', error.message);

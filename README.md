@@ -61,3 +61,7 @@ For a dedicated disposable control plane, see `scripts/smoke-control-plane.cjs`.
 Use a branch and pull request. A UI build does not establish safe hosting. Pin production images by digest, keep secrets in provider settings, review migrations and validate staging before promotion. Report security issues privately to the repository owner; do not put credentials in public issues.
 
 Infrastructure is not provisioned by this change. The hosting plan contains proposed accounts, isolation boundaries, budget and acceptance criteria.
+
+## Page integration review
+
+See the [frontend/backend audit](docs/FRONTEND_BACKEND_AUDIT.md) for all 137 pages and their integration gaps. The frontend follow-up contains unverified draft changes: the coding executor was unavailable, so previous build/test results do not certify this revision.

@@ -19,7 +19,7 @@ const authMiddleware = async (req, res, next) => {
     if (!account || !account.isActive || (decoded.version || 0) !== (account.tokenVersion || 0)) return res.status(401).json({ error: 'Session is no longer valid' });
     const route = req.originalUrl?.split('?')[0];
     if (config.nodeEnv === 'production' && !account.emailVerified && !['/auth/profile','/auth/logout','/auth/email-verification/request','/auth/change-password'].includes(route)) return res.status(403).json({ error: 'Verify your email before using the production workspace' });
-    req.user = { ...decoded, _id: uid }
+    req.user = { ...decoded, id: uid, _id: uid }
     req.userId = uid
 
     next()
