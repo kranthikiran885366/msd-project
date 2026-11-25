@@ -15,10 +15,17 @@ class ProjectService {
       framework: data.framework || 'Next.js',
       repository: data.repository,
       buildSettings: data.buildSettings,
+      runtimeConfig: data.runtimeConfig,
+      deploymentSettings: data.deploymentSettings,
     })
 
     await project.save()
     return project
+  }
+
+  safeUpdates(data) {
+    const keys = ['name', 'description', 'framework', 'status', 'buildSettings', 'runtimeConfig', 'deploymentSettings', 'features'];
+    return Object.fromEntries(keys.filter(key => Object.hasOwn(data, key)).map(key => [key, data[key]]));
   }
 
   async getProjects(userId) {
@@ -38,7 +45,7 @@ class ProjectService {
             const recentDeployments = await Deployment.find({ projectId: project._id })
               .sort({ createdAt: -1 })
               .limit(5)
-              .populate('environmentId', 'name')
+
             
             return {
               ...project.toObject(),
@@ -71,14 +78,13 @@ class ProjectService {
   }
 
   async updateProject(id, data) {
-    return await Project.findByIdAndUpdate(id, data, { new: true })
+    return await Project.findByIdAndUpdate(id, { $set: this.safeUpdates(data) }, { new: true, runValidators: true })
   }
 
   async deleteProject(id) {
-    await Deployment.deleteMany({ projectId: id })
-    await Function.deleteMany({ projectId: id })
-    await Environment.deleteMany({ projectId: id })
-    return await Project.findByIdAndDelete(id)
+    // Preserve deployment/claim records until explicit runtime termination and
+    // retention workflows complete. Hard deletion would orphan charged resources.
+    return Project.findByIdAndUpdate(id, { $set: { status: 'archived' } }, { new: true, runValidators: true })
   }
 
   async getProjectStats(projectId) {
@@ -86,7 +92,7 @@ class ProjectService {
     const deployments = allDeployments.length
     const failedDeployments = allDeployments.filter((d) => d.status === "failed").length
     const runningDeployments = allDeployments.filter((d) => ["pending", "building", "deploying"].includes(d.status)).length
-    const successfulDeployments = allDeployments.filter((d) => d.status === "success").length
+    const successfulDeployments = allDeployments.filter((d) => d.status === "running").length
     const cancelledDeployments = allDeployments.filter((d) => d.status === "cancelled").length
 
     // Calculate build times from deployment data
@@ -99,7 +105,7 @@ class ProjectService {
       : 0
 
     // Calculate monthly bandwidth (mock data for now)
-    const monthlyBandwidth = Math.random() * 5 + 1 // 1-6 GB
+    const monthlyBandwidth = null // No bandwidth collector is configured.
     
     // Get environments count
     const environments = await Environment.countDocuments({ projectId })
@@ -112,7 +118,7 @@ class ProjectService {
       cancelledDeployments,
       successRate: deployments > 0 ? ((successfulDeployments / deployments) * 100).toFixed(1) : "100.0",
       avgBuildTime: Math.round(avgBuildTime),
-      monthlyBandwidth: `${monthlyBandwidth.toFixed(1)} GB`,
+      monthlyBandwidth: monthlyBandwidth,
       environments,
       lastDeployment: allDeployments[0],
       isActive: runningDeployments > 0,
@@ -139,7 +145,7 @@ class ProjectService {
   }
 
   async updateProjectSettings(projectId, settings) {
-    return await Project.findByIdAndUpdate(projectId, settings, { new: true })
+    return await Project.findByIdAndUpdate(projectId, { $set: this.safeUpdates(settings) }, { new: true, runValidators: true })
   }
 
   calculateHealthStatus(successful, failed, running) {

@@ -10,22 +10,20 @@
  * WORKER_SECRET must be set.
  */
 const config = require('../config/env');
+const { timingSafeEqual } = require('crypto');
 
 module.exports = function internalAuth(req, res, next) {
     const secret = config.workerSecret;
 
     // If no secret configured, warn and pass through (dev mode only)
     if (!secret) {
-        if (config.nodeEnv === 'production') {
-            return res.status(401).json({ error: 'Internal auth not configured' });
-        }
-        return next();
+        return res.status(503).json({ error: 'Worker authentication is not configured' });
     }
 
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
 
-    if (!token || token !== secret) {
+    if (!token || Buffer.byteLength(token) !== Buffer.byteLength(secret) || !timingSafeEqual(Buffer.from(token), Buffer.from(secret))) {
         return res.status(401).json({ error: 'Invalid worker credentials' });
     }
 

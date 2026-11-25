@@ -21,19 +21,22 @@ class JobQueueService {
                 enableReadyCheck: false,
             };
 
-            this.client = new IORedis(redisConnection);
+            this.client = process.env.REDIS_URL ? new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null, enableReadyCheck: false }) : new IORedis(redisConnection);
+            this.client.on('error', () => { this.isConnected = false; });
+            this.client.on('ready', () => { this.isConnected = true; });
+            await this.client.ping();
 
             // Initialize job queue with ioredis-style connection
             this.queue = new Queue('deployments', {
                 connection: this.client,
                 defaultJobOptions: {
-                    attempts: 3,
+                    attempts: 1,
                     backoff: {
                         type: 'exponential',
                         delay: 2000
                     },
-                    removeOnComplete: { age: 3600 },
-                    removeOnFail: { age: 86400 }
+                    removeOnComplete: true,
+                    removeOnFail: true
                 }
             });
 
@@ -41,6 +44,7 @@ class JobQueueService {
             this.queueEvents = new QueueEvents('deployments', { connection: this.client });
 
             console.log('[v0] Job queue service initialized');
+            await this.queue.waitUntilReady();
             this.isConnected = true;
         } catch (error) {
             console.error('[v0] Failed to initialize job queue service:', error);
@@ -60,8 +64,8 @@ class JobQueueService {
         }
 
         const job = await this.queue.add('deployment', {
-            deploymentId,
-            ...options
+            ...options,
+            deploymentId
         }, {
             jobId: `deployment-${deploymentId}`,
             priority: options.priority || 5
@@ -125,7 +129,7 @@ class JobQueueService {
             id: job.id,
             state,
             progress,
-            data: job.data,
+            data: { deploymentId: job.data?.deploymentId },
             returnvalue: job.returnvalue,
             failedReason: job.failedReason,
             attemptsMade: job.attemptsMade,

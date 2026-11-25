@@ -1,58 +1,45 @@
-# Multi-stage build for frontend
-FROM node:18-alpine AS frontend-builder
+# ── Frontend Dockerfile (Next.js) ────────────────────────────────────────────
+FROM node:22-alpine AS builder
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm && pnpm install
+
+
+# Copy manifests first for layer caching
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy source and build
 COPY . .
-RUN pnpm run build
 
-# Backend container
-FROM node:18-alpine AS backend
-WORKDIR /server
-COPY server/package.json server/pnpm-lock.yaml ./
-RUN npm install -g pnpm && pnpm install --production
+# Build args injected at build time so Next.js bakes them in
+ARG NEXT_PUBLIC_API_URL=
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS=false
+ENV NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS=$NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS
+ARG INTERNAL_BACKEND_URL=http://backend:3001
+ENV INTERNAL_BACKEND_URL=$INTERNAL_BACKEND_URL
 
-# Production runtime
-FROM node:18-alpine
+RUN npm run build
+
+# ── Runtime image ─────────────────────────────────────────────────────────────
+FROM node:22-alpine
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+RUN addgroup -S clouddeck && adduser -S clouddeck -G clouddeck
 
-# Create app user
-RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+# Next.js standalone output bundles everything needed
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
-# Copy built frontend
-COPY --from=frontend-builder /app/.next /app/.next
-COPY --from=frontend-builder /app/public /app/public
-COPY --from=frontend-builder /app/node_modules /app/node_modules
-COPY --from=frontend-builder /app/package.json /app/
+RUN chown -R clouddeck:clouddeck /app
+USER clouddeck
 
-# Copy backend
-COPY --from=backend /server/node_modules /app/server/node_modules
-COPY server /app/server
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-# Copy env template
-COPY .env.example /app/.env.production
+EXPOSE 3000
 
-# Set ownership
-RUN chown -R nodejs:nodejs /app
+HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000',(r)=>{process.exit(r.statusCode<500?0:1)}).on('error',()=>process.exit(1))"
 
-USER nodejs
-
-# Set environment variables for production
-ENV PORT=5000 \
-    NODE_ENV=production \
-    NEXT_PUBLIC_API_URL=${API_URL}
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:5000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
-
-EXPOSE 5000
-
-# Use dumb-init to handle signals
-ENTRYPOINT ["dumb-init", "--"]
-
-# Start backend server (primary service)
-CMD ["node", "/app/server/index.js"]
+CMD ["node", "server.js"]

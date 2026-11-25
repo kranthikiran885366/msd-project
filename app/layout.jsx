@@ -7,9 +7,8 @@ import { Toaster } from "@/components/ui/toaster"
 import { Suspense } from "react"
 
 export const metadata = {
-  title: "CloudDeck",
-  description: "Unified Cloud Dashboard",
-  generator: "v0.app",
+  title: "CloudDeck · Your code, delivered",
+  description: "A focused workspace for Git-based deployments, projects and delivery logs.",
 }
 
 export default function RootLayout({ children }) {
@@ -18,7 +17,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <Suspense fallback={null}>
             {children}
             <Toaster />

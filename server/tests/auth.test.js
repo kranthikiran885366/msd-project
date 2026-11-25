@@ -18,15 +18,15 @@ let mongod;
 beforeAll(async () => {
   mongod = await MongoMemoryServer.create();
   await mongoose.connect(mongod.getUri());
-});
+}, 60000);
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  if (mongod) await mongod.stop();
 });
 
 afterEach(async () => {
-  await mongoose.connection.db.dropDatabase();
+  if (mongoose.connection.db) await mongoose.connection.db.dropDatabase();
 });
 
 const getAuthService = () => require("../services/authService");
@@ -54,7 +54,7 @@ test("2. Register locally then GitHub login with same email → links GitHub to 
   const User = getUser();
 
   const email = "shared@example.com";
-  const localUser = await new User({ email, password: "pass123", name: "Bob" }).save();
+  const localUser = await new User({ email, password: "pass123", name: "Bob", emailVerified: true }).save();
 
   const { user, isNewUser, isLinked } = await AuthService.findOrCreateUser(email, "github", {
     id: "gh_123",
@@ -77,7 +77,7 @@ test("3. Google login with existing email → links Google to existing user", as
   const User = getUser();
 
   const email = "carol@example.com";
-  const existing = await new User({ email, password: "pass123", name: "Carol" }).save();
+  const existing = await new User({ email, password: "pass123", name: "Carol", emailVerified: true }).save();
 
   const { user, isNewUser, isLinked } = await AuthService.findOrCreateUser(email, "google", {
     id: "google_456",
@@ -85,6 +85,7 @@ test("3. Google login with existing email → links Google to existing user", as
     picture: "https://google.com/photo.jpg",
     name: "Carol",
     refreshToken: "rt_xyz",
+    emailVerified: true,
   });
 
   expect(isNewUser).toBe(false);
@@ -121,7 +122,7 @@ test("5. Login after linking GitHub → same user found by GitHub ID, token refr
   const User = getUser();
 
   const email = "dave@example.com";
-  await new User({ email, password: "pass123", name: "Dave" }).save();
+  await new User({ email, password: "pass123", name: "Dave", emailVerified: true }).save();
 
   // First: link GitHub
   await AuthService.findOrCreateUser(email, "github", {

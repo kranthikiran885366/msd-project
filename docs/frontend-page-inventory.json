@@ -1,0 +1,5700 @@
+{
+  "auditedCommit": "d067aa103ef5114e362be170e84182d8d3ea23e7",
+  "sourceLevelOnly": true,
+  "executorAvailable": false,
+  "counts": {
+    "Local/static behavior review": 13,
+    "Raw fetch/proxy integration review": 14,
+    "API referenced; runtime acceptance pending": 78,
+    "Missing client methods": 22,
+    "Delegated dashboard API hook": 1,
+    "Store-backed; persistence/enforcement review": 3,
+    "Presentation/navigation": 4,
+    "Delegated authentication component": 2
+  },
+  "missingClientMethodCount": 81,
+  "routeCandidates": [
+    {
+      "method": "POST",
+      "path": "/auth/signup",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/forgot-password",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/reset-password",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/refresh-token",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/oauth-session",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/email-verification/request",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/verify-email",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/providers",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/profile",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "PUT",
+      "path": "/auth/profile",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/change-password",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/github",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/github/callback",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/google",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "file": "server/routes/auth.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/repository/:projectId",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/webhooks/git/:provider/:projectId",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/preview/:projectId",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/schedule/:projectId",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/lock/:projectId",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/deployments/cache/check/:projectId",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/cache/update/:projectId",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/deployments",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/deployments/project/:projectId",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/deployments/analytics/project/:projectId",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/deployments/:id",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/deployments/:id/metrics",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/deployments/:id/status",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/rollback",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/deployments/:id/logs",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/redeploy",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/assign-domain",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/rebuild",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/cancel",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/stop",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/deployments/:id/gateway",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/claim",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/deployments/:id/worker-state",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/logs",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/status",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/deployments/:id/cleanup",
+      "file": "server/routes/deployments.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects",
+      "file": "server/routes/projects.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects",
+      "file": "server/routes/projects.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/:id/health",
+      "file": "server/routes/projects.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/:id/stats",
+      "file": "server/routes/projects.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/:id",
+      "file": "server/routes/projects.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/projects/:id/settings",
+      "file": "server/routes/projects.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/projects/:id",
+      "file": "server/routes/projects.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/projects/:id",
+      "file": "server/routes/projects.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/:id/env",
+      "file": "server/routes/projectConfig.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/:id/env",
+      "file": "server/routes/projectConfig.js"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/projects/:id/env/:key",
+      "file": "server/routes/projectConfig.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/projects/:id/env/:key",
+      "file": "server/routes/projectConfig.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/:id/config",
+      "file": "server/routes/projectConfig.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/:id/config",
+      "file": "server/routes/projectConfig.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/templates",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/templates/:templateId/create",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/databases/:databaseId",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/databases/:databaseId",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/start",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/stop",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/restart",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/pause",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/query",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/tables",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/tables/:tableName/schema",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/tables/:tableName/browse",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/backups",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/backups",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/backups/:backupId/restore",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/databases/:databaseId/backups/:backupId",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/stats",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/health",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/metrics",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/connections",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/users",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/users",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/migrations",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/migrations",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/scaling-options",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/scale",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/databases/:databaseId/compliance",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/databases/:databaseId/compliance/check",
+      "file": "server/routes/databases.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/functions/project/:projectId",
+      "file": "server/routes/functions.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/functions/project/:projectId",
+      "file": "server/routes/functions.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/functions/:id/metrics",
+      "file": "server/routes/functions.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/functions/:id",
+      "file": "server/routes/functions.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/functions/:id/toggle",
+      "file": "server/routes/functions.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/functions/:id",
+      "file": "server/routes/functions.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/functions/:id",
+      "file": "server/routes/functions.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/functions/:id/invoke",
+      "file": "server/routes/functions.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cronjobs/project/:projectId",
+      "file": "server/routes/cronjobs.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cronjobs/project/:projectId",
+      "file": "server/routes/cronjobs.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/cronjobs/:id",
+      "file": "server/routes/cronjobs.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/cronjobs/:id",
+      "file": "server/routes/cronjobs.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cronjobs/:id/run",
+      "file": "server/routes/cronjobs.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/domains/project/:projectId",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/domains/project/:projectId",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/domains/:id/verify",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/domains/:id/verification-status",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/domains/:id/regenerate-verification",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/domains/:id",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/domains/redirects",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/domains/:domainId/redirects",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/domains/redirects/:id",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/domains/redirects/:id",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/domains/redirects/:id",
+      "file": "server/routes/domains.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dns/records",
+      "file": "server/routes/dns.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/dns/records",
+      "file": "server/routes/dns.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dns/records/:id",
+      "file": "server/routes/dns.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/dns/records/:id",
+      "file": "server/routes/dns.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/dns/records/:id",
+      "file": "server/routes/dns.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ssl/certificates",
+      "file": "server/routes/ssl.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ssl/certificates",
+      "file": "server/routes/ssl.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ssl/certificates/:id",
+      "file": "server/routes/ssl.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ssl/certificates/:id",
+      "file": "server/routes/ssl.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ssl/certificates/:id/renew",
+      "file": "server/routes/ssl.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/edge-handlers",
+      "file": "server/routes/edge-handlers.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/edge-handlers/:id",
+      "file": "server/routes/edge-handlers.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/edge-handlers",
+      "file": "server/routes/edge-handlers.js"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/edge-handlers/:id",
+      "file": "server/routes/edge-handlers.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/edge-handlers/:id",
+      "file": "server/routes/edge-handlers.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/edge-handlers/:id/deploy",
+      "file": "server/routes/edge-handlers.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/edge-handlers/:id/test",
+      "file": "server/routes/edge-handlers.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/environment/project/:projectId",
+      "file": "server/routes/environment.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/environment/project/:projectId",
+      "file": "server/routes/environment.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/environment/:id",
+      "file": "server/routes/environment.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/environment/:id",
+      "file": "server/routes/environment.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/team/members",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/project/:projectId",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/:memberId",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/team/:memberId/role",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/team/:memberId",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/team/invitations",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/invitations/pending/:projectId",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/invitations/:invitationId",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/team/invitations/:invitationId/accept",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/team/invitations/:invitationId/decline",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/team/invitations/:invitationId/resend",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/team/invitations/:invitationId/revoke",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/activity-logs",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/user-activity",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/:projectId/settings",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/team/:projectId/settings",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/:memberId/permissions",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/:projectId/stats",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/team/:projectId/roles",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/team/bulk/add",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/team/bulk/remove",
+      "file": "server/routes/team.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/logs/project/:projectId",
+      "file": "server/routes/logs.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/logs/project/:projectId/stats",
+      "file": "server/routes/logs.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/logs/project/:projectId",
+      "file": "server/routes/logs.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/builds/:projectId",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/builds/:projectId",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/builds/:projectId/:id",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/builds/:projectId/:id/status",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/builds/:projectId/:buildId/logs",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/builds/:projectId/:buildId/logs",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/builds/:projectId/:buildId/steps",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/builds/:projectId/:buildId/steps/:stepName",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/builds/:projectId/:buildId/hooks/execute",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/builds/:projectId/:buildId/retry",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/builds/:projectId/:buildId/cancel",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/builds/:projectId/:buildId/metrics",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/builds/:projectId/analytics",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/builds/:projectId/cache",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/builds/cache-key",
+      "file": "server/routes/builds.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/monitoring/metric",
+      "file": "server/routes/monitoring.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitoring/metrics/:projectId",
+      "file": "server/routes/monitoring.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitoring/summary/:projectId",
+      "file": "server/routes/monitoring.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitoring/health/:projectId",
+      "file": "server/routes/monitoring.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitoring/errors/:projectId",
+      "file": "server/routes/monitoring.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/monitoring/alerts/:projectId",
+      "file": "server/routes/monitoring.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitoring/prometheus",
+      "file": "server/routes/monitoring.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/monitoring/metrics/bulk",
+      "file": "server/routes/monitoring.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/security/roles",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/roles",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/roles/:roleId",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/security/roles/:roleId",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/security/roles/:roleId",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/security/permissions",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/permissions",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/security/users/:userId/roles/:roleId",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/security/users/:userId/roles/:roleId",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/users/:userId/roles",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/users/:userId/permissions",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/security/check-permission",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/security/access-policies",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/access-policies",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/security/access-policies/:policyId",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/audit-logs",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/audit-logs/:logId",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/security/audit-logs/archive",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/security/audit-logs",
+      "file": "server/routes/security.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/overview",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/history",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/metrics",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/deployments",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/users",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/performance",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/analytics/metrics",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/metrics",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/metrics/:deploymentId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/metrics/stats/:projectId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/aggregates/:projectId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/analytics/alerts",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/alerts",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/alerts/:alertId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/analytics/alerts/:alertId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/analytics/alerts/:alertId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/analytics/alerts/:alertId/trigger",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/analytics/reports",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/reports",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/reports/:reportId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/analytics/reports/:reportId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/dashboard/:projectId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/health/:projectId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/analytics/compare",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/trends/:projectId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/alert-history",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/export/:projectId",
+      "file": "server/routes/analytics.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/api-tokens",
+      "file": "server/routes/api-tokens.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/api-tokens",
+      "file": "server/routes/api-tokens.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/api-tokens/:tokenId",
+      "file": "server/routes/api-tokens.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/api-tokens/:tokenId/rotate",
+      "file": "server/routes/api-tokens.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/api-tokens/:tokenId",
+      "file": "server/routes/api-tokens.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/api-tokens/:tokenId/delete",
+      "file": "server/routes/api-tokens.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/api-tokens/:tokenId/usage",
+      "file": "server/routes/api-tokens.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/api-tokens/stats/:projectId",
+      "file": "server/routes/api-tokens.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/api-tokens/validate",
+      "file": "server/routes/api-tokens.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhooks",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/webhooks",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/webhooks/:webhookId",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/webhooks/:webhookId",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/webhooks/:webhookId",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhooks/:webhookId/test",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/webhooks/:webhookId/deliveries",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/webhooks/:webhookId/deliveries/:deliveryId",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhooks/:webhookId/deliveries/:deliveryId/retry",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/webhooks/:webhookId/statistics",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/webhooks/project/:projectId/statistics",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/webhooks/events",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhooks/bulk/disable",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhooks/:webhookId/deliveries/clear",
+      "file": "server/routes/webhooks.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/env-vars",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/env-vars",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/env-vars/:varId",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/env-vars/:varId",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/settings/env-vars/:varId",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/domains",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/domains",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/domains/:domainId",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/domains/:domainId",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/settings/domains/:domainId",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/domains/:domainId/generate-verification",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/domains/:domainId/verify",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/build",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/build",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/env-vars/bulk",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/export/:projectId",
+      "file": "server/routes/settings.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/user/profile",
+      "file": "server/routes/userSettingsRoutes.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/user/profile",
+      "file": "server/routes/userSettingsRoutes.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/user/appearance",
+      "file": "server/routes/userSettingsRoutes.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/user/appearance",
+      "file": "server/routes/userSettingsRoutes.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/user/security",
+      "file": "server/routes/userSettingsRoutes.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/user/security",
+      "file": "server/routes/userSettingsRoutes.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/user/notifications",
+      "file": "server/routes/userSettingsRoutes.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/user/notifications",
+      "file": "server/routes/userSettingsRoutes.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/settings/user/account",
+      "file": "server/routes/userSettingsRoutes.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/providers/list",
+      "file": "server/routes/providers.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/providers/connect",
+      "file": "server/routes/providers.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/providers/:provider/disconnect",
+      "file": "server/routes/providers.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/providers/deploy",
+      "file": "server/routes/providers.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/providers/deployments/:deploymentId/status",
+      "file": "server/routes/providers.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/providers/deployments/:deploymentId/logs",
+      "file": "server/routes/providers.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/providers/deployments/:deploymentId/cancel",
+      "file": "server/routes/providers.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/providers/webhooks/:provider",
+      "file": "server/routes/providers.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard",
+      "file": "server/routes/dashboard.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard/stats",
+      "file": "server/routes/dashboard.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard/recent-activity",
+      "file": "server/routes/dashboard.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard/metrics",
+      "file": "server/routes/dashboard.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/incidents",
+      "file": "server/routes/incidents.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/incidents/project/:projectId",
+      "file": "server/routes/incidents.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/incidents/project/:projectId/stats",
+      "file": "server/routes/incidents.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/incidents/:id",
+      "file": "server/routes/incidents.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/incidents/:id/status",
+      "file": "server/routes/incidents.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/incidents/:id/assign",
+      "file": "server/routes/incidents.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/incidents/:id/resolve",
+      "file": "server/routes/incidents.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/escalation",
+      "file": "server/routes/escalation.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/escalation/project/:projectId",
+      "file": "server/routes/escalation.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/escalation/project/:projectId/teams",
+      "file": "server/routes/escalation.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/escalation/project/:projectId/stats",
+      "file": "server/routes/escalation.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/escalation/:id",
+      "file": "server/routes/escalation.js"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/escalation/:id",
+      "file": "server/routes/escalation.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/escalation/:id",
+      "file": "server/routes/escalation.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/escalation/:id/toggle",
+      "file": "server/routes/escalation.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/escalation/:id/test",
+      "file": "server/routes/escalation.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/uptime/project/:projectId/stats",
+      "file": "server/routes/uptime.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/uptime/project/:projectId/sla",
+      "file": "server/routes/uptime.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/uptime/project/:projectId/history",
+      "file": "server/routes/uptime.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/uptime/project/:projectId/incidents",
+      "file": "server/routes/uptime.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/reports",
+      "file": "server/routes/reports.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/project/:projectId",
+      "file": "server/routes/reports.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/:id",
+      "file": "server/routes/reports.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/:id/export",
+      "file": "server/routes/reports.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/reports/:id",
+      "file": "server/routes/reports.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/github-provider/repositories",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/github-provider/repositories/:owner/:repo",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/github-provider/repositories/:owner/:repo/branches",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/github-provider/repositories/:owner/:repo/file/:path",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/github-provider/connect",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/github-provider/disconnect",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/github-provider/status",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/github-provider/repositories/:owner/:repo/webhooks",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/github-provider/repositories/:owner/:repo/webhooks/deployment",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/github-provider/import",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/github-provider/webhook/:projectId",
+      "file": "server/routes/github-provider.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/billing/plans",
+      "file": "server/routes/billing.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/billing/subscription",
+      "file": "server/routes/billing.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/billing/subscription",
+      "file": "server/routes/billing.js"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/billing/subscription/:id",
+      "file": "server/routes/billing.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/billing/subscription/:id",
+      "file": "server/routes/billing.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/billing/subscription/:id/usage",
+      "file": "server/routes/billing.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/billing/subscription/:id/usage",
+      "file": "server/routes/billing.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/nodes/register",
+      "file": "server/routes/nodes.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/nodes/heartbeat",
+      "file": "server/routes/nodes.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/nodes",
+      "file": "server/routes/nodes.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/nodes/available",
+      "file": "server/routes/nodes.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/nodes/stats/overview",
+      "file": "server/routes/nodes.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/nodes/:nodeId",
+      "file": "server/routes/nodes.js"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/nodes/:nodeId",
+      "file": "server/routes/nodes.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/nodes/:nodeId/error",
+      "file": "server/routes/nodes.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/queue",
+      "file": "server/routes/jobs.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/pull",
+      "file": "server/routes/jobs.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId",
+      "file": "server/routes/jobs.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs",
+      "file": "server/routes/jobs.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/stats/queue",
+      "file": "server/routes/jobs.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/progress",
+      "file": "server/routes/jobs.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/cancel",
+      "file": "server/routes/jobs.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ports/allocate",
+      "file": "server/routes/ports.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ports/:deploymentId",
+      "file": "server/routes/ports.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ports/:deploymentId/release",
+      "file": "server/routes/ports.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ports",
+      "file": "server/routes/ports.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ports/stats/utilization",
+      "file": "server/routes/ports.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ports/nginx-config",
+      "file": "server/routes/ports.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/help/:...path",
+      "file": "app/api/help/[...path]/route.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/help/:...path",
+      "file": "app/api/help/[...path]/route.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/appearance",
+      "file": "app/api/settings/appearance/route.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/appearance",
+      "file": "app/api/settings/appearance/route.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/notifications",
+      "file": "app/api/settings/notifications/route.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/notifications",
+      "file": "app/api/settings/notifications/route.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/profile",
+      "file": "app/api/settings/profile/route.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/profile",
+      "file": "app/api/settings/profile/route.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/security",
+      "file": "app/api/settings/security/route.js"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/security",
+      "file": "app/api/settings/security/route.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/status/:...path",
+      "file": "app/api/status/[...path]/route.js"
+    },
+    {
+      "method": "POST",
+      "path": "/api/status/:...path",
+      "file": "app/api/status/[...path]/route.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/status/incidents",
+      "file": "app/api/status/incidents/route.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/status/system",
+      "file": "app/api/status/system/route.js"
+    }
+  ],
+  "pages": [
+    {
+      "source": "app/(app)/admin/analytics/compliance/page.jsx",
+      "sourceSha": "000622e8aa2c676366dc6f0b7ff4a6511f0a0e8f",
+      "route": "/admin/analytics/compliance",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/analytics/cost/page.jsx",
+      "sourceSha": "c1812d8c52075be13f04851513abd078197c0e3d",
+      "route": "/admin/analytics/cost",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/admin/analytics/cost?timeRange=${timeRange}"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/analytics/performance/page.jsx",
+      "sourceSha": "8021021b508ad258740ca03b80b199b9d557713a",
+      "route": "/admin/analytics/performance",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/analytics/security/page.jsx",
+      "sourceSha": "e2f170dcac0feee73508ef3662e53da9cb16e155",
+      "route": "/admin/analytics/security",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/api/page.jsx",
+      "sourceSha": "cb26f8117e8b859120f51a766db103aeaf098c98",
+      "route": "/admin/api",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/admin/api/tokens",
+        "/api/admin/api/stats"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/audit/page.jsx",
+      "sourceSha": "031e3c07516759c396cc5943a3cedb2923392120",
+      "route": "/admin/audit",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "request"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/auth/page.jsx",
+      "sourceSha": "b11045eff0668e41dc8f5438ee3a483cb823f3f1",
+      "route": "/admin/auth",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/cicd/page.jsx",
+      "sourceSha": "103c4dccdda1e4dd47347f3efa4d27881fb6ad92",
+      "route": "/admin/cicd",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/compliance/page.jsx",
+      "sourceSha": "d33b78395ce101372720ff43be515d6546d21e37",
+      "route": "/admin/compliance",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/compliance/status"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/costs/page.jsx",
+      "sourceSha": "593b0edecfc97b91828e62b7426cae25ae8ba0c2",
+      "route": "/admin/costs",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/analytics/costs?timeRange=${timeRange}"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/monitoring/page.jsx",
+      "sourceSha": "714cd0adc5fdb0064ca4a2f68fa9ba52de6402db",
+      "route": "/admin/monitoring",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/admin/monitoring/health",
+        "/api/admin/monitoring/services",
+        "/api/admin/monitoring/alerts",
+        "/api/admin/monitoring/performance"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/page.jsx",
+      "sourceSha": "06a3e9393003a79009aee1c094a3c24c54ff6a6c",
+      "route": "/admin",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getAnalyticsOverview",
+        "getAnalyticsHistory",
+        "getAuditLogs",
+        "getProjects"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getAnalyticsOverview",
+          "endpoint": "/analytics/overview",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAnalyticsHistory",
+          "endpoint": "/analytics/history${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAuditLogs",
+          "endpoint": "/security/audit-logs${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/performance/page.jsx",
+      "sourceSha": "34db10fd4149aa9752c9a49ea170ff5def3170ba",
+      "route": "/admin/performance",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getAnalyticsHistory",
+        "getAnalyticsOverview",
+        "getProjects",
+        "getServiceHealth"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getAnalyticsHistory",
+          "endpoint": "/analytics/history${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAnalyticsOverview",
+          "endpoint": "/analytics/overview",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getServiceHealth",
+          "endpoint": "/monitoring/health/${projectId}",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/security/page.jsx",
+      "sourceSha": "01d7bc8931e8c6c592d8d5f071e0c623d3a9a6d7",
+      "route": "/admin/security",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/security/status"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/settings/page.jsx",
+      "sourceSha": "161f6cb10d3632dbce3e6ccb9b71396b432c5443",
+      "route": "/admin/settings",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/admin/team/page.jsx",
+      "sourceSha": "e3426c0abda528fb2bfd875703a62092d481eb92",
+      "route": "/admin/team",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/admin/team"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/analytics/compliance/page.jsx",
+      "sourceSha": "bf05576404ff67310c31655b15fa59da7b49ba32",
+      "route": "/analytics/compliance",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getComplianceAnalytics",
+        "getSecurityEvents",
+        "getAuditLogs",
+        "getComplianceHistory"
+      ],
+      "missingClientMethods": [
+        "getComplianceAnalytics",
+        "getSecurityEvents",
+        "getComplianceHistory"
+      ],
+      "endpointHints": [
+        {
+          "method": "getAuditLogs",
+          "endpoint": "/security/audit-logs${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/analytics/cost/page.jsx",
+      "sourceSha": "0f491bb5bd91e200a85479196bebf029ddf5f7f5",
+      "route": "/analytics/cost",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getCostAnalytics",
+        "getCostHistory",
+        "getCostByService"
+      ],
+      "missingClientMethods": [
+        "getCostAnalytics",
+        "getCostHistory",
+        "getCostByService"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/analytics/custom-reports/page.jsx",
+      "sourceSha": "c8caa5b149104f39855d5f8ca6dbf441e92d8f20",
+      "route": "/analytics/custom-reports",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getCustomReports",
+        "createCustomReport",
+        "deleteCustomReport",
+        "generateReport",
+        "downloadReport"
+      ],
+      "missingClientMethods": [
+        "getCustomReports",
+        "createCustomReport",
+        "deleteCustomReport",
+        "downloadReport"
+      ],
+      "endpointHints": [
+        {
+          "method": "generateReport",
+          "endpoint": "/reports/project/${projectId}/generate",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/analytics/page.jsx",
+      "sourceSha": "8a8158ab51def2f2a889ee446ee2213b24209e76",
+      "route": "/analytics",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getAnalyticsOverview",
+        "getAnalyticsHistory"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getAnalyticsOverview",
+          "endpoint": "/analytics/overview",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAnalyticsHistory",
+          "endpoint": "/analytics/history${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": true,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/analytics/performance/page.jsx",
+      "sourceSha": "4f59930ec566c72ba07f07b7a9824f7f12db7398",
+      "route": "/analytics/performance",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getPerformanceAnalytics",
+        "getEndpointMetrics",
+        "getLatencyHistory"
+      ],
+      "missingClientMethods": [
+        "getEndpointMetrics",
+        "getLatencyHistory"
+      ],
+      "endpointHints": [
+        {
+          "method": "getPerformanceAnalytics",
+          "endpoint": "/analytics/performance${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/analytics/security/page.jsx",
+      "sourceSha": "c712aa713d10b1bc710c75c83b4240b8970dbd84",
+      "route": "/analytics/security",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getSecurityAudit",
+        "getAuditEvents",
+        "getVulnerabilities",
+        "getAuditHistory"
+      ],
+      "missingClientMethods": [
+        "getSecurityAudit",
+        "getAuditEvents",
+        "getVulnerabilities",
+        "getAuditHistory"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/api-graph/page.jsx",
+      "sourceSha": "a025709570bbf0f9b5ffde1ee83009dec100146c",
+      "route": "/api-graph",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getApis",
+        "getApiUsage",
+        "createApi",
+        "deleteApi"
+      ],
+      "missingClientMethods": [
+        "getApis",
+        "getApiUsage",
+        "createApi",
+        "deleteApi"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/forgot-password/page.jsx",
+      "sourceSha": "cdcab897e03813735ef09d42f757c16c94a193d8",
+      "route": "/auth/forgot-password",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "forgotPassword"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "forgotPassword",
+          "endpoint": "/auth/forgot-password",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/ldap/page.jsx",
+      "sourceSha": "575cc10184c6c5c8f1e4658c046cc361243925b7",
+      "route": "/auth/ldap",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getLDAPConfig",
+        "updateLDAPConfig",
+        "testLDAPConnection",
+        "syncLDAPUsers"
+      ],
+      "missingClientMethods": [
+        "getLDAPConfig",
+        "updateLDAPConfig",
+        "testLDAPConnection",
+        "syncLDAPUsers"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/login/page.jsx",
+      "sourceSha": "c8916711a82f915e4f4765f5f53236eddffa0786",
+      "route": "/auth/login",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "login",
+        "startGitHubOAuth",
+        "startGoogleOAuth"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "login",
+          "endpoint": "/auth/login",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/mfa-setup/page.jsx",
+      "sourceSha": "2a956d0a322af005be7e4e7d584b12792b7f584a",
+      "route": "/auth/mfa-setup",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getMFAMethods",
+        "generateTOTPSecret",
+        "verifyAndEnableTOTP",
+        "setupEmailMFA",
+        "verifyAndEnableEmailMFA",
+        "setupSMSMFA",
+        "verifyAndEnableSMSMFA",
+        "disableMFA"
+      ],
+      "missingClientMethods": [
+        "getMFAMethods",
+        "generateTOTPSecret",
+        "verifyAndEnableTOTP",
+        "setupEmailMFA",
+        "verifyAndEnableEmailMFA",
+        "setupSMSMFA",
+        "verifyAndEnableSMSMFA",
+        "disableMFA"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/password-policy/page.jsx",
+      "sourceSha": "3b449303b52a05d6ff0481e11af16ee25fd98c07",
+      "route": "/auth/password-policy",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getPasswordPolicy",
+        "updatePasswordPolicy"
+      ],
+      "missingClientMethods": [
+        "getPasswordPolicy",
+        "updatePasswordPolicy"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/reset-password/page.jsx",
+      "sourceSha": "91f3a75b2623284db23f530bbb088f06ff7ece62",
+      "route": "/auth/reset-password",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "resetPassword"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "resetPassword",
+          "endpoint": "/auth/reset-password",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/saml/page.jsx",
+      "sourceSha": "7ac1499d9f5922df0ff678522cd5a387a145e321",
+      "route": "/auth/saml",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getSAMLConfig",
+        "updateSAMLConfig",
+        "testSAMLConnection"
+      ],
+      "missingClientMethods": [
+        "getSAMLConfig",
+        "updateSAMLConfig",
+        "testSAMLConnection"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/session-management/page.jsx",
+      "sourceSha": "d168d191239ea18e0faa0dfaf5d5ee70657fc6f1",
+      "route": "/auth/session-management",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getSessions",
+        "terminateSession",
+        "terminateAllOtherSessions"
+      ],
+      "missingClientMethods": [
+        "getSessions",
+        "terminateSession",
+        "terminateAllOtherSessions"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/sso/page.jsx",
+      "sourceSha": "00de04a8fd8d0854ad0bd904f4aeb5c468669618",
+      "route": "/auth/sso",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getSSOConfig",
+        "updateSSOProvider"
+      ],
+      "missingClientMethods": [
+        "updateSSOProvider"
+      ],
+      "endpointHints": [
+        {
+          "method": "getSSOConfig",
+          "endpoint": "/team/sso",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/auth/webauthn/page.jsx",
+      "sourceSha": "adcaa9703d18f5b2b570fdb9241114706b7bfd5c",
+      "route": "/auth/webauthn",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getWebAuthnCredentials",
+        "initializeWebAuthnRegistration",
+        "completeWebAuthnRegistration",
+        "deleteWebAuthnCredential"
+      ],
+      "missingClientMethods": [
+        "getWebAuthnCredentials",
+        "initializeWebAuthnRegistration",
+        "completeWebAuthnRegistration",
+        "deleteWebAuthnCredential"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/billing/analytics/page.jsx",
+      "sourceSha": "c35783cb01b1aca5548579ee1a228ddbe680d780",
+      "route": "/billing/analytics",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/billing/subscription/${subscriptionId}/usage?timeframe=${timeframe}"
+      ],
+      "flags": [
+        "Raw fetch has no visible bearer header"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/billing/cost-optimization/page.jsx",
+      "sourceSha": "eda917b9b7827feaadffcd86e972465c77340f2f",
+      "route": "/billing/cost-optimization",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getCostOptimizationRecommendations",
+        "getCostBreakdown",
+        "getCostProjections",
+        "applyCostOptimizationRecommendation"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getCostOptimizationRecommendations",
+          "endpoint": "/billing/cost-optimization/recommendations",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getCostBreakdown",
+          "endpoint": "/billing/cost-optimization/breakdown",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getCostProjections",
+          "endpoint": "/billing/cost-optimization/projections",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "applyCostOptimizationRecommendation",
+          "endpoint": "/billing/cost-optimization/recommendations/${recommendationId}/apply",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/billing/invoices/page.jsx",
+      "sourceSha": "e42a26628bae3943619f83c7082d9e82bf73876e",
+      "route": "/billing/invoices",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getInvoices",
+        "downloadInvoice",
+        "getInvoiceDetails",
+        "resendInvoice"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getInvoices",
+          "endpoint": "/billing/invoices${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "downloadInvoice",
+          "endpoint": "/billing/invoices/${invoiceId}/download",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getInvoiceDetails",
+          "endpoint": "/billing/invoices/${invoiceId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "resendInvoice",
+          "endpoint": "/billing/invoices/${invoiceId}/resend",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/billing/page.jsx",
+      "sourceSha": "71397c39492e86aad68221ff10310ee330f44339",
+      "route": "/billing",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/billing/payment-methods/page.jsx",
+      "sourceSha": "9c1eb310fc6b236ae6c27388cf94c39d72c315e7",
+      "route": "/billing/payment-methods",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getPaymentMethods",
+        "addPaymentMethod",
+        "deletePaymentMethod",
+        "setDefaultPaymentMethod"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getPaymentMethods",
+          "endpoint": "/billing/payment-methods",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "addPaymentMethod",
+          "endpoint": "/billing/payment-methods",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deletePaymentMethod",
+          "endpoint": "/billing/payment-methods/${methodId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "setDefaultPaymentMethod",
+          "endpoint": "/billing/payment-methods/${methodId}/default",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/billing/plans/page.jsx",
+      "sourceSha": "ac136a063053c0af9811cb1d59daa56af94db772",
+      "route": "/billing/plans",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getBillingPlans",
+        "getCurrentPlan",
+        "upgradePlan",
+        "downgradePlan"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getBillingPlans",
+          "endpoint": "/billing/plans",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getCurrentPlan",
+          "endpoint": "/billing/subscription",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "upgradePlan",
+          "endpoint": "/billing/subscription",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "downgradePlan",
+          "endpoint": "/billing/subscription",
+          "httpMethod": "PUT"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/billing/usage/page.jsx",
+      "sourceSha": "f58450d66bf03118f59b7f24e73a515affbbeda5",
+      "route": "/billing/usage",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getCurrentUsage",
+        "getCurrentPlan",
+        "getUsageHistory"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getCurrentUsage",
+          "endpoint": "/billing/usage",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getCurrentPlan",
+          "endpoint": "/billing/subscription",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getUsageHistory",
+          "endpoint": "/billing/usage/history${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/blueprints/page.jsx",
+      "sourceSha": "2083ebf2e66529136801b87039a147a27fe2fda4",
+      "route": "/blueprints",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/blueprints",
+        "/api/blueprints",
+        "/api/blueprints/${templateId}/generate",
+        "/api/blueprints/${templateId}/deploy"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/builds/page.jsx",
+      "sourceSha": "7a6b890a7e91e69b273c7297ee985d3b0861edc7",
+      "route": "/builds",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getBuilds",
+        "createBuild",
+        "getBuildLogs",
+        "retryBuild",
+        "cancelBuild"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getBuilds",
+          "endpoint": "/builds/${projectId}${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createBuild",
+          "endpoint": "/builds/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "getBuildLogs",
+          "endpoint": "/builds/${projectId}/${buildId}/logs",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "retryBuild",
+          "endpoint": "/builds/${projectId}/${buildId}/retry",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "cancelBuild",
+          "endpoint": "/builds/${projectId}/${buildId}/cancel",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/ci-cd/argocd/page.jsx",
+      "sourceSha": "bf04fc9713109c9070850ddf580cf5aa7e7a0ed7",
+      "route": "/ci-cd/argocd",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getArgoCDApplications",
+        "getArgoCDConfig",
+        "createArgoCDApplication",
+        "deleteArgoCDApplication",
+        "syncArgoCDApplication",
+        "updateArgoCDConfig"
+      ],
+      "missingClientMethods": [
+        "getArgoCDApplications",
+        "getArgoCDConfig",
+        "createArgoCDApplication",
+        "deleteArgoCDApplication",
+        "syncArgoCDApplication",
+        "updateArgoCDConfig"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/ci-cd/github-actions/page.jsx",
+      "sourceSha": "7f6e3914c0467c1ff7befbae6e877825e3761b32",
+      "route": "/ci-cd/github-actions",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getGitHubWorkflows",
+        "getGitHubSecrets",
+        "createGitHubSecret",
+        "deleteGitHubSecret",
+        "createGitHubWorkflow",
+        "triggerGitHubWorkflow",
+        "deleteGitHubWorkflow"
+      ],
+      "missingClientMethods": [
+        "getGitHubWorkflows",
+        "getGitHubSecrets",
+        "createGitHubSecret",
+        "deleteGitHubSecret",
+        "createGitHubWorkflow",
+        "triggerGitHubWorkflow",
+        "deleteGitHubWorkflow"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/ci-cd/page.jsx",
+      "sourceSha": "d8a77e45b794f4272a95eab4bc96ab9a3de66401",
+      "route": "/ci-cd",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getBuilds",
+        "getBuildLogs",
+        "createBuild",
+        "triggerBuild",
+        "deleteBuild"
+      ],
+      "missingClientMethods": [
+        "triggerBuild",
+        "deleteBuild"
+      ],
+      "endpointHints": [
+        {
+          "method": "getBuilds",
+          "endpoint": "/builds/${projectId}${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getBuildLogs",
+          "endpoint": "/builds/${projectId}/${buildId}/logs",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createBuild",
+          "endpoint": "/builds/${projectId}",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/ci-cd/tekton/page.jsx",
+      "sourceSha": "22835c39453f8aebe23dc05227398e6f4827db6a",
+      "route": "/ci-cd/tekton",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getTektonPipelines",
+        "getTektonRuns",
+        "createTektonPipeline",
+        "deleteTektonPipeline",
+        "triggerTektonRun"
+      ],
+      "missingClientMethods": [
+        "getTektonPipelines",
+        "getTektonRuns",
+        "createTektonPipeline",
+        "deleteTektonPipeline",
+        "triggerTektonRun"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/cronjobs/page.jsx",
+      "sourceSha": "f32dbff7a21b9ecc7cb2e2a7563be3598382bdf2",
+      "route": "/cronjobs",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects",
+        "getCronJobs",
+        "createCronJob",
+        "runCronJob",
+        "updateCronJob",
+        "deleteCronJob"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getCronJobs",
+          "endpoint": "/cronjobs/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createCronJob",
+          "endpoint": "/cronjobs/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "runCronJob",
+          "endpoint": "/cronjobs/${id}/run",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "updateCronJob",
+          "endpoint": "/cronjobs/${id}",
+          "httpMethod": "PATCH"
+        },
+        {
+          "method": "deleteCronJob",
+          "endpoint": "/cronjobs/${id}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/dashboard/page.jsx",
+      "sourceSha": "caade698465ea85e2df8b0c16ae9b0da41408117",
+      "route": "/dashboard",
+      "classification": "Delegated dashboard API hook",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/[id]/page.jsx",
+      "sourceSha": "6ada02aa4c8932d6169b80be237ff508f9c81517",
+      "route": "/databases/[id]",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabaseDetail",
+        "getDatabaseMetrics",
+        "getDatabaseHealth",
+        "getDatabaseConnections",
+        "restartDatabase"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabaseDetail",
+          "endpoint": "/databases/${id}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseMetrics",
+          "endpoint": "/databases/${databaseId}/metrics?timeRange=${timeRange}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseHealth",
+          "endpoint": "/databases/${databaseId}/health",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseConnections",
+          "endpoint": "/databases/${databaseId}/connections",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "restartDatabase",
+          "endpoint": "/databases/${id}/restart",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/backup/page.jsx",
+      "sourceSha": "894f6e8d5d58d695397be13c6e7311f4f63eab3b",
+      "route": "/databases/backup",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "getBackups",
+        "createBackup",
+        "restoreBackup",
+        "deleteBackup"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getBackups",
+          "endpoint": "/databases/${databaseId}/backups",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createBackup",
+          "endpoint": "/databases/${databaseId}/backups",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "restoreBackup",
+          "endpoint": "/databases/${databaseId}/backups/${backupId}/restore",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteBackup",
+          "endpoint": "/databases/${databaseId}/backups/${backupId}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/backups/page.jsx",
+      "sourceSha": "1115828bbc7920e07e932984466781573681b87b",
+      "route": "/databases/backups",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "getBackups",
+        "createBackup",
+        "deleteBackup",
+        "restoreBackup"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getBackups",
+          "endpoint": "/databases/${databaseId}/backups",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createBackup",
+          "endpoint": "/databases/${databaseId}/backups",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteBackup",
+          "endpoint": "/databases/${databaseId}/backups/${backupId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "restoreBackup",
+          "endpoint": "/databases/${databaseId}/backups/${backupId}/restore",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/compliance/page.jsx",
+      "sourceSha": "a1876dcd8be54849132c2508df1598820a51eae8",
+      "route": "/databases/compliance",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "getDatabaseCompliance",
+        "getAuditLogs",
+        "runComplianceCheck"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseCompliance",
+          "endpoint": "/databases/${databaseId}/compliance",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAuditLogs",
+          "endpoint": "/security/audit-logs${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "runComplianceCheck",
+          "endpoint": "/databases/${databaseId}/compliance/check",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/create/page.jsx",
+      "sourceSha": "4f9860085a386a3fad99eb1ee7ece4cc9df62bff",
+      "route": "/databases/create",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "createDatabase"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "createDatabase",
+          "endpoint": "/databases",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/migrations/page.jsx",
+      "sourceSha": "2f9e38d9461e42ec21c02b56ad0a42e7c237bd4c",
+      "route": "/databases/migrations",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "getDatabaseMigrations",
+        "runMigration"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseMigrations",
+          "endpoint": "/databases/${databaseId}/migrations",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "runMigration",
+          "endpoint": "/databases/${databaseId}/migrations",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/monitoring/page.jsx",
+      "sourceSha": "4be5d9185b83f6e8de16827c5bd9476752ad1f1d",
+      "route": "/databases/monitoring",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "getDatabaseMetrics",
+        "getDatabaseStats",
+        "getDatabaseConnections"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseMetrics",
+          "endpoint": "/databases/${databaseId}/metrics?timeRange=${timeRange}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseStats",
+          "endpoint": "/databases/${databaseId}/stats",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseConnections",
+          "endpoint": "/databases/${databaseId}/connections",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/page.jsx",
+      "sourceSha": "5048a1837be621ec4c8c76053f18621352b74fef",
+      "route": "/databases",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "createDatabase",
+        "deleteDatabase"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createDatabase",
+          "endpoint": "/databases",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteDatabase",
+          "endpoint": "/databases/${id}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/query-builder/page.jsx",
+      "sourceSha": "6e1a71040aedcb8be400a292af7a21e7c26705cb",
+      "route": "/databases/query-builder",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "executeQuery"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "executeQuery",
+          "endpoint": "/databases/${databaseId}/query",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/restore/page.jsx",
+      "sourceSha": "006d5e07cf958c201afe3e8b1e0104a2692895dd",
+      "route": "/databases/restore",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "getBackups",
+        "getAuditLogs",
+        "restoreBackup"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getBackups",
+          "endpoint": "/databases/${databaseId}/backups",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAuditLogs",
+          "endpoint": "/security/audit-logs${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "restoreBackup",
+          "endpoint": "/databases/${databaseId}/backups/${backupId}/restore",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/scaling/page.jsx",
+      "sourceSha": "8043ff796c33b81467a535516da1d994b799ab6b",
+      "route": "/databases/scaling",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "getDatabaseScalingOptions",
+        "getDatabaseDetail",
+        "getDatabaseMetrics",
+        "scaleDatabaseUp"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseScalingOptions",
+          "endpoint": "/databases/${databaseId}/scaling-options",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseDetail",
+          "endpoint": "/databases/${id}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseMetrics",
+          "endpoint": "/databases/${databaseId}/metrics?timeRange=${timeRange}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "scaleDatabaseUp",
+          "endpoint": "/databases/${databaseId}/scale",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/templates/page.jsx",
+      "sourceSha": "fba0c4d950a24a91faef20ef90cd690fb901f3eb",
+      "route": "/databases/templates",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabaseTemplates",
+        "createDatabaseFromTemplate"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabaseTemplates",
+          "endpoint": "/databases/templates",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createDatabaseFromTemplate",
+          "endpoint": "/databases/templates/${templateId}/create",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/databases/users/page.jsx",
+      "sourceSha": "b326f2453b958f84ddf572d8cf2e4d2e60f003b4",
+      "route": "/databases/users",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDatabases",
+        "getDatabaseUsers",
+        "createDatabaseUser",
+        "deleteDatabaseUser"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabaseUsers",
+          "endpoint": "/databases/${databaseId}/users",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createDatabaseUser",
+          "endpoint": "/databases/${databaseId}/users",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteDatabaseUser",
+          "endpoint": "/databases/${databaseId}/users/${userId}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Non-cryptographic randomness"
+      ],
+      "patchPrepared": true,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/deployments/[id]/page.jsx",
+      "sourceSha": "76323f457512b3536f8c5d7cfbe6750efb109166",
+      "route": "/deployments/[id]",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDeployment",
+        "getDeploymentLogs",
+        "redeployDeployment",
+        "request",
+        "cancelDeployment",
+        "rollbackDeployment",
+        "rebuildDeployment"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDeployment",
+          "endpoint": "/deployments/${id}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDeploymentLogs",
+          "endpoint": "/deployments/${id}/logs",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "redeployDeployment",
+          "endpoint": "/deployments/${id}/redeploy",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "cancelDeployment",
+          "endpoint": "/deployments/${id}/cancel",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "rollbackDeployment",
+          "endpoint": "/deployments/${id}/rollback",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "rebuildDeployment",
+          "endpoint": "/deployments/${id}/rebuild",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/deployments/alerts/page.jsx",
+      "sourceSha": "44ad6d45582bf42695132a2019e4c8759ec81acb",
+      "route": "/deployments/alerts",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects",
+        "getAlerts",
+        "createAlert",
+        "deleteAlert",
+        "toggleAlert"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAlerts",
+          "endpoint": "/alerts/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createAlert",
+          "endpoint": "/alerts/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteAlert",
+          "endpoint": "/alerts/${alertId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "toggleAlert",
+          "endpoint": "/alerts/${alertId}/toggle",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/deployments/escalation/page.jsx",
+      "sourceSha": "aea0cc7bca54eb5c0456944468bd27131dd8262d",
+      "route": "/deployments/escalation",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getEscalationPolicies",
+        "getProjects",
+        "getTeams",
+        "createEscalationPolicy",
+        "deleteEscalationPolicy",
+        "toggleEscalationPolicy"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getEscalationPolicies",
+          "endpoint": "/escalation/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getTeams",
+          "endpoint": "/escalation/project/${projectId}/teams",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createEscalationPolicy",
+          "endpoint": "/escalation/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteEscalationPolicy",
+          "endpoint": "/escalation/${policyId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "toggleEscalationPolicy",
+          "endpoint": "/escalation/${policyId}/toggle",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/deployments/incidents/page.jsx",
+      "sourceSha": "88ddb17a74bb3409ba8eea8f6bded4725738c43d",
+      "route": "/deployments/incidents",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getIncidents",
+        "getProjects",
+        "createIncident",
+        "updateIncidentStatus",
+        "resolveIncident"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getIncidents",
+          "endpoint": "/incidents/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createIncident",
+          "endpoint": "/incidents/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "updateIncidentStatus",
+          "endpoint": "/incidents/${incidentId}/status",
+          "httpMethod": "PATCH"
+        },
+        {
+          "method": "resolveIncident",
+          "endpoint": "/incidents/${incidentId}/resolve",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/deployments/metrics/page.jsx",
+      "sourceSha": "c9a775ffcddf6c49003f64be9c25dc661e560ad3",
+      "route": "/deployments/metrics",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getMetrics",
+        "createMetric",
+        "deleteMetric",
+        "toggleMetric"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getMetrics",
+          "endpoint": "/monitoring/metrics/${projectId}?metricType=${metricType}&timeRange=${timeRange}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createMetric",
+          "endpoint": "/metrics/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteMetric",
+          "endpoint": "/metrics/${metricId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "toggleMetric",
+          "endpoint": "/metrics/${metricId}/toggle",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/deployments/page.jsx",
+      "sourceSha": "7ef742fc39263c9c7c24e3b0dfc8582eb06a6f22",
+      "route": "/deployments",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getAllDeployments"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getAllDeployments",
+          "endpoint": "/deployments",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/deployments/reports/page.jsx",
+      "sourceSha": "b430afaeac0a99be0cdca8e192fd2c0d6b702cc9",
+      "route": "/deployments/reports",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects",
+        "getReports",
+        "generateReport",
+        "exportReport"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getReports",
+          "endpoint": "/reports/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "generateReport",
+          "endpoint": "/reports/project/${projectId}/generate",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "exportReport",
+          "endpoint": "/reports/project/${projectId}/export",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/deployments/uptime/page.jsx",
+      "sourceSha": "dbc5e37528dfcead9a4eb295eb4960679173f40d",
+      "route": "/deployments/uptime",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDeployments",
+        "getUptimeMetrics",
+        "getSLAStatus",
+        "getUptimeHistory",
+        "getIncidentHistory"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDeployments",
+          "endpoint": "/deployments/project/${projectId}?limit=${limit}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getUptimeMetrics",
+          "endpoint": "/uptime/project/${projectId}/stats?timeRange=${timeRange}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getSLAStatus",
+          "endpoint": "/uptime/project/${projectId}/sla",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getUptimeHistory",
+          "endpoint": "/uptime/project/${projectId}/history?days=${days}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getIncidentHistory",
+          "endpoint": "/uptime/project/${projectId}/incidents?timeRange=${timeRange}",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/deployments/webhooks/page.jsx",
+      "sourceSha": "018e8e1cb39ddbd6af3fb70e92128c8d1d0c7eea",
+      "route": "/deployments/webhooks",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "createWebhook",
+        "testWebhook",
+        "deleteWebhook",
+        "toggleWebhook"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createWebhook",
+          "endpoint": "/webhooks",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "testWebhook",
+          "endpoint": "/webhooks/${webhookId}/test",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteWebhook",
+          "endpoint": "/webhooks/${webhookId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "toggleWebhook",
+          "endpoint": "/webhooks/${webhookId}/toggle",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/domains/dns/page.jsx",
+      "sourceSha": "403f8cd246338db88c5012f2914c60a48c6d7fde",
+      "route": "/domains/dns",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDomains",
+        "getDNSRecords",
+        "addDNSRecord",
+        "deleteDNSRecord"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDomains",
+          "endpoint": "/domains/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDNSRecords",
+          "endpoint": "/dns/records${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "addDNSRecord",
+          "endpoint": "/dns/records",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteDNSRecord",
+          "endpoint": "/dns/records/${recordId}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/domains/page.jsx",
+      "sourceSha": "35367ffe73e4bc6c29d42ab8391b71811ee23db7",
+      "route": "/domains",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDomains",
+        "createDomain",
+        "deleteDomain"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDomains",
+          "endpoint": "/domains/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createDomain",
+          "endpoint": "/domains/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteDomain",
+          "endpoint": "/domains/${id}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/domains/redirects/page.jsx",
+      "sourceSha": "bd28e223d5126f42a8fd3802ff78e5638a67601f",
+      "route": "/domains/redirects",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDomains",
+        "getDomainRedirects",
+        "updateDomainRedirect",
+        "addDomainRedirect",
+        "deleteDomainRedirect"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDomains",
+          "endpoint": "/domains/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDomainRedirects",
+          "endpoint": "/domains/redirects${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "updateDomainRedirect",
+          "endpoint": "/domains/redirects/${redirectId}",
+          "httpMethod": "PATCH"
+        },
+        {
+          "method": "addDomainRedirect",
+          "endpoint": "/domains/${domainId}/redirects",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteDomainRedirect",
+          "endpoint": "/domains/redirects/${redirectId}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/domains/ssl/page.jsx",
+      "sourceSha": "3d8b024500238975f623a3c07f7a4fb70daae5ed",
+      "route": "/domains/ssl",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDomains",
+        "getSSLCertificates",
+        "uploadSSLCertificate",
+        "deleteSSLCertificate",
+        "renewSSLCertificate"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDomains",
+          "endpoint": "/domains/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getSSLCertificates",
+          "endpoint": "/ssl/certificates${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "uploadSSLCertificate",
+          "endpoint": "/ssl/certificates",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteSSLCertificate",
+          "endpoint": "/ssl/certificates/${certificateId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "renewSSLCertificate",
+          "endpoint": "/ssl/certificates/${certificateId}/renew",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/edge-handlers/page.jsx",
+      "sourceSha": "fde904847929989719a2003389810ecf68dc6ec6",
+      "route": "/edge-handlers",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "request"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/env/page.jsx",
+      "sourceSha": "336e069c3a6a02812466e98fd09d0474c799527a",
+      "route": "/env",
+      "classification": "Store-backed; persistence/enforcement review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": true,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/forms/page.jsx",
+      "sourceSha": "c920f2668cbbf47e5e2171ed5e9dd56b544cd448",
+      "route": "/forms",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getForms",
+        "getFormSubmissions",
+        "createForm",
+        "deleteForm"
+      ],
+      "missingClientMethods": [
+        "getForms",
+        "getFormSubmissions",
+        "createForm",
+        "deleteForm"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/functions/page.jsx",
+      "sourceSha": "86cc3ce78f4afc9b42345532d6741f6e9282218a",
+      "route": "/functions",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects",
+        "getFunctions",
+        "createFunction",
+        "invokeFunction",
+        "toggleFunction",
+        "deleteFunction"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getFunctions",
+          "endpoint": "/functions/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createFunction",
+          "endpoint": "/functions/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "invokeFunction",
+          "endpoint": "/functions/${id}/invoke",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "toggleFunction",
+          "endpoint": "/functions/${functionId}/toggle",
+          "httpMethod": "PATCH"
+        },
+        {
+          "method": "deleteFunction",
+          "endpoint": "/functions/${id}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/help/page.jsx",
+      "sourceSha": "7727d51b2b143ac79d3eaae6c5b22f202612330c",
+      "route": "/help",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/help/articles",
+        "/api/help/faqs",
+        "/api/help/tutorials",
+        "/api/help/search?query=${encodeURIComponent(searchQuery)}"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/analytics/page.jsx",
+      "sourceSha": "209ad4b1dcba7b7e5fa48b3638bca32aa9db8982",
+      "route": "/integrations/analytics",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getAnalyticsOverview",
+        "getAnalyticsHistory",
+        "getPerformanceAnalytics",
+        "getWebhooks",
+        "exportIntegrationAnalytics"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getAnalyticsOverview",
+          "endpoint": "/analytics/overview",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAnalyticsHistory",
+          "endpoint": "/analytics/history${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getPerformanceAnalytics",
+          "endpoint": "/analytics/performance${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "exportIntegrationAnalytics",
+          "endpoint": "/analytics/export/integrations${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/custom/page.jsx",
+      "sourceSha": "104d4b1dd0ea624cbfc01055ea9bdfbc3901d747",
+      "route": "/integrations/custom",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "createCustomIntegration",
+        "deleteCustomIntegration",
+        "testCustomIntegration",
+        "getCustomIntegrationLogs"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/datadog/page.jsx",
+      "sourceSha": "417f8dd735737caaedd3cb428687170405ca2c6a",
+      "route": "/integrations/datadog",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "createWebhook",
+        "deleteWebhook",
+        "getAnalyticsMetrics"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createWebhook",
+          "endpoint": "/webhooks",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteWebhook",
+          "endpoint": "/webhooks/${webhookId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "getAnalyticsMetrics",
+          "endpoint": "/analytics/metrics${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/endpoints/page.jsx",
+      "sourceSha": "95a7f0a5beec6566500061c5f010c0a3b24a5129",
+      "route": "/integrations/endpoints",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "createWebhookEndpoint",
+        "deleteWebhookEndpoint",
+        "testWebhookEndpoint",
+        "getWebhookEndpointLogs"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/gateway/page.jsx",
+      "sourceSha": "5963bc058ca4f8380731c9846e48d2452dab4bb4",
+      "route": "/integrations/gateway",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "createGatewayEndpoint",
+        "deleteGatewayEndpoint",
+        "configureRateLimiting"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/git/page.jsx",
+      "sourceSha": "4eae79f9ff260f795831a97e75bf27ace4cf6a95",
+      "route": "/integrations/git",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects",
+        "getGitHubConnectionStatus",
+        "getGitHubRepositories",
+        "configureRepository"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getGitHubConnectionStatus",
+          "endpoint": "/github-provider/status",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getGitHubRepositories",
+          "endpoint": "/github-provider/repositories",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "configureRepository",
+          "endpoint": "/deployments/repository/${projectId}",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/grafana/page.jsx",
+      "sourceSha": "6557f7c62f40932c62f22779204b2ed505d3b2db",
+      "route": "/integrations/grafana",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "createWebhook",
+        "deleteWebhook"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createWebhook",
+          "endpoint": "/webhooks",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteWebhook",
+          "endpoint": "/webhooks/${webhookId}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/newrelic/page.jsx",
+      "sourceSha": "7e55e478ce2e5197c169b9c38319a082fc4098f1",
+      "route": "/integrations/newrelic",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "createWebhook",
+        "deleteWebhook",
+        "getPerformanceAnalytics"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createWebhook",
+          "endpoint": "/webhooks",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteWebhook",
+          "endpoint": "/webhooks/${webhookId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "getPerformanceAnalytics",
+          "endpoint": "/analytics/performance${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/page.jsx",
+      "sourceSha": "87fe91c56caca62e321c75b4008857860f9cf4a8",
+      "route": "/integrations",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/prometheus/page.jsx",
+      "sourceSha": "a9391e18d0864345e9b82448fb0204024c1e053c",
+      "route": "/integrations/prometheus",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "createWebhook",
+        "deleteWebhook",
+        "getAnalyticsMetrics"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createWebhook",
+          "endpoint": "/webhooks",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteWebhook",
+          "endpoint": "/webhooks/${webhookId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "getAnalyticsMetrics",
+          "endpoint": "/analytics/metrics${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/integrations/webhooks/page.jsx",
+      "sourceSha": "11a92268d7c7fec60bd079bd5e07a1348c275e26",
+      "route": "/integrations/webhooks",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "updateWebhook",
+        "createWebhook",
+        "testWebhook",
+        "deleteWebhook"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "updateWebhook",
+          "endpoint": "/webhooks/${webhookId}",
+          "httpMethod": "PATCH"
+        },
+        {
+          "method": "createWebhook",
+          "endpoint": "/webhooks",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "testWebhook",
+          "endpoint": "/webhooks/${webhookId}/test",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteWebhook",
+          "endpoint": "/webhooks/${webhookId}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/isr-config/page.jsx",
+      "sourceSha": "4ed29dad04883b76a9d11cc858a4c8cc1166bdd8",
+      "route": "/isr-config",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/isr/pages",
+        "/api/isr/pages",
+        "/api/isr/pages/${id}",
+        "/api/isr/pages/${id}/revalidate"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/media-cdn/page.jsx",
+      "sourceSha": "3dbb635f4739892d170ebd1acc02f2bdc42e3648",
+      "route": "/media-cdn",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getMediaAssets",
+        "uploadMediaAsset",
+        "optimizeMediaAsset",
+        "purgeMediaCache",
+        "deleteMediaAsset"
+      ],
+      "missingClientMethods": [
+        "getMediaAssets",
+        "uploadMediaAsset",
+        "optimizeMediaAsset",
+        "purgeMediaCache",
+        "deleteMediaAsset"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/monitoring/alerts/page.jsx",
+      "sourceSha": "c0025c039426caddcec8240b3275ae60b5fe5291",
+      "route": "/monitoring/alerts",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getAlerts",
+        "createAlert",
+        "updateAlert",
+        "deleteAlert"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getAlerts",
+          "endpoint": "/alerts/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createAlert",
+          "endpoint": "/alerts/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "updateAlert",
+          "endpoint": "/alerts/${alertId}",
+          "httpMethod": "PATCH"
+        },
+        {
+          "method": "deleteAlert",
+          "endpoint": "/alerts/${alertId}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/monitoring/incidents/page.jsx",
+      "sourceSha": "c4c97baac184b83a3c885ae3c40d081d4f8f0c19",
+      "route": "/monitoring/incidents",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getIncidents",
+        "createIncident",
+        "resolveIncident",
+        "updateIncidentStatus"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getIncidents",
+          "endpoint": "/incidents/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createIncident",
+          "endpoint": "/incidents/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "resolveIncident",
+          "endpoint": "/incidents/${incidentId}/resolve",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "updateIncidentStatus",
+          "endpoint": "/incidents/${incidentId}/status",
+          "httpMethod": "PATCH"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/monitoring/metrics/page.jsx",
+      "sourceSha": "05797b89bc94615927b0bca945634416b4e26d50",
+      "route": "/monitoring/metrics",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects",
+        "getAnalyticsOverview",
+        "getMetricsSummary"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAnalyticsOverview",
+          "endpoint": "/analytics/overview",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getMetricsSummary",
+          "endpoint": "/monitoring/summary/${projectId}?timeRange=${timeRange}",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/monitoring/page.jsx",
+      "sourceSha": "732f3e7f31a836267c084702d3048d9b12e78e2a",
+      "route": "/monitoring",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "getAlerts",
+        "getUptimeData",
+        "createAlert",
+        "deleteAlert"
+      ],
+      "missingClientMethods": [
+        "getUptimeData"
+      ],
+      "endpointHints": [
+        {
+          "method": "getAlerts",
+          "endpoint": "/alerts/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createAlert",
+          "endpoint": "/alerts/project/${projectId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteAlert",
+          "endpoint": "/alerts/${alertId}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Optional API invocation",
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/multi-region/page.jsx",
+      "sourceSha": "190d545a5ca92e1d36e4e6cdb3657520406e963f",
+      "route": "/multi-region",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/multi-region/regions",
+        "/api/multi-region/deployments",
+        "/api/multi-region/health",
+        "/api/multi-region/regions",
+        "/api/multi-region/traffic/${regionId}",
+        "/api/multi-region/traffic",
+        "/api/multi-region/regions/${regionId}/toggle",
+        "/api/multi-region/deploy"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/projects/[id]/github-setup/page.jsx",
+      "sourceSha": "d5fc2e917df85095e4c8339fbe273823e0d0ca03",
+      "route": "/projects/[id]/github-setup",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getDeploymentConfig",
+        "setupDeploymentWebhook",
+        "updateDeploymentSettings"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getDeploymentConfig",
+          "endpoint": "/projects/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "setupDeploymentWebhook",
+          "endpoint": "/github-provider/repositories/${owner}/${repo}/webhooks/deployment",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "updateDeploymentSettings",
+          "endpoint": "/projects/${projectId}/settings",
+          "httpMethod": "PATCH"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/projects/[id]/page.jsx",
+      "sourceSha": "8fcb5823c526aff221457717308e7ba6f2cad02f",
+      "route": "/projects/[id]",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProject",
+        "getDeployments",
+        "request",
+        "createDeployment"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProject",
+          "endpoint": "/projects/${id}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDeployments",
+          "endpoint": "/deployments/project/${projectId}?limit=${limit}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createDeployment",
+          "endpoint": "/deployments",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/projects/create/page.jsx",
+      "sourceSha": "26036ec2de6308202603297af408c7cd183121a3",
+      "route": "/projects/create",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "createProject"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "createProject",
+          "endpoint": "/projects",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/projects/page.jsx",
+      "sourceSha": "6d983e22797c1d633b25911a343856712a190d2f",
+      "route": "/projects",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/providers/page.jsx",
+      "sourceSha": "e6b4f8723287d434c8acdb538074914b8a4f0568",
+      "route": "/providers",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": true,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/services/page.jsx",
+      "sourceSha": "330499dbc44b0c233637b2a87934b0d0bf7229a1",
+      "route": "/services",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/settings/appearance/page.jsx",
+      "sourceSha": "1db7e973901651fc80e15762dc4f23a5a18bd32b",
+      "route": "/settings/appearance",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/settings/notifications/page.jsx",
+      "sourceSha": "f8fec72e21dcebd7349664b28e3cfe5ddfa3df3e",
+      "route": "/settings/notifications",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "request"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/settings/page.jsx",
+      "sourceSha": "bc945ee684b3f4513c00126e3bf6dddde01e5619",
+      "route": "/settings",
+      "classification": "Store-backed; persistence/enforcement review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": true,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/settings/profile/page.jsx",
+      "sourceSha": "bf332d9ad3a13d0b94c1dd5a15f4df00105f59a3",
+      "route": "/settings/profile",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getCurrentUser",
+        "getProjects",
+        "getDatabases",
+        "getAllDeployments",
+        "updateProfile"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getCurrentUser",
+          "endpoint": "/auth/profile",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getDatabases",
+          "endpoint": "/databases${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAllDeployments",
+          "endpoint": "/deployments",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "updateProfile",
+          "endpoint": "/auth/profile",
+          "httpMethod": "PUT"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/settings/security/page.jsx",
+      "sourceSha": "5ebc17a116725a751a2bb323a288f3a6dc179f24",
+      "route": "/settings/security",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "request"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/settings/services/page.jsx",
+      "sourceSha": "91f3293fa41600f00498ab40c8645cef8f7da3ec",
+      "route": "/settings/services",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/split-testing/page.jsx",
+      "sourceSha": "1c919ce123e126acf1a01c0bd99fa217ca98c16a",
+      "route": "/split-testing",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/split-tests",
+        "/api/split-tests",
+        "/api/split-tests/${testId}/metrics",
+        "/api/split-tests/${testId}/variants/${variantName}"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/ssh-access/page.jsx",
+      "sourceSha": "862c7706ce00e1c4e0deb33e1b2c13b003b57322",
+      "route": "/ssh-access",
+      "classification": "Raw fetch/proxy integration review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [
+        "/api/ssh/keys",
+        "/api/services",
+        "/api/ssh/keys",
+        "/api/ssh/connect/${serviceId}"
+      ],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/status/page.jsx",
+      "sourceSha": "9958ce13652821c88b2018bba68be5ceb2ac591c",
+      "route": "/status",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "request"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/activity/page.jsx",
+      "sourceSha": "134240211d2eecc0e15e7bb05995070c1f034940",
+      "route": "/team/activity",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects",
+        "getTeamActivityLogs"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getTeamActivityLogs",
+          "endpoint": "/team/activity-logs${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/analytics/page.jsx",
+      "sourceSha": "831e7b48c1c17f0c2e8702654b5b6e23dc9cb8b0",
+      "route": "/team/analytics",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects",
+        "getTeamMembers",
+        "getTeamActivityLogs",
+        "getAllDeployments",
+        "getNodeStats"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getTeamMembers",
+          "endpoint": "/team/project/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getTeamActivityLogs",
+          "endpoint": "/team/activity-logs${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getAllDeployments",
+          "endpoint": "/deployments",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getNodeStats",
+          "endpoint": "/nodes/stats",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/api-keys/page.jsx",
+      "sourceSha": "04c5115920c3f49fec0072260ddbdab202fcd3b0",
+      "route": "/team/api-keys",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getApiTokens",
+        "createApiToken",
+        "revokeApiToken",
+        "rotateApiToken"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getApiTokens",
+          "endpoint": "/api-tokens${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createApiToken",
+          "endpoint": "/api-tokens",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "revokeApiToken",
+          "endpoint": "/api-tokens/${tokenId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "rotateApiToken",
+          "endpoint": "/api-tokens/${tokenId}/rotate",
+          "httpMethod": "PATCH"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/audit-log/page.jsx",
+      "sourceSha": "d1a300a4616f7168a77b911ae2c0d0507476f28d",
+      "route": "/team/audit-log",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getAuditLogs"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getAuditLogs",
+          "endpoint": "/security/audit-logs${query ? ",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/billing-contacts/page.jsx",
+      "sourceSha": "0ded6485a2c37dde9d67fcabe6883b542a64e97a",
+      "route": "/team/billing-contacts",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getBillingContacts",
+        "createBillingContact",
+        "updateBillingContact",
+        "deleteBillingContact"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getBillingContacts",
+          "endpoint": "/team/billing-contacts/${organizationId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createBillingContact",
+          "endpoint": "/team/billing-contacts/${organizationId}",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "updateBillingContact",
+          "endpoint": "/team/billing-contacts/${organizationId}/${id}",
+          "httpMethod": "PUT"
+        },
+        {
+          "method": "deleteBillingContact",
+          "endpoint": "/team/billing-contacts/${organizationId}/${id}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/groups/page.jsx",
+      "sourceSha": "dc7db8ace53a7a4b962859a67e6681c23c95831b",
+      "route": "/team/groups",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getTeamGroups",
+        "createTeamGroup",
+        "deleteTeamGroup",
+        "updateTeamGroup",
+        "addTeamGroupMembers"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getTeamGroups",
+          "endpoint": "/team/groups/team/${teamId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createTeamGroup",
+          "endpoint": "/team/groups",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteTeamGroup",
+          "endpoint": "/team/groups/${groupId}",
+          "httpMethod": "DELETE"
+        },
+        {
+          "method": "updateTeamGroup",
+          "endpoint": "/team/groups/${groupId}",
+          "httpMethod": "PUT"
+        },
+        {
+          "method": "addTeamGroupMembers",
+          "endpoint": "/team/groups/${groupId}/members",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/invitations/page.jsx",
+      "sourceSha": "8f7d76f5e6c3178602308de8d4097f063179193c",
+      "route": "/team/invitations",
+      "classification": "Local/static behavior review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [
+        "Static/state-seeded operational content candidate"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/invites/page.jsx",
+      "sourceSha": "a9fcceca5aa94a0a7332b10ef4f6d9f9d962c036",
+      "route": "/team/invites",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getTeamInvitations",
+        "resendInvitation",
+        "cancelInvitation"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getTeamInvitations",
+          "endpoint": "/team/invitations/pending/${projectId}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "resendInvitation",
+          "endpoint": "/team/invitations/${invitationId}/resend",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "cancelInvitation",
+          "endpoint": "/team/invitations/${invitationId}/revoke",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/members/page.jsx",
+      "sourceSha": "7fce3c9f849ea51923483e682917784511906ee4",
+      "route": "/team/members",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "request"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/organization/page.jsx",
+      "sourceSha": "05a56e0d4e69c68a9c75b37379f30fa9d3cd0f10",
+      "route": "/team/organization",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "updateOrgSettings",
+        "updateBrandingSettings",
+        "updateContactInfo"
+      ],
+      "missingClientMethods": [
+        "updateOrgSettings",
+        "updateBrandingSettings",
+        "updateContactInfo"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/page.jsx",
+      "sourceSha": "d12432a5fd5717bd8c2f7b668471da7c28e2284b",
+      "route": "/team",
+      "classification": "Store-backed; persistence/enforcement review",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/roles/page.jsx",
+      "sourceSha": "933137d3249d074235c54317054039af4a75c28d",
+      "route": "/team/roles",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getProjects",
+        "getTeamRoles"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getProjects",
+          "endpoint": "/projects",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getTeamRoles",
+          "endpoint": "/team/${projectId}/roles",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/team/sso/page.jsx",
+      "sourceSha": "c17a748bee8e92ab4468eb1c3400932e260fa59c",
+      "route": "/team/sso",
+      "classification": "Missing client methods",
+      "clientReferences": [
+        "toggleSSOProvider",
+        "deleteSSOProvider",
+        "createSSOProvider"
+      ],
+      "missingClientMethods": [
+        "toggleSSOProvider",
+        "deleteSSOProvider",
+        "createSSOProvider"
+      ],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(app)/webhooks/page.jsx",
+      "sourceSha": "50d521ffffdec2fc242842fdffdbdcce17c05845",
+      "route": "/webhooks",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "getWebhooks",
+        "getWebhookDeliveries",
+        "createWebhook",
+        "deleteWebhook"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getWebhooks",
+          "endpoint": "/webhooks${query}",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "getWebhookDeliveries",
+          "endpoint": "/webhooks/${webhookId}/deliveries${query ? ",
+          "httpMethod": "GET"
+        },
+        {
+          "method": "createWebhook",
+          "endpoint": "/webhooks",
+          "httpMethod": "POST"
+        },
+        {
+          "method": "deleteWebhook",
+          "endpoint": "/webhooks/${webhookId}",
+          "httpMethod": "DELETE"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [
+        "Legacy localStorage project selection"
+      ],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(auth)/forgot-password/page.jsx",
+      "sourceSha": "fd5318eb18aa07a2f77112ceac11de01d2b0b566",
+      "route": "/forgot-password",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "forgotPassword"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "forgotPassword",
+          "endpoint": "/auth/forgot-password",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/(auth)/reset-password/page.jsx",
+      "sourceSha": "4e17b0604dfb987fe90ed34f4f891f45cfe4d6f9",
+      "route": "/reset-password",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "resetPassword"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "resetPassword",
+          "endpoint": "/auth/reset-password",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/docs/page.jsx",
+      "sourceSha": "812897d9dc39883cb217eb3b25f2461d0a0ee7a6",
+      "route": "/docs",
+      "classification": "Presentation/navigation",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/login/auth-callback/page.jsx",
+      "sourceSha": "368854aa728216b206cd1f93301d3fb56b993a4f",
+      "route": "/login/auth-callback",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "request",
+        "setToken",
+        "setRefreshToken",
+        "getCurrentUser"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "getCurrentUser",
+          "endpoint": "/auth/profile",
+          "httpMethod": "GET"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/login/auth-error/page.jsx",
+      "sourceSha": "30b9e4c0efca527b991b5278293d5c76f78cfd79",
+      "route": "/login/auth-error",
+      "classification": "Presentation/navigation",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/login/error/page.jsx",
+      "sourceSha": "a484939b7203f4d8201cff30cea871a924c890d8",
+      "route": "/login/error",
+      "classification": "Presentation/navigation",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/login/page.jsx",
+      "sourceSha": "8d148b81fea10fb81ff6cd697b0f45e66d9b2a4d",
+      "route": "/login",
+      "classification": "Delegated authentication component",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/login/signup/page.jsx",
+      "sourceSha": "d286e355af7bf52c28b70340dc668dad85f0bc99",
+      "route": "/login/signup",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "signup",
+        "startGoogleOAuth",
+        "startGitHubOAuth"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [
+        {
+          "method": "signup",
+          "endpoint": "/auth/signup",
+          "httpMethod": "POST"
+        }
+      ],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/page.jsx",
+      "sourceSha": "fb4fdbd5a18b6360868f02f5014a4d639e89d175",
+      "route": "/",
+      "classification": "Presentation/navigation",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/signup/page.jsx",
+      "sourceSha": "efed1c64191dcdd5a1703acaf360a9aa52c73343",
+      "route": "/signup",
+      "classification": "Delegated authentication component",
+      "clientReferences": [],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    },
+    {
+      "source": "app/verify-email/page.jsx",
+      "sourceSha": "ca82abd8bb94c84d14077dcc34dc94dc58deccc8",
+      "route": "/verify-email",
+      "classification": "API referenced; runtime acceptance pending",
+      "clientReferences": [
+        "request"
+      ],
+      "missingClientMethods": [],
+      "endpointHints": [],
+      "rawFetch": [],
+      "flags": [],
+      "patchPrepared": false,
+      "runtimeVerified": false
+    }
+  ],
+  "logicChecks": [
+    "Missing owner rejected before storage access",
+    "Invalid/unbounded time windows rejected",
+    "Owned-project scope, observed counts, null telemetry and UTC history confirmed with controlled storage"
+  ],
+  "runtimeChecksExecuted": false
+}

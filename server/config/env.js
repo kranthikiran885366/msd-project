@@ -37,7 +37,7 @@ const config = {
   },
 
   // ── Auth ──────────────────────────────────────────────────────────────────
-  jwtSecret: process.env.JWT_SECRET || 'change-this-secret',
+  jwtSecret: process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? require('crypto').randomBytes(48).toString('hex') : ''),
 
   // ── Worker / deployment ───────────────────────────────────────────────────
   deploymentStrategy: process.env.DEPLOYMENT_STRATEGY || 'internal',

@@ -410,7 +410,7 @@ export default function NewRelicIntegrationPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold">{insight.title}</h4>
-                          <Badge className={severityColors[insight.severity]} className="text-xs">
+                          <Badge className={`${severityColors[insight.severity]} text-xs`}>
                             {insight.severity}
                           </Badge>
                         </div>

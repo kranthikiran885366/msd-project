@@ -2,16 +2,21 @@ const express = require('express');
 const router = express.Router();
 const portManagementService = require('../services/portManagementService');
 const { validateRequest } = require('../middleware/validation');
+const { workerClaim } = require('../middleware/workerClaim');
+
+router.use(require('../middleware/internalAuth'));
 
 /**
  * POST /api/ports/allocate
  * Allocate a port for a deployment
  */
-router.post('/allocate', validateRequest(['deploymentId']), async (req, res) => {
+router.post('/allocate', validateRequest(['deploymentId']), workerClaim, async (req, res) => {
     try {
         const { deploymentId, preferredPort, subdomain } = req.body;
+        if (!['building', 'deploying'].includes(req.workerDeployment.status)) return res.status(409).json({ error: 'Deployment is not active' });
 
         const mapping = await portManagementService.allocatePort(deploymentId, {
+            nodeId: req.workerDeployment.workerNodeId,
             preferredPort,
             subdomain,
         });
@@ -65,31 +70,7 @@ router.get('/:deploymentId', async (req, res) => {
  * POST /api/ports/:deploymentId/release
  * Release a port
  */
-router.post('/:deploymentId/release', async (req, res) => {
-    try {
-        const { deploymentId } = req.params;
-        const mapping = await portManagementService.releasePort(deploymentId);
-
-        if (!mapping) {
-            return res.status(404).json({
-                success: false,
-                error: 'Port mapping not found'
-            });
-        }
-
-        res.json({
-            success: true,
-            message: 'Port released',
-            mapping
-        });
-    } catch (error) {
-        console.error('[v0] Error releasing port:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
+router.post('/:deploymentId/release', (req, res) => res.status(410).json({ error: 'Use the claimed deployment cleanup acknowledgement after stopping its runtime' }));
 
 /**
  * GET /api/ports

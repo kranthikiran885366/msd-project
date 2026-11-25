@@ -1,158 +1,46 @@
-"use client"
+'use client';
+import Link from 'next/link';
+import {useCallback,useState} from 'react';
+import apiClient from '@/lib/api-client';
+import {useResource} from '@/hooks/use-resource';
+import {PageHeader,ErrorNotice} from '@/components/product/brand';
 
-import { useState } from "react"
-import { useAppStore } from "@/store/use-app-store"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Copy, Eye, EyeOff, Trash2, Key } from "lucide-react"
-
-export default function EnvPage() {
-  const { envVars, addEnv, deleteEnv } = useAppStore()
-  const [name, setName] = useState("")
-  const [value, setValue] = useState("")
-  const [scope, setScope] = useState("prod")
-  const [loading, setLoading] = useState(false)
-  const [showValue, setShowValue] = useState({})
-
-  async function add() {
-    if (!name.trim() || !value.trim()) return
-    setLoading(true)
-    try {
-      addEnv({ name, value, scope })
-      setName("")
-      setValue("")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function copy(val) {
-    try {
-      await navigator.clipboard.writeText(val)
-      alert("Copied!")
-    } catch (err) {
-      console.error("Copy failed:", err)
-    }
-  }
-
-  const scopeConfig = {
-    prod: { color: "bg-red-500", icon: "🔴", label: "Production" },
-    staging: { color: "bg-yellow-500", icon: "🟡", label: "Staging" },
-    dev: { color: "bg-blue-500", icon: "🔵", label: "Development" },
-  }
-
-  return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Environment Variables</h1>
-        <p className="text-muted-foreground">Manage secrets and configuration across environments</p>
-      </div>
-
-      <Card>
-        <CardContent className="p-6">
-          <h3 className="font-semibold mb-4">Add Environment Variable</h3>
-          <div className="grid gap-4 sm:grid-cols-5">
-            <div>
-              <label className="text-sm font-medium">Name</label>
-              <input
-                className="border rounded-lg px-4 py-2 w-full mt-2 bg-background font-mono"
-                placeholder="API_KEY"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Value</label>
-              <input
-                className="border rounded-lg px-4 py-2 w-full mt-2 bg-background"
-                placeholder="your-secret-value"
-                type="password"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Scope</label>
-              <select
-                className="border rounded-lg px-4 py-2 w-full mt-2 bg-background"
-                value={scope}
-                onChange={(e) => setScope(e.target.value)}
-              >
-                <option value="prod">Production</option>
-                <option value="staging">Staging</option>
-                <option value="dev">Development</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <Button onClick={add} disabled={loading} className="w-full">
-                {loading ? "Adding..." : "Add"}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-3">
-        {envVars.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center text-muted-foreground">
-              <Key className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p>No environment variables set</p>
-              <p className="text-sm mt-2">Add variables to configure your applications</p>
-            </CardContent>
-          </Card>
-        ) : (
-          envVars.map((e) => {
-            const config = scopeConfig[e.scope]
-            const isShown = showValue[e.id]
-            return (
-              <Card key={e.id} className="hover:shadow-sm transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Badge className={`${config.color} text-white whitespace-nowrap`}>{config.label}</Badge>
-                      <div className="min-w-0">
-                        <div className="font-mono font-semibold text-sm">{e.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          Created {new Date(e.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowValue({ ...showValue, [e.id]: !isShown })}
-                        title={isShown ? "Hide value" : "Show value"}
-                      >
-                        {isShown ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => copy(e.value)} title="Copy value">
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteEnv(e.id)}
-                        className="text-destructive hover:bg-destructive/10"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  {isShown && (
-                    <div className="mt-3 p-2 bg-muted/50 rounded font-mono text-xs break-all text-muted-foreground">
-                      {e.value}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })
-        )}
-      </div>
-    </div>
-  )
+export default function EnvironmentPage(){
+ const [selection,setSelection]=useState(''),[busy,setBusy]=useState(false),[actionError,setActionError]=useState(null),[notice,setNotice]=useState('');
+ const loadProjects=useCallback(()=>apiClient.getProjects(),[]);
+ const projects=useResource(loadProjects);
+ const projectList=Array.isArray(projects.data)?projects.data:[];
+ const projectId=selection||projectList[0]?._id||'';
+ const loadVariables=useCallback(async()=>{
+  if(!projectId)return [];
+  const result=await apiClient.request('/projects/'+encodeURIComponent(projectId)+'/env');
+  return result.variables;
+ },[projectId]);
+ const variables=useResource(loadVariables);
+ async function save(event){
+  event.preventDefault();const form=event.currentTarget;const fields=new FormData(form);
+  setBusy(true);setActionError(null);setNotice('');
+  try{
+   const key=String(fields.get('key')||'').trim();
+   await apiClient.request('/projects/'+encodeURIComponent(projectId)+'/env/'+encodeURIComponent(key),{method:'PUT',body:JSON.stringify({value:String(fields.get('value')||''),isSecret:true})});
+   form.reset();setNotice('Variable saved. It will apply to subsequent deployments.');await variables.refresh();
+  }catch(error){setActionError(error);}finally{setBusy(false);}
+ }
+ async function remove(key){
+  if(!window.confirm('Delete '+key+' from this project?'))return;
+  setBusy(true);setActionError(null);setNotice('');
+  try{await apiClient.request('/projects/'+encodeURIComponent(projectId)+'/env/'+encodeURIComponent(key),{method:'DELETE'});setNotice('Variable deleted. Existing running deployments are unchanged.');await variables.refresh();}
+  catch(error){setActionError(error);}finally{setBusy(false);}
+ }
+ return <div className="cd-page">
+  <PageHeader eyebrow="PROJECT CONFIGURATION" title="Environment variables" description="Manage project configuration and secrets for subsequent deployments."/>
+  <ErrorNotice error={projects.error||variables.error||actionError} retry={()=>{projects.refresh();variables.refresh();}}/>
+  {notice&&<p role="status">{notice}</p>}
+  {projects.loading?<p role="status">Loading projects…</p>:!projectList.length?<div className="cd-empty">Create a project before adding variables. <Link href="/projects/create">Create project</Link></div>:<>
+   <section className="cd-panel"><div className="cd-form-fields"><label>Project<select value={projectId} disabled={busy} onChange={event=>{setSelection(event.target.value);setNotice('');setActionError(null);}}>{projectList.map(project=><option key={project._id} value={project._id}>{project.name}</option>)}</select></label>
+    <form onSubmit={save}><div className="cd-form-pair"><label>Variable name<input name="key" required pattern="[A-Za-z_][A-Za-z0-9_]*" autoComplete="off" maxLength={256}/></label><label>Secret value<input name="value" type="password" required autoComplete="new-password"/></label></div><button className="cd-button" disabled={busy||variables.loading}>{busy?'Saving…':'Save variable'}</button></form>
+   </div></section>
+   <section className="cd-panel"><div className="cd-panel-heading"><h2>Project variables</h2></div>{variables.loading?<p role="status">Loading variables…</p>:Array.isArray(variables.data)&&variables.data.length?<table><thead><tr><th>Name</th><th>Value</th><th>Action</th></tr></thead><tbody>{variables.data.map(variable=><tr key={variable.key}><td><code>{variable.key}</code></td><td>{variable.isSecret?'••••••••':variable.value}</td><td><button disabled={busy} className="cd-text-link" onClick={()=>remove(variable.key)}>Delete</button></td></tr>)}</tbody></table>:!variables.error&&<p>No variables are configured for this project.</p>}</section>
+  </>}
+ </div>;
 }

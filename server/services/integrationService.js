@@ -178,22 +178,11 @@ const integrationService = {
       return { success: false, error: 'Datadog not connected' };
     }
 
-    try {
-      // Export metrics logic here
-      return { success: true, message: 'Metrics exported successfully' };
-    } catch (error) {
-      return { success: false, error: 'Failed to export metrics' };
-    }
+    throw Object.assign(new Error('Datadog metric export is not configured'), { status: 501 });
   },
 
-  // Analytics Integration
-  async exportIntegrationAnalytics(userId, options) {
-    try {
-      // Export analytics logic here
-      return { success: true, message: 'Analytics exported successfully' };
-    } catch (error) {
-      return { success: false, error: 'Failed to export analytics' };
-    }
+  async exportIntegrationAnalytics() {
+    throw Object.assign(new Error('Integration analytics export is not configured'), { status: 501 });
   },
 
   // Generic integration methods

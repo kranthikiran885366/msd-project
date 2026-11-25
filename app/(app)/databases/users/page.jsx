@@ -154,8 +154,14 @@ export default function DatabaseUsersPage() {
   const generatePassword = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
     let password = '';
-    for (let i = 0; i < 16; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    const cutoff = 256 - (256 % chars.length);
+    const bytes = new Uint8Array(64);
+    while (password.length < 16) {
+      crypto.getRandomValues(bytes);
+      for (const value of bytes) {
+        if (value < cutoff) password += chars[value % chars.length];
+        if (password.length === 16) break;
+      }
     }
     setUserForm({ ...userForm, password });
   };

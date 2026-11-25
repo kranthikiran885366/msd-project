@@ -27,9 +27,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(
     new GoogleStrategy(
       {
+        state: true,
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: `${process.env.API_URL || "http://localhost:3001"}/auth/google/callback`,
+        callbackURL: `${process.env.OAUTH_PUBLIC_URL || process.env.CLIENT_URL || process.env.API_URL || "http://localhost:5000"}/auth/google/callback`,
       },
       (accessToken, refreshToken, profile, done) => {
         // Pass raw profile to controller — no DB writes here
@@ -44,9 +45,10 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   passport.use(
     new GitHubStrategy(
       {
+        state: true,
         clientID: process.env.GITHUB_CLIENT_ID,
         clientSecret: process.env.GITHUB_CLIENT_SECRET,
-        callbackURL: `${process.env.API_URL || "http://localhost:3001"}/auth/github/callback`,
+        callbackURL: `${process.env.OAUTH_PUBLIC_URL || process.env.CLIENT_URL || process.env.API_URL || "http://localhost:5000"}/auth/github/callback`,
       },
       (accessToken, refreshToken, profile, done) => {
         // Pass raw profile + token to controller — no DB writes here

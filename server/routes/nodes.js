@@ -5,6 +5,8 @@ const nodeManagementService = require('../services/nodeManagementService');
 const { validateRequest } = require('../middleware/validation');
 const internalAuth = require('../middleware/internalAuth');
 
+router.use(require('../middleware/internalAuth'));
+
 /**
  * POST /api/nodes/register
  * Register a worker node. Called by runner-agent on startup.

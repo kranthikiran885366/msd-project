@@ -36,23 +36,16 @@ class WebhookManager {
     const secret = process.env[`${provider.toUpperCase()}_WEBHOOK_SECRET`];
     if (!secret) return false;
 
-    switch (provider) {
-      case 'github':
-        const hmac = crypto.createHmac('sha256', secret);
-        const digest = 'sha256=' + hmac.update(JSON.stringify(payload)).digest('hex');
-        return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
-        
-      case 'gitlab':
-        return signature === secret;
-        
-      case 'bitbucket':
-        const hmacBB = crypto.createHmac('sha256', secret);
-        const digestBB = hmacBB.update(JSON.stringify(payload)).digest('hex');
-        return signature === digestBB;
-        
-      default:
-        return false;
-    }
+    if (typeof signature !== 'string') return false;
+    const bytes = Buffer.isBuffer(payload) ? payload : null;
+    if (!bytes) return false; // HMAC authenticates received bytes, never reserialized JSON.
+    let expected;
+    if (provider === 'github') expected = 'sha256=' + crypto.createHmac('sha256', secret).update(bytes).digest('hex');
+    else if (provider === 'gitlab') expected = secret;
+    else if (provider === 'bitbucket') expected = crypto.createHmac('sha256', secret).update(bytes).digest('hex');
+    else return false;
+    const actual = Buffer.from(signature), target = Buffer.from(expected);
+    return actual.length === target.length && crypto.timingSafeEqual(actual, target);
   }
 
   async createGithubWebhook(token, owner, repo, webhookUrl) {

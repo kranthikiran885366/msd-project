@@ -11,7 +11,7 @@ const { validateRequest }= require('../middleware/validation');
  * POST /api/jobs/queue
  * Queue a new deployment job (authenticated user action).
  */
-router.post('/queue', authMiddleware, validateRequest(['deploymentId']), async (req, res) => {
+router.post('/queue', authMiddleware, require('../middleware/resourceOwnership').authorizeDeployment, validateRequest(['deploymentId']), async (req, res) => {
     try {
         const { deploymentId, options } = req.body;
 
@@ -28,7 +28,7 @@ router.post('/queue', authMiddleware, validateRequest(['deploymentId']), async (
             success: true,
             message: 'Job queued',
             jobId: job.id,
-            job
+            job: { id: job.id }
         });
     } catch (error) {
         console.error('[v0] Error queuing job:', error);
@@ -44,42 +44,13 @@ router.post('/queue', authMiddleware, validateRequest(['deploymentId']), async (
  * Pull one available job for a worker node (internal — worker auth required).
  * Stamps assignedNodeId to prevent double-dispatch.
  */
-router.get('/pull', internalAuth, validateRequest(['nodeId']), async (req, res) => {
-    try {
-        const { nodeId } = req.query;
-        const pendingJobs = await jobQueueService.getPendingJobs();
-
-        // Serve jobs either already assigned to this node or currently unassigned.
-        const candidate = pendingJobs.find((j) => {
-            const assignedNodeId = j.data?.assignedNodeId;
-            return !assignedNodeId || assignedNodeId === nodeId;
-        });
-
-        if (!candidate) {
-            return res.status(404).json({ success: false, message: 'No jobs available' });
-        }
-
-        const job = candidate;
-        if (!job.data?.assignedNodeId) {
-            await job.updateData({ ...job.data, assignedNodeId: nodeId, assignedAt: new Date() }).catch(() => {});
-        }
-
-        res.json({
-            success: true,
-            jobs: [{ id: job.id, deploymentId: job.data.deploymentId, data: job.data }],
-            count: 1
-        });
-    } catch (error) {
-        console.error('[jobs] Pull error:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
+router.get('/pull', internalAuth, (req, res) => res.status(410).json({ error: 'Use the BullMQ worker consumer; legacy HTTP dispatch is disabled' }));
 
 /**
  * GET /api/jobs/:jobId
  * Get job status and progress
  */
-router.get('/:jobId', async (req, res) => {
+router.get('/:jobId', internalAuth, async (req, res) => {
     try {
         const { jobId } = req.params;
         const status = await jobQueueService.getJobStatus(jobId);
@@ -108,7 +79,7 @@ router.get('/:jobId', async (req, res) => {
  * GET /api/jobs
  * Get all jobs with optional filters
  */
-router.get('/', async (req, res) => {
+router.get('/', internalAuth, async (req, res) => {
     try {
         const status = req.query.status;
 
@@ -147,7 +118,7 @@ router.get('/', async (req, res) => {
  * GET /api/jobs/stats
  * Get queue statistics
  */
-router.get('/stats/queue', async (req, res) => {
+router.get('/stats/queue', internalAuth, async (req, res) => {
     try {
         const stats = await jobQueueService.getQueueStats();
 
@@ -168,7 +139,7 @@ router.get('/stats/queue', async (req, res) => {
  * POST /api/jobs/:jobId/progress
  * Update job progress
  */
-router.post('/:jobId/progress', async (req, res) => {
+router.post('/:jobId/progress', internalAuth, async (req, res) => {
     try {
         const { jobId } = req.params;
         const { progress } = req.body;
@@ -192,7 +163,7 @@ router.post('/:jobId/progress', async (req, res) => {
  * POST /api/jobs/:jobId/cancel
  * Cancel a job
  */
-router.post('/:jobId/cancel', async (req, res) => {
+router.post('/:jobId/cancel', internalAuth, async (req, res) => {
     try {
         const { jobId } = req.params;
         const job = await jobQueueService.getJob(jobId);

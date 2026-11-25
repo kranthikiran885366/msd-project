@@ -9,11 +9,13 @@ const deploymentSchema = new mongoose.Schema(
       required: true,
     },
     version: String,
+    triggerKey: String,
     status: {
       type: String,
-      enum: ["pending", "building", "deploying", "running", "failed", "rolled-back"],
+      enum: ["pending", "building", "deploying", "running", "failed", "rolled-back", "cancelled", "stopped"],
       default: "pending",
     },
+    healthCheckPath: { type: String, default: '/' },
     buildTime: Number,
     deployTime: Number,
     buildCacheHitRate: { type: Number, default: 0 },
@@ -23,6 +25,16 @@ const deploymentSchema = new mongoose.Schema(
     productionUrl: String,
     stagingUrl: String,
     localUrl: String,
+    runtimeUrl: String,
+    workerClaimedAt: Date,
+    workerNodeId: String,
+    workerClaimHash: { type: String, select: false },
+    lifecycleVersion: { type: Number, default: 0 },
+    cleanupStatus: { type: String, enum: ['not-required', 'pending', 'complete', 'failed'], default: 'not-required' },
+    cleanupRequestedAt: Date,
+    cleanupCompletedAt: Date,
+    cleanupError: String,
+    artifact: { imageId: String, nodeId: String },
     // Optional custom domain assigned to this deployment (e.g. example.com)
     customDomain: String,
     gitCommit: String,
@@ -81,6 +93,7 @@ const deploymentSchema = new mongoose.Schema(
       additionalData: mongoose.Schema.Types.Mixed,
     },
     providerConfig: {
+      noCache: Boolean,
       buildCommand: String,
       outputDirectory: String,
       framework: String,
@@ -93,5 +106,6 @@ const deploymentSchema = new mongoose.Schema(
 
 deploymentSchema.index({ projectId: 1, createdAt: -1 })
 deploymentSchema.index({ status: 1 })
+deploymentSchema.index({ projectId: 1, triggerKey: 1 }, { unique: true, partialFilterExpression: { triggerKey: { $type: "string" } } })
 
 module.exports = mongoose.model("Deployment", deploymentSchema)

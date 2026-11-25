@@ -1,0 +1,33 @@
+name: Verify CloudDeck
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  product:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      MONGOMS_VERSION: '7.0.24'
+      JWT_SECRET: isolated-ci-fixture-key-never-use-for-a-deployment
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            runner-agent/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix server
+      - run: npm ci --prefix runner-agent
+      - run: npm run verify
+      - name: HTTP and server-rendered page checks
+        run: node scripts/smoke-frontend.cjs
+      - name: Actual disposable MongoDB identity and tenant tests
+        run: npm test --prefix server -- --runInBand

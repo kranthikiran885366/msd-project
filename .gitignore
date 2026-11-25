@@ -110,10 +110,18 @@ docker-compose.override.yml
 *.tfstate
 *.tfstate.*
 .terraform/
-.terraform.lock.hcl
 
 # Secrets
 secrets/
 *.pem
 *.key
 !*.key.example
+# TypeScript incremental build metadata
+*.tsbuildinfo
+# Local verification evidence
+.local-evidence/
+
+.env.*
+!.env.example
+
+.next-dev/

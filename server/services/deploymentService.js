@@ -8,6 +8,7 @@ const notificationService = require('./notificationService');
 const webhookService = require('./webhookService');
 const logService = require('./logService');
 const deployerFactory = require('./deployers/deployerFactory');
+const lifecycle = require('./deploymentLifecycle').createLifecycle(Deployment);
 
 class DeploymentService {
     // FIX: was (projectId, environmentId, options) — controller passes a flat options object
@@ -29,11 +30,24 @@ class DeploymentService {
 
         const project = await Project.findById(projectId);
         if (!project) throw new Error('Project not found');
+        if (userId && String(project.userId) !== String(userId)) throw Object.assign(new Error('Project not found'), { status: 404 });
+        if (project.status !== 'active' || project.deployLock?.enabled) throw Object.assign(new Error('Deployments are paused for this project'), { status: 409 });
 
+        if (!['preview', 'production', 'staging'].includes(environment)) throw Object.assign(new Error('Invalid deployment environment'), { status: 400 });
+        if (gitCommit && !/^[a-f\d]{40}$/i.test(gitCommit)) throw Object.assign(new Error('A full commit SHA is required'), { status: 400 });
+        if (canaryDeployment) throw Object.assign(new Error('Canary routing is not supported by this executor'), { status: 501 });
+        if (customDomain) throw Object.assign(new Error('Managed custom-domain routing is not configured'), { status: 501 });
         const resolvedBranch = await this.resolveDeploymentBranch(project, gitBranch);
 
-        const deployment = await Deployment.create({
+        if (options.triggerKey) {
+            const prior = await Deployment.findOne({ projectId, triggerKey: options.triggerKey });
+            if (prior) return prior;
+        }
+        let deployment;
+        try { deployment = await Deployment.create({
             projectId,
+            healthCheckPath: project.runtimeConfig?.healthCheckPath || '/',
+            triggerKey: options.triggerKey || undefined,
             gitCommit,
             gitBranch: resolvedBranch,
             customDomain,
@@ -48,14 +62,18 @@ class DeploymentService {
             provider: options.provider || project.deploymentSettings?.provider || 'custom',
             providerConfig: { ...(options.providerConfig || {}), noCache },
             logs: []
-        });
+        }); } catch (error) {
+            if (error.code === 11000 && options.triggerKey) {
+                const prior = await Deployment.findOne({ projectId, triggerKey: options.triggerKey });
+                if (prior) return prior;
+            }
+            throw error;
+        }
 
-        // Fire-and-forget — caller gets the pending deployment immediately
-        this.processDeployment(deployment._id).catch(error => {
-            console.error(`[deploy] Deployment ${deployment._id} failed:`, error);
-        });
+        // Acknowledge only after configuration validation and durable queue insertion.
+        await this.processDeployment(deployment._id);
 
-        return deployment;
+        return await Deployment.findById(deployment._id);
     }
 
     async resolveDeploymentBranch(project, requestedBranch) {
@@ -63,20 +81,12 @@ class DeploymentService {
             return String(requestedBranch).trim();
         }
 
-        const provider = String(project?.repository?.provider || '').toLowerCase();
-        const owner = project?.repository?.owner;
-        const name = project?.repository?.name;
-
-        if (provider === 'github' && owner && name) {
-            const defaultBranch = await this.fetchGitHubDefaultBranch(owner, name);
-            if (defaultBranch) {
-                return defaultBranch;
-            }
-        }
-
         const configuredBranch = project?.repository?.branch;
-        if (configuredBranch && String(configuredBranch).trim()) {
-            return String(configuredBranch).trim();
+        if (configuredBranch && String(configuredBranch).trim()) return String(configuredBranch).trim();
+        const { provider, owner, name } = project.repository || {};
+        if (provider === 'github' && owner && name) {
+            const branch = await this.fetchGitHubDefaultBranch(owner, name);
+            if (branch) return branch;
         }
 
         return 'main';
@@ -123,9 +133,7 @@ class DeploymentService {
                 let deployConfig;
                 try {
                     deployConfig = await projectConfigService.resolveDeployConfig(project._id);
-                } catch (_) {
-                    deployConfig = { runtime: 'node', installCommand: 'npm install', buildCommand: 'npm run build', startCommand: 'node index.js', port: 3000 };
-                }
+                } catch (error) { throw new Error(`Project configuration is invalid: ${error.message}`); }
 
                 // Decrypt env variables
                 let mergedEnv = {};
@@ -133,13 +141,11 @@ class DeploymentService {
                     const envMap = await projectConfigService.getDecryptedEnvMap(project._id);
                     const databaseEnv = await databaseService.getProjectRuntimeDatabaseEnv(project._id);
                     mergedEnv = { ...envMap, ...databaseEnv };
-                } catch (_) {}
+                } catch (error) { throw new Error(`Environment configuration could not be decrypted: ${error.message}`); }
 
                 // Get GitHub access token — try by project owner, then repo owner username, then any available
                 const ghIntegration =
-                    await GitHubIntegration.findOne({ userId: project.userId }).lean() ||
-                    await GitHubIntegration.findOne({ githubUsername: project.repository?.owner }).lean() ||
-                    await GitHubIntegration.findOne().sort({ connectedAt: -1 }).lean();
+                    await GitHubIntegration.findOne({ userId: project.userId }).lean();
                 const accessToken = ghIntegration?.accessToken || project.repository?.accessToken;
 
                 await jobQueueService.queueDeployment(deploymentId.toString(), {
@@ -147,17 +153,19 @@ class DeploymentService {
                         (project.repository?.owner && project.repository?.name
                             ? `https://github.com/${project.repository.owner}/${project.repository.name}.git`
                             : null),
+                    gitCommit:       deployment.gitCommit,
+                    healthCheckPath: deployment.healthCheckPath,
                     branch:          deployment.gitBranch || project.repository?.branch || 'main',
                     environment:     deployment.environment || 'production',
                     noCache:         Boolean(deployment.providerConfig?.noCache || false),
                     // Build settings from project
                     runtime:         deployConfig.runtime,
-                    installCommand:  project.buildSettings?.installCommand || deployConfig.installCommand,
-                    buildCommand:    project.buildSettings?.buildCommand   || deployConfig.buildCommand,
-                    startCommand:    project.buildSettings?.startCommand   || deployConfig.startCommand,
+                    installCommand:  project.runtimeConfig?.installCommand || project.buildSettings?.installCommand || '',
+                    buildCommand:    project.runtimeConfig?.buildCommand || project.buildSettings?.buildCommand || '',
+                    startCommand:    project.runtimeConfig?.startCommand || project.buildSettings?.startCommand || '',
                     outputDirectory: project.buildSettings?.outputDirectory|| deployConfig.outputDirectory || '',
                     rootDirectory:   project.buildSettings?.rootDirectory  || '/',
-                    appPort:         deployConfig.port,
+                    appPort:         project.runtimeConfig?.port || null,
                     envVariables:    mergedEnv,
                     region:          project.deploymentSettings?.region || 'us-east-1',
                     accessToken,
@@ -197,9 +205,10 @@ class DeploymentService {
                 });
                 deployUrl = deployResult.url;
             } catch (adapterErr) {
-                console.warn(`[deploy] Provider adapter error (non-fatal): ${adapterErr.message}`);
+                throw adapterErr;
             }
 
+            if (!deployUrl) throw new Error('Provider did not return a deployment URL');
             const urlField = (deployment.environment === 'preview' || deployment.environment === 'staging') ? { previewUrl: deployUrl } : { productionUrl: deployUrl };
             await this.updateDeploymentStatus(deploymentId, 'running', {
                 ...urlField,
@@ -241,23 +250,20 @@ class DeploymentService {
     }
 
     async updateDeploymentStatus(deploymentId, status, updates = {}) {
-        const deployment = await Deployment.findByIdAndUpdate(
-            deploymentId,
-            { status, ...updates },
-            { new: true }
-        );
-        await logService.addDeploymentLog(deploymentId, `Deployment status changed to: ${status}`);
-        return deployment;
+        return lifecycle.transition(deploymentId, status, updates);
     }
 
     async getAllDeployments(limit = 50, filters = {}) {
         // Sanitize filters: only allow known safe string fields
         const safeFilters = {};
+        if (!filters.userId) throw Object.assign(new Error('Authentication required'), { status: 401 });
+        const owned = await Project.find({ userId: filters.userId }).select('_id').lean();
+        safeFilters.projectId = { $in: owned.map(project => project._id) };
         if (filters.status)      safeFilters.status      = String(filters.status);
         if (filters.environment) safeFilters.environment = String(filters.environment);
         return await Deployment.find(safeFilters)
             .sort({ createdAt: -1 })
-            .limit(limit)
+            .limit(Math.min(100, Math.max(1, Number(limit) || 50)))
             .populate('projectId', 'name')
             .lean();
     }
@@ -266,7 +272,7 @@ class DeploymentService {
         if (!mongoose.Types.ObjectId.isValid(projectId)) throw new Error('Invalid projectId');
         return await Deployment.find({ projectId: new mongoose.Types.ObjectId(projectId), ...filters })
             .sort({ createdAt: -1 })
-            .limit(limit)
+            .limit(Math.min(100, Math.max(1, Number(limit) || 50)))
             .lean();
     }
 
@@ -319,7 +325,7 @@ class DeploymentService {
         return result;
     }
 
-    async rollbackDeployment(deploymentId, reason = 'User initiated rollback') {
+    async rollbackDeployment(deploymentId, reason = 'User initiated rollback', userId = null) {
         if (!mongoose.Types.ObjectId.isValid(deploymentId)) throw new Error('Invalid deploymentId');
         const deployment = await Deployment.findById(deploymentId);
         if (!deployment) throw new Error('Deployment not found');
@@ -327,11 +333,13 @@ class DeploymentService {
         const previous = await Deployment.findOne({
             projectId: new mongoose.Types.ObjectId(String(deployment.projectId)),
             status: 'running',
+            environment: deployment.environment,
             _id: { $ne: new mongoose.Types.ObjectId(String(deploymentId)) },
             createdAt: { $lt: deployment.createdAt }
         }).sort({ createdAt: -1 });
 
-        if (!previous) throw new Error('No previous successful deployment found to rollback to');
+        if (!previous) throw Object.assign(new Error('No previous successful deployment exists in this environment'), { status: 409 });
+        if (!/^[a-f\d]{40}$/i.test(previous.gitCommit || '')) throw Object.assign(new Error('Previous deployment has no immutable commit identity'), { status: 409 });
 
         return await this.createDeployment({
             projectId: deployment.projectId,
@@ -340,57 +348,37 @@ class DeploymentService {
             gitAuthor: previous.gitAuthor,
             commitMessage: `Rollback: ${reason}`,
             triggeredBy: 'rollback',
+            environment: deployment.environment,
+            userId: userId || deployment.deployedBy || null,
         });
     }
 
     async assignDomain(deploymentId, domainId, userId = null) {
         if (!mongoose.Types.ObjectId.isValid(deploymentId)) throw new Error('Invalid deploymentId');
-        const deployment = await Deployment.findById(deploymentId).populate('projectId');
-        if (!deployment) throw new Error('Deployment not found');
-
-        const Domain = require('../models/Domain');
-        const domain = await Domain.findById(domainId);
-        if (!domain) throw new Error('Domain not found');
-        if (String(domain.projectId) !== String(deployment.projectId._id)) throw new Error('Domain does not belong to this project');
-        if (domain.status !== 'verified') throw new Error('Domain is not verified');
-
-        deployment.customDomain = domain.host;
-        deployment.providerMetadata = { ...(deployment.providerMetadata || {}), domain: domain.host };
-        await deployment.save();
-
-        await this.addDeploymentLog(deploymentId, `Domain assigned: ${domain.host}`);
-
-        return deployment;
+        throw Object.assign(new Error('Managed custom-domain routing and TLS must be configured before assigning a domain'), { status: 501 });
     }
 
     async cancelDeployment(deploymentId) {
         const deployment = await Deployment.findById(deploymentId);
-        if (!deployment) throw new Error('Deployment not found');
-
-        if (!['pending', 'building', 'deploying'].includes(deployment.status)) {
-            throw new Error('Cannot cancel deployment in current status');
-        }
-
-        if (deployment.buildId) {
-            try {
-                await buildService.cancelBuild(deployment.buildId);
-            } catch (_) {
-                // Ignore build cancellation errors and still mark deployment as canceled.
-            }
-        }
-
-        await this.updateDeploymentStatus(deploymentId, 'rolled-back', { rollbackReason: 'Cancelled by user' });
+        if (!deployment) throw Object.assign(new Error('Deployment not found'), { status: 404 });
+        if (deployment.status === 'cancelled') return deployment;
+        if (!['pending', 'building', 'deploying'].includes(deployment.status)) throw Object.assign(new Error('Cannot cancel deployment in current status'), { status: 409 });
+        // Provider cancellation errors must not be reported as successful cancellation.
+        if (deployment.provider !== 'custom' && deployment.providerDeploymentId) await deployerFactory.cancelDeployment(deployment.provider, deployment.providerDeploymentId);
+        if (deployment.buildId) await buildService.cancelBuild(deployment.buildId);
+        const changed = await this.updateDeploymentStatus(deploymentId, 'cancelled', { rollbackReason: 'Cancelled by user' });
+        // An active BullMQ job remains locked until its worker observes cancellation.
+        const queue = require('./jobQueueService');
         try {
-            await notificationService.sendDeploymentNotification(deployment, 'cancelled');
-        } catch (_) {}
-        return deployment;
+            const job = await queue.getJob(`deployment-${deploymentId}`);
+            if (job && ['waiting', 'delayed', 'prioritized', 'waiting-children'].includes(await job.getState())) await job.remove();
+        } catch (error) { console.warn('[deploy] Cancelled record retained; queue cleanup requires reconciliation:', error.message); }
+        return changed;
     }
 
     // Compatibility method used by blueprint service.
     async startDeployment(deploymentId) {
-        this.processDeployment(deploymentId).catch((error) => {
-            console.error(`[deploy] startDeployment failed for ${deploymentId}:`, error.message);
-        });
+        await this.processDeployment(deploymentId);
 
         return await Deployment.findById(deploymentId).lean();
     }
@@ -514,19 +502,7 @@ class DeploymentService {
     }
 
     async cancelDeploymentViaProvider(deploymentId) {
-        const deployment = await Deployment.findById(deploymentId);
-        if (!deployment) throw new Error('Deployment not found');
-
-        if (deployment.provider && deployment.provider !== 'custom' && deployment.providerDeploymentId) {
-            try {
-                await deployerFactory.cancelDeployment(deployment.provider, deployment.providerDeploymentId);
-            } catch (error) {
-                console.warn(`[deploy] Provider cancellation warning: ${error.message}`);
-            }
-        }
-
-        await this.cancelDeployment(deploymentId);
-        return { success: true, message: 'Deployment canceled' };
+        return this.cancelDeployment(deploymentId);
     }
 
     async addDeploymentLog(deploymentId, message, level = 'info') {
@@ -535,12 +511,12 @@ class DeploymentService {
         });
     }
 
-    async checkBuildCache(projectId, cacheKey, framework) {
-        return null; // Cache lookup stub — extend with Redis if needed
+    async checkBuildCache() {
+        throw Object.assign(new Error('Cache metadata is unavailable; Docker manages its actual local build cache'), { status: 501 });
     }
 
-    async saveBuildCache(projectId, cacheKey, framework, buildSteps, size) {
-        return { projectId, cacheKey, framework, size, savedAt: new Date() };
+    async saveBuildCache() {
+        throw Object.assign(new Error('Synthetic build-cache records are not supported'), { status: 501 });
     }
 
     async getDeploymentStats(projectId, timeRange = 30) {

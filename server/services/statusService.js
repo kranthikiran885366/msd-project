@@ -188,12 +188,10 @@ class StatusService {
   }
 
   async checkCacheHealth() {
-    try {
-      // Implement Redis health check
-      return 'up';
-    } catch (error) {
-      return 'down';
-    }
+    const queue = require('./jobQueueService');
+    if (!queue.client || !queue.isConnected) return 'down';
+    try { return await queue.client.ping() === 'PONG' ? 'up' : 'down'; }
+    catch { return 'down'; }
   }
 
   async checkApiHealth() {

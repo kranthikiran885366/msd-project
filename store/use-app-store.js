@@ -2,29 +2,13 @@
 
 import { create } from "zustand"
 import { nanoid } from "nanoid"
+import apiClient from "@/lib/api-client"
 
-const STORAGE_KEY = "clouddeck"
+const STORAGE_KEY = "clouddeck-ui-preferences"
 
 function serializeState(s) {
-  return {
-    user: s.user,
-    isAuthenticated: s.isAuthenticated,
-    deployments: s.deployments,
-    projects: s.projects,
-    databases: s.databases,
-    recentActivity: s.recentActivity,
-    functions: s.functions,
-    cronjobs: s.cronjobs,
-    envVars: s.envVars,
-    domains: s.domains,
-    team: s.team,
-    teamGroups: s.teamGroups,
-    ssoConfig: s.ssoConfig,
-    billingContacts: s.billingContacts,
-    settings: s.settings,
-    billing: s.billing,
-    logs: s.logs,
-  }
+  // Only non-sensitive UI preferences belong in browser persistence.
+  return { settings: s.settings };
 }
 
 export const useAppStore = create((set, get) => ({
@@ -43,11 +27,14 @@ export const useAppStore = create((set, get) => ({
   ssoConfig: null,
   billingContacts: [],
   settings: { autoDeploy: true, notifySlack: false },
-  billing: { plan: "Hobby", paymentMethod: null, usage: { bandwidthGb: 1, functionsMs: 1500, storageGb: 0.2 } },
+  billing: { plan: "Hobby", paymentMethod: null, usage: { bandwidthGb: 0, functionsMs: 0, storageGb: 0 } },
   logs: [],
   _initialized: false,
   login: (user) => set({ user, isAuthenticated: true }),
-  logout: () => set({ user: null, isAuthenticated: false }),
+  logout: () => {
+    if (typeof window !== "undefined") localStorage.removeItem("clouddeck");
+    set({ user: null, isAuthenticated: false, projects: [], deployments: [], databases: [], functions: [], cronjobs: [], envVars: [], domains: [], team: [], teamGroups: [], billingContacts: [], ssoConfig: null, logs: [], recentActivity: [] });
+  },
   setUser: (user) => set({ user }),
   setIsAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
   loadInitialData: () => {
@@ -57,7 +44,7 @@ export const useAppStore = create((set, get) => ({
     if (raw) {
       try {
         const saved = JSON.parse(raw)
-        set({ ...saved, _initialized: true })
+        set({ settings: saved.settings || {}, _initialized: true })
         return
       } catch {}
     }
@@ -78,61 +65,27 @@ export const useAppStore = create((set, get) => ({
       _initialized: true,
     })
   },
-  triggerDeployment: ({ project }) => {
-    const newDep = {
-      id: `dep_${nanoid(6)}`,
-      project,
-      version: `v${Math.floor(Math.random() * 5) + 1}.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`,
-      status: "Building",
-      time: "just now",
-    }
-    set((s) => ({
-      deployments: [newDep, ...s.deployments],
-      recentActivity: [{ id: nanoid(6), message: `Triggered deploy for ${project}`, when: "now" }, ...s.recentActivity],
-    }))
-    setTimeout(() => {
-      set((s) => ({
-        deployments: s.deployments.map((d) => (d.id === newDep.id ? { ...d, status: "Running", time: "1m ago" } : d)),
-        recentActivity: [
-          { id: nanoid(6), message: `Deploy ready for ${project}`, when: "1m ago" },
-          ...s.recentActivity,
-        ],
-      }))
-    }, 1500)
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState(get())))
-    } catch {}
+  triggerDeployment: async ({ project, projectId }) => {
+    const match = get().projects.find(item => String(item._id || item.id) === String(projectId) || item.name === project);
+    if (!match) throw new Error('Select an existing project before deploying');
+    const deployment = await apiClient.createDeployment({ projectId: match._id || match.id });
+    set(state => ({ deployments: [deployment, ...state.deployments] }));
+    return deployment;
   },
-  rollbackDeployment: (id) => {
-    const dep = get().deployments.find((d) => d.id === id)
-    if (!dep) return
-    set((s) => ({
-      recentActivity: [{ id: nanoid(6), message: `Rolled back ${dep.project}`, when: "now" }, ...s.recentActivity],
-    }))
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState(get())))
-    } catch {}
+  rollbackDeployment: async id => {
+    const result = await apiClient.rollbackDeployment(id);
+    return result;
   },
-  createProject: ({ name, framework, region }) => {
-    set((s) => ({
-      projects: [{ id: nanoid(6), name, framework, region }, ...s.projects],
-      recentActivity: [{ id: nanoid(6), message: `Created project ${name}`, when: "now" }, ...s.recentActivity],
-    }))
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState(get())))
-    } catch {}
+  createProject: async data => {
+    const project = await apiClient.createProject(data);
+    set(state => ({ projects: [project, ...state.projects] }));
+    return project;
   },
-  createDatabase: ({ type, size, region }) => {
-    set((s) => ({
-      databases: [
-        { id: nanoid(6), type, size, region, connectionString: `${type.toLowerCase()}://user:pass@host:0000/app` },
-        ...s.databases,
-      ],
-      recentActivity: [{ id: nanoid(6), message: `Created ${type} database`, when: "now" }, ...s.recentActivity],
-    }))
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState(get())))
-    } catch {}
+  createDatabase: async data => {
+    if (!data.projectId) throw new Error('Select a project before provisioning a database');
+    const database = await apiClient.createDatabase(data);
+    set(state => ({ databases: [database, ...state.databases] }));
+    return database;
   },
   linkDatabaseToProject: (dbId) => {
     const db = get().databases.find((d) => d.id === dbId)
@@ -158,29 +111,7 @@ export const useAppStore = create((set, get) => ({
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState(get())))
     } catch {}
   },
-  invokeFunction: (id) => {
-    const fn = get().functions.find((f) => f.id === id)
-    if (!fn) return
-    const ok = Math.random() > 0.1
-    set((s) => ({
-      functions: s.functions.map((f) =>
-        f.id === id ? { ...f, lastRunAt: Date.now(), lastStatus: ok ? "success" : "error" } : f,
-      ),
-      logs: [
-        {
-          id: String(Date.now()),
-          service: fn.name,
-          level: ok ? "info" : "error",
-          message: `Invocation ${ok ? "ok" : "failed"}`,
-          timestamp: Date.now(),
-        },
-        ...s.logs,
-      ],
-    }))
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState(get())))
-    } catch {}
-  },
+  invokeFunction: async id => apiClient.invokeFunction(id),
   addCron: ({ name, schedule, target }) => {
     const valid =
       /^(\*|([0-5]?\d))\s+(\*|([01]?\d|2[0-3]))\s+(\*|([01]?\d|2[0-9]|3[01]))\s+(\*|([1-7]))\s+(\*|([0-9]|1[0-2]))/.test(
@@ -241,11 +172,10 @@ export const useAppStore = create((set, get) => ({
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState(get())))
     } catch {}
   },
-  verifyDomain: (id) => {
-    set((s) => ({ domains: s.domains.map((d) => (d.id === id ? { ...d, status: "verified" } : d)) }))
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState(get())))
-    } catch {}
+  verifyDomain: async id => {
+    const result = await apiClient.getDomainVerificationStatus(id);
+    set(state => ({ domains: state.domains.map(domain => (domain._id || domain.id) === id ? { ...domain, ...result } : domain) }));
+    return result;
   },
   deleteDomain: (id) => {
     set((s) => ({ domains: s.domains.filter((d) => d.id !== id) }))

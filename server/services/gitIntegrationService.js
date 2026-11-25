@@ -27,7 +27,7 @@ class GitIntegrationService {
     if (!project) throw new Error('Project not found');
 
     // Configure webhook for continuous deployment
-    const webhookUrl = `${process.env.API_URL}/api/webhooks/git/${provider}/${projectId}`;
+    const webhookUrl = `${process.env.API_URL}/api/deployments/webhooks/git/${provider}/${projectId}`;
     const webhook = await createWebhook(provider, repoDetails, webhookUrl);
 
     // Update project with repository details
@@ -50,66 +50,28 @@ class GitIntegrationService {
       throw new Error('Project not configured for git integration');
     }
 
-    // Extract commit info based on provider
-    const commitInfo = this.extractCommitInfo(provider, payload);
-    
-    // Check if this is a PR/branch preview
-    const isPreview = this.isPreviewDeploy(provider, payload);
-    
-    // Create deployment
-    return await deploymentService.createDeployment({
-      projectId,
-      gitCommit: commitInfo.commit,
-      gitBranch: commitInfo.branch,
-      gitAuthor: commitInfo.author,
-      commitMessage: commitInfo.message,
-      environment: isPreview ? 'preview' : 'production',
-      deploymentContext: isPreview ? 'preview' : project.repository.branch === commitInfo.branch ? 'production' : 'staging',
+    if (provider !== 'github') throw Object.assign(new Error('Only GitHub push deployments are supported by this lifecycle'), { status: 501 });
+    if (payload.pull_request) throw Object.assign(new Error('Protected pull-request preview automation is not implemented'), { status: 501 });
+    const expectedRepository = `${project.repository.owner}/${project.repository.name}`.toLowerCase();
+    if (String(payload.repository?.full_name || '').toLowerCase() !== expectedRepository) throw Object.assign(new Error('Webhook repository does not match this project'), { status: 403 });
+    if (!project.repository.deployOnPush || payload.deleted || payload.ref !== `refs/heads/${project.repository.branch}`) return { ignored: true, reason: 'Push is outside the configured deployment branch' };
+    if (!/^[a-f\d]{40}$/i.test(payload.after || '') || /^0+$/.test(payload.after)) throw Object.assign(new Error('Push lacks an immutable commit identity'), { status: 400 });
+    return deploymentService.createDeployment({
+      projectId, gitCommit: payload.after, gitBranch: project.repository.branch,
+      gitAuthor: String(payload.pusher?.name || 'github').slice(0, 200),
+      commitMessage: String(payload.head_commit?.message || 'GitHub push').slice(0, 2000),
+      environment: 'production', deploymentContext: 'production', triggeredBy: 'github-push',
+      triggerKey: `github-push:${payload.ref}:${payload.after}`,
+      userId: project.userId,
     });
   }
 
   async createPreviewDeploy(projectId, prDetails) {
-    const project = await Project.findById(projectId);
-    if (!project) throw new Error('Project not found');
-
-    return await deploymentService.createDeployment({
-      projectId,
-      gitCommit: prDetails.headCommit,
-      gitBranch: prDetails.branch,
-      gitAuthor: prDetails.author,
-      commitMessage: prDetails.title,
-      environment: 'preview',
-      deploymentContext: 'preview',
-      previewData: {
-        prNumber: prDetails.number,
-        prTitle: prDetails.title,
-        sourceBranch: prDetails.branch,
-        targetBranch: prDetails.targetBranch,
-      },
-    });
+    throw Object.assign(new Error('Protected PR previews and cleanup must be implemented before enabling preview automation'), { status: 501 });
   }
 
-  async scheduleDeployment(projectId, schedule) {
-    const project = await Project.findById(projectId);
-    if (!project) throw new Error('Project not found');
-
-    // Validate cron expression
-    if (!this.isValidCronExpression(schedule.cronExpression)) {
-      throw new Error('Invalid cron expression');
-    }
-
-    // Add scheduled deployment
-    project.scheduledDeployments = project.scheduledDeployments || [];
-    project.scheduledDeployments.push({
-      cronExpression: schedule.cronExpression,
-      branch: schedule.branch || project.repository.branch,
-      environment: schedule.environment || 'production',
-      enabled: true,
-      nextRun: this.getNextRunTime(schedule.cronExpression),
-    });
-
-    await project.save();
-    return project;
+  async scheduleDeployment() {
+    throw Object.assign(new Error('A durable deployment scheduler is not configured'), { status: 501 });
   }
 
   async toggleDeployLock(projectId, lock = true, reason = '') {

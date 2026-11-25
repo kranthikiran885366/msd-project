@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs")
 
 const userSchema = new mongoose.Schema(
   {
+    tokenVersion: { type: Number, default: 0 },
     email: {
       type: String,
       required: true,
@@ -57,6 +58,8 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    emailVerificationToken: { type: String, select: false },
+    emailVerificationExpires: { type: Date, select: false },
     verificationToken: String,
     verificationTokenExpires: Date,
     // OAuth Fields
