@@ -7,6 +7,7 @@ const { Worker } = require('bullmq');
 const IORedis = require('ioredis');
 const Agent = require('./agent');
 const JobExecutor = require('./jobExecutor');
+const RuntimeSupervisor = require('./runtimeSupervisor');
 const { assertDevelopmentExecutor } = require('./executionPolicy');
 async function start() {
   assertDevelopmentExecutor();
@@ -18,11 +19,17 @@ async function start() {
   const agent = new Agent();
   await redis.ping();
   await agent.start();
+  const supervisor = new RuntimeSupervisor(agent.nodeId, agent.backendUrl);
+  await supervisor.recover();
+  const supervision = setInterval(() => supervisor.tick().catch(error => console.error('[supervisor]', error.message)), 15000);
   let active = 0; let stopping = false;
   const worker = new Worker('deployments', async job => {
     const executor = new JobExecutor(agent.nodeId, agent.backendUrl);
     const claim = await executor.client.post(`/api/deployments/${job.data.deploymentId}/claim`, { nodeId: agent.nodeId });
     if (claim.status !== 200) throw new Error('Deployment claim refused; automatic execution will not be repeated');
+    if (!claim.data?.claimToken) throw new Error('Worker claim token missing');
+    executor.client.defaults.headers.common['x-clouddeck-claim'] = claim.data.claimToken;
+    await supervisor.remember(job.data.deploymentId, claim.data.claimToken, executor);
     active++;
     try { return await executor.executeJob({ deploymentId: job.data.deploymentId, data: job.data }); }
     finally { active--; }
@@ -30,9 +37,8 @@ async function start() {
   worker.on('error', error => console.error('[worker] Queue error:', error.message));
   worker.on('failed', async (job, error) => {
     console.error(`[worker] Job ${job?.id} failed: ${error.message}`);
-    if (!job) return;
-    const executor = new JobExecutor(agent.nodeId, agent.backendUrl);
-    await executor.updateStatus(job.data.deploymentId, 'failed', { error: 'Worker execution failed; inspect the deployment logs before manually retrying' }).catch(() => {});
+    // The executor owns fenced failure/cleanup reporting. A second unfenced
+    // callback here could undo a committed running state after a lost response.
   });
   const app = express();
   app.get('/health', (req, res) => res.json({ status: 'healthy', nodeId: agent.nodeId, activeJobs: active }));
@@ -40,7 +46,7 @@ async function start() {
   const server = app.listen(Number(process.env.WORKER_AGENT_PORT || 4000));
   async function shutdown() {
     if (stopping) return;
-    stopping = true; server.close();
+    stopping = true; server.close(); clearInterval(supervision);
     await worker.close(); await agent.shutdown(); await redis.quit();
   }
   process.once('SIGTERM', () => shutdown().catch(() => process.exit(1)));

@@ -45,7 +45,7 @@ class JobExecutor {
         let workspaceDir = null;
         let imageTag     = null;
         let port         = null;
-        const containerName = `msd-${String(deploymentId).slice(-12)}`;
+        const containerName = `msd-${deploymentId}`;
 
         try {
             // ── Step 1: Clone ──────────────────────────────────────────────
@@ -63,11 +63,14 @@ class JobExecutor {
 
             // ── Step 3: Build image ────────────────────────────────────────
             await this.log(deploymentId, '==> Building Docker image', 'info');
-            imageTag = `msd-${String(deploymentId).slice(-12)}:latest`;
+            imageTag = `msd-${deploymentId}:latest`;
             if (noCache) await this.log(deploymentId, '==> Cache disabled (--no-cache)', 'info');
             const buildStarted = Date.now();
             await this.buildImage(deploymentId, buildDir, imageTag, noCache);
             const buildTime = (Date.now() - buildStarted) / 1000;
+            const inspected = await this.exec(deploymentId, 'docker', ['image', 'inspect', '--format', '{{.Id}}', imageTag]);
+            const imageId = inspected.stdout.trim();
+            if (!/^sha256:[a-f\d]{64}$/i.test(imageId)) throw new Error('Docker did not provide an immutable image identity');
 
             // ── Step 4: Allocate port ──────────────────────────────────────
             port = await this.allocatePort(deploymentId);
@@ -106,17 +109,17 @@ class JobExecutor {
             if (customDomain) await this.log(deploymentId, `==> Assigned custom domain: ${customDomain}`, 'info');
             await this.updateStatus(deploymentId, 'deploying', { rawUrl, localUrl: rawUrl, port, nodeId: this.nodeId });
             await this.verifyIngress(deploymentId, publicUrl);
-            await this.updateStatus(deploymentId, 'running', {
+            await this.publishRunning(deploymentId, {
                 url: publicUrl,
                 rawUrl,
                 localUrl: rawUrl,
                 port, nodeId: this.nodeId,
                 domain: customDomain || domain,
-                imageTag, gitCommit: this.resolvedCommit, buildTime
+                imageTag, imageId, gitCommit: this.resolvedCommit, buildTime
             });
 
             this.runningContainers.set(containerName, { deploymentId, port });
-            await this.cleanup(workspaceDir);
+            await this.cleanup(workspaceDir).catch(error => this.log(deploymentId, `Workspace cleanup needs attention: ${error.message}`, 'warn'));
             this.currentJobData = null;
 
             return { deploymentId, status: 'running', url: appUrl };
@@ -124,13 +127,23 @@ class JobExecutor {
         } catch (err) {
             console.error(`[executor] ✗ Job ${deploymentId} failed: ${err.message}`);
             await this.log(deploymentId, `==> ✗ ${err.message}`, 'error');
-            await this.updateStatus(deploymentId, 'failed', { error: err.message }).catch(() => {});
-
-            await this.exec(null, 'docker', ['rm', '-f', containerName]).catch(() => {});
-            if (port) {
-                await this.client.post(`/api/ports/${deploymentId}/release`).catch(() => {});
+            if (err.reconciliationRequired) {
+                // A lost success acknowledgement does not authorize destroying a
+                // potentially committed healthy application. Keep its reservation.
+                if (workspaceDir) await this.cleanup(workspaceDir).catch(() => {});
+                this.currentJobData = null;
+                throw err;
             }
-            if (workspaceDir) await this.cleanup(workspaceDir);
+            await this.updateStatus(deploymentId, 'failed', { error: err.message }).catch(() => {});
+            const failures = [];
+            try { await this.removeRuntime(containerName); await this.removeImage(deploymentId); } catch (error) { failures.push(error.message); }
+            if (workspaceDir) try { await this.cleanup(workspaceDir); } catch (error) { failures.push(error.message); }
+            try {
+                const result = await this.client.post(`/api/deployments/${deploymentId}/cleanup`, {
+                    status: failures.length ? 'failed' : 'complete', error: failures.join('; ').slice(0, 2000),
+                }, { timeout: 10000 });
+                if (result.status !== 200) throw new Error(`Cleanup acknowledgement rejected (${result.status})`);
+            } catch (error) { await this.log(deploymentId, `Cleanup requires reconciliation: ${error.message}`, 'error'); }
             this.currentJobData = null;
             throw err;
         }
@@ -161,6 +174,9 @@ class JobExecutor {
             this.resolvedCommit = stdout.trim();
             // Never copy Git credential helpers, history or config into build images.
             await fs.rm(path.join(dir, '.git'), { recursive: true, force: true });
+        } catch (error) {
+            await fs.rm(dir, { recursive: true, force: true });
+            throw error;
         } finally { await fs.rm(askpass, { force: true }); }
 
         return dir;
@@ -222,7 +238,7 @@ class JobExecutor {
             if (deploymentId) await this.assertActive(deploymentId);
             if (!await this.isRunning(containerName)) throw new Error('Application container exited before becoming ready');
             try {
-                const response = await axios.get(`http://${process.env.RUNTIME_HOST || '127.0.0.1'}:${port}/`, { timeout: 2000, maxRedirects: 0, validateStatus: status => status >= 200 && status < 400 });
+                const response = await axios.get(`http://${process.env.RUNTIME_HOST || '127.0.0.1'}:${port}${this.currentJobData?.healthCheckPath || '/'}`, { timeout: 2000, maxRedirects: 0, validateStatus: status => status >= 200 && status < 400 });
                 if (response) return;
             } catch (_) {}
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -562,6 +578,23 @@ CMD ["nginx","-g","daemon off;"]`,
         ]); } finally { await fs.rm(envFile, { force: true }); }
     }
 
+    async runtimeState(containerName) {
+        try {
+            const { stdout } = await require('util').promisify(require('child_process').execFile)('docker', ['inspect', '--format', '{{.State.Running}}', containerName], { timeout: 5000 });
+            return stdout.trim() === 'true';
+        } catch (error) {
+            if (/No such (?:container|object):/i.test(error.stderr || '')) return false;
+            throw new Error('Docker runtime state is unavailable; preserving the application for reconciliation');
+        }
+    }
+
+    async probeRuntime(runtimeUrl, healthPath) {
+        if (!/^\/(?!\/)[^\\?#\r\n]*$/.test(healthPath)) throw new Error('Invalid health path');
+        const origin = new URL(runtimeUrl);
+        if (origin.protocol !== 'http:' || origin.username || origin.password) throw new Error('Invalid runtime URL');
+        await axios.get(new URL(healthPath, origin), { timeout: 5000, maxRedirects: 0, validateStatus: status => status >= 200 && status < 400 });
+    }
+
     async isRunning(containerName) {
         return new Promise(resolve => {
             const p = spawn('docker', ['inspect', '--format', '{{.State.Running}}', containerName]);
@@ -581,7 +614,7 @@ CMD ["nginx","-g","daemon off;"]`,
             if (this.currentJobData && this.currentJobData.customDomain) payload.subdomain = this.currentJobData.customDomain;
             const res = await this.client.post('/api/ports/allocate', payload);
             const allocated = Number(res.data?.port);
-            if (allocated && !reservedPorts.has(allocated)) {
+            if (res.status === 200 && Number.isInteger(allocated) && allocated >= 1024 && allocated <= 65535 && !reservedPorts.has(allocated)) {
                 return allocated;
             }
         } catch (_) {}
@@ -589,14 +622,45 @@ CMD ["nginx","-g","daemon off;"]`,
         throw new Error('Port allocation failed; refusing an unreserved port');
     }
 
-    // ── Status update — tries PATCH first (correct route), falls back to POST ──
+    // ── Fenced worker callbacks ──────────────────────────────────────────────
     async updateStatus(deploymentId, status, extras = {}) {
-        const body = { status, ...extras };
-        const res = await this.client.post(`/api/deployments/${deploymentId}/status`, body);
+        const body = { status, ...extras, nodeId: this.nodeId };
+        const res = await this.client.post(`/api/deployments/${deploymentId}/status`, body, { timeout: 10000 });
         if (res.status >= 400) throw new Error(`Status callback rejected (${res.status})`);
     }
 
     // ── Log append ─────────────────────────────────────────────────────────────
+    async publishRunning(deploymentId, extras) {
+        try { return await this.updateStatus(deploymentId, 'running', extras); }
+        catch (error) {
+            let observed;
+            try {
+                const response = await this.client.get(`/api/deployments/${deploymentId}/worker-state`, { timeout: 5000 });
+                if (response.status !== 200) throw new Error('State lookup unavailable');
+                observed = response.data;
+            } catch {
+                error.reconciliationRequired = true;
+                throw error;
+            }
+            if (observed.status === 'running' && observed.workerNodeId === this.nodeId) return;
+            if (!['failed', 'cancelled', 'building', 'deploying'].includes(observed.status)) error.reconciliationRequired = true;
+            throw error;
+        }
+    }
+
+    async removeRuntime(name) {
+        try { await this.exec(null, 'docker', ['rm', '-f', name]); }
+        catch (error) {
+            if (!/No such container:/i.test(error.message)) throw error;
+        }
+    }
+
+    async removeImage(deploymentId) {
+        if (!/^[a-f\d]{24}$/i.test(String(deploymentId))) throw new Error('Invalid image deployment identity');
+        try { await this.exec(null, 'docker', ['image', 'rm', `msd-${deploymentId}:latest`]); }
+        catch (error) { if (!/No such image:/i.test(error.message)) throw error; }
+    }
+
     async log(deploymentId, message, level = 'info') {
         let trimmed = String(message).trim();
         const values = [process.env.WORKER_SECRET, this.currentJobData?.accessToken, ...Object.values(this.currentJobData?.envVariables || {})].filter(v => typeof v === 'string' && v.length > 3);
@@ -634,6 +698,7 @@ CMD ["nginx","-g","daemon off;"]`,
             });
 
             let stderr = '';
+            let stdout = '';
             let cancellation = null;
             let checking = false;
             const guard = deploymentId ? setInterval(async () => {
@@ -645,6 +710,7 @@ CMD ["nginx","-g","daemon off;"]`,
             const finish = () => { if (guard) clearInterval(guard); clearTimeout(timeout); };
 
             proc.stdout.on('data', d => {
+                stdout = (stdout + d.toString()).slice(-65536);
                 const msg = d.toString().trim();
                 if (msg && deploymentId) this.log(deploymentId, msg, 'info');
             });
@@ -658,7 +724,7 @@ CMD ["nginx","-g","daemon off;"]`,
             proc.on('close', code => {
                 finish();
                 if (cancellation) reject(cancellation);
-                else if (code === 0) resolve();
+                else if (code === 0) resolve({ stdout, stderr });
                 else reject(new Error(`${cmd} ${args[0]} exited ${code}: ${stderr.slice(-300)}`));
             });
 
@@ -667,7 +733,7 @@ CMD ["nginx","-g","daemon off;"]`,
     }
 
     async cleanup(dir) {
-        try { await fs.rm(dir, { recursive: true, force: true }); } catch (_) {}
+        await fs.rm(dir, { recursive: true, force: true });
     }
 
     // Called by agent on graceful shutdown

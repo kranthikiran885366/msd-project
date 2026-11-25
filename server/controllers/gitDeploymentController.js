@@ -26,7 +26,7 @@ class GitDeploymentController extends BaseController {
       const signature = req.headers['x-hub-signature-256'] || req.headers['x-gitlab-token'] || req.headers['x-hook-signature'];
       
       // Validate webhook signature
-      if (!validateGitSignature(provider, req.body, signature)) {
+      if (!validateGitSignature(provider, req.rawBody, signature)) {
         return res.status(401).json({ error: 'Invalid webhook signature' });
       }
 

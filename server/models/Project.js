@@ -90,6 +90,7 @@ const projectSchema = new mongoose.Schema(
             },
             // Port the app listens on inside the container
             port: { type: Number, default: null, min: 1, max: 65535 },
+            healthCheckPath: { type: String, default: '/', maxlength: 1024, match: /^\/(?!\/)[^\\?#\r\n]*$/ },
             // Environment variables (values encrypted at rest for secrets)
             envVariables: [envVarSchema],
         },

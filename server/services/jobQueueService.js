@@ -35,8 +35,8 @@ class JobQueueService {
                         type: 'exponential',
                         delay: 2000
                     },
-                    removeOnComplete: { age: 3600 },
-                    removeOnFail: { age: 86400 }
+                    removeOnComplete: true,
+                    removeOnFail: true
                 }
             });
 
@@ -64,8 +64,8 @@ class JobQueueService {
         }
 
         const job = await this.queue.add('deployment', {
-            deploymentId,
-            ...options
+            ...options,
+            deploymentId
         }, {
             jobId: `deployment-${deploymentId}`,
             priority: options.priority || 5

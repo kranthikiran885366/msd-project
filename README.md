@@ -4,13 +4,13 @@
 
 A cloud deployment platform under active development: Next.js workspace, Express control plane, MongoDB records, Redis/BullMQ dispatch and a Docker development runner.
 
-**Release status: engineering review. Public customer onboarding is blocked.** This branch improves real application paths and removes several fabricated success paths. It does not establish Vercel/Render parity or production tenant isolation. Read the [audit](docs/PRODUCT_AUDIT.md), [hosting proposal](docs/HOSTING_PLAN.md) and [verification record](docs/VERIFICATION.md) before deploying.
+**Release status: engineering review. Public customer onboarding is blocked.** This branch improves real application paths and removes several fabricated success paths. It does not establish Vercel/Render parity or production tenant isolation. Read the [audit](docs/PRODUCT_AUDIT.md), [hosting proposal](docs/HOSTING_PLAN.md) and [verification record](docs/VERIFICATION.md) and [deployment lifecycle review](docs/DEPLOYMENT_LIFECYCLE.md) before deploying.
 
 ## Product workspace
 
 - A new CloudDeck identity, responsive navigation and landing page without invented customers or compliance claims.
 - API-backed project creation, search, configuration and encrypted environment variables.
-- Deployment history, logs, cancellation, retry and commit-based rollback requests, with explicit errors instead of simulated results.
+- Deployment history, logs, stop/cleanup status, cancellation, retry and commit-based rollback requests, with explicit errors instead of simulated results.
 - Email/password sign-in, provider availability, session revocation, email verification and a session-bound one-time OAuth exchange.
 - A separate HTTP/WebSocket application gateway, ownership checks on core project/deployment resources and honest readiness signals.
 

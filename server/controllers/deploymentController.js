@@ -84,8 +84,8 @@ class DeploymentController extends BaseController {
     try {
       const { id } = req.params
       const { reason } = req.body
-      const previousDeployment = await deploymentService.rollbackDeployment(id, reason || "User initiated rollback")
-      res.json({ message: "Rollback successful", deployment: previousDeployment })
+      const previousDeployment = await deploymentService.rollbackDeployment(id, reason || "User initiated rollback", req.userId)
+      res.json({ message: "Previous-commit rebuild queued; completion is not yet confirmed", deployment: previousDeployment })
     } catch (error) {
       next(error)
     }

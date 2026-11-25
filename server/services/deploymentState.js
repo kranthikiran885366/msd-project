@@ -3,8 +3,8 @@ const transitions = {
   pending: ['building', 'failed', 'cancelled'],
   building: ['deploying', 'failed', 'cancelled'],
   deploying: ['running', 'failed', 'cancelled'],
-  running: ['failed', 'rolled-back'],
-  failed: [], cancelled: [], 'rolled-back': [],
+  running: ['failed', 'rolled-back', 'stopped'],
+  failed: [], cancelled: [], 'rolled-back': [], stopped: [],
 };
 function canTransition(from, to) {
   return Object.hasOwn(transitions, from) && (from === to || transitions[from].includes(to));

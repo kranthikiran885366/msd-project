@@ -125,7 +125,7 @@ class ProjectConfigService {
         const project = await this._getOwnedProject(projectId, userId);
         project.runtimeConfig = project.runtimeConfig || {};
 
-        const allowed = ['installCommand', 'buildCommand', 'startCommand', 'port', 'runtime'];
+        const allowed = ['installCommand', 'buildCommand', 'startCommand', 'port', 'runtime', 'healthCheckPath'];
         for (const field of allowed) {
             if (config[field] !== undefined) {
                 project.runtimeConfig[field] = config[field];
@@ -218,6 +218,7 @@ class ProjectConfigService {
             installCommand: rc.installCommand || '',
             buildCommand:   rc.buildCommand   || '',
             startCommand:   rc.startCommand   || '',
+            healthCheckPath: rc.healthCheckPath || '/',
             runtime:        rc.runtime        || 'auto',
             port:           rc.port           || 3000,
         };

@@ -14,6 +14,7 @@ networks:
 volumes:
   mongo-data:
   redis-data:
+  worker-state:
 
 services:
 
@@ -162,7 +163,9 @@ services:
       RUNTIME_HOST: "host.docker.internal"
       GATEWAY_INTERNAL_URL: "http://gateway:8080"
       WORKER_AGENT_PORT: "${WORKER_AGENT_PORT}"
+      WORKER_STATE_DIR: /var/lib/clouddeck-worker
     volumes:
+      - worker-state:/var/lib/clouddeck-worker
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/msd-builds:/tmp/msd-builds
       - /tmp/msd-envfiles:/tmp/msd-envfiles

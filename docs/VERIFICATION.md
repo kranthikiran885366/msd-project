@@ -7,10 +7,10 @@
 | Clean `npm ci` in root/server/runner | Passed | Fresh installs reproduced from the three npm lockfiles |
 | Root ESLint | Passed | Configured structural/Next rules; not an exhaustive security analyzer |
 | TypeScript `tsc --noEmit` | Passed | JS-heavy backend still requires runtime/integration checks |
-| `npm test` | **32 passed, 0 failed, 0 skipped** | Unit/transport tests, not cloud E2E |
+| `npm test` | **54 passed, 0 failed, 0 skipped** | Unit/transport tests, not cloud E2E |
 | Strict `next build` | Passed | Type/build checks enabled; not browser acceptance |
 | Frontend HTTP smoke | **5 routes passed**, including CSS retrieval | `/`, `/docs`, `/login`, `/signup`, `/verify-email`; server-rendered responses only |
-| Real MongoDB Jest suite | **Blocked; command failed** | Both suites/9 tests fail in setup because actual mongod exits code 100. Probe reports `open: Operation not permitted`; assertions did not establish passing behavior |
+| Real MongoDB Jest suite | **Blocked; command failed** | Three suites/12 tests fail in setup because actual mongod exits code 100. Probe reports `open: Operation not permitted`; assertions did not establish passing behavior |
 | Browser/visual review | Not run successfully | Local preview was unavailable to the browser; no layout/interaction claims |
 | Docker image build and real worker deployment | Not run | No Docker-capable staging machine available |
 | OAuth/SMTP/payment/DNS/TLS providers | Not accepted | Credentials, owned domains and real staging exercise required |
@@ -37,3 +37,11 @@ The GitHub workflow is configured for clean installs, verification, HTTP checks 
 The control-plane smoke script is explicitly gated because it creates persistent records. Fresh signup mode is for disposable development configurations; production-mode staging requires a genuinely verified test account and SMTP/provider acceptance. Its optional deployment mode checks actual application HTTP but is only one acceptance case, not isolation/security/recovery certification.
 
 No customer onboarding, production rollout, paid provisioning or real payment is authorized by these local results. See [HOSTING_PLAN.md](HOSTING_PLAN.md) for the ordered staging acceptance and provisioning checkpoint.
+
+## Deployment lifecycle follow-up
+
+The follow-up adds atomic revisioned lifecycle transitions, deployment-scoped worker claims, honest cleanup state, stop/termination, private persistent worker journals, restart recovery, HTTP runtime supervision, concurrency-safe port reuse and exact-byte GitHub push validation/deduplication. It also prevents hard project deletion from orphaning runtimes. See [DEPLOYMENT_LIFECYCLE.md](DEPLOYMENT_LIFECYCLE.md).
+
+Latest local checks: 54 unit/transport tests passed, lint/type checks passed, strict Next build passed and all five HTTP/SSR/CSS checks passed. Three actual-MongoDB suites (12 tests) failed before their assertions could establish passing behavior. A direct MongoDB 7.0.24 probe exited 100 with `open: Operation not permitted`. A cold-download hook timeout was also corrected to allow a real 60-second setup window; using the cached binary confirmed the independent server-start restriction. No fake database or Docker stand-in was reported as E2E success.
+
+Docker image build, running-container stop/restart/cancellation, public ingress/TLS, cloud orphan cleanup and retained registry-artifact rollback still require real staging acceptance. Local journal and controlled dependency tests do not establish a production tenant boundary. Shared-Docker production execution remains disabled.

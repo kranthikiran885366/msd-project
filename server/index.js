@@ -79,7 +79,7 @@ app.use(
 )
 app.disable("x-powered-by")
 app.set("trust proxy", 1)
-app.use(express.json({ limit: "256kb" }))
+app.use(express.json({ limit: "256kb", verify: (req, res, buffer) => { if (req.originalUrl.startsWith("/api/deployments/webhooks/git/")) req.rawBody = Buffer.from(buffer); } }))
 app.use(express.urlencoded({ extended: true }))
 
 // Session middleware for OAuth
@@ -213,6 +213,7 @@ async function start() {
   require("./config/validateEnvironment")();
   return connectDB()
   .then(async () => {
+    await Promise.all([require("./models/Deployment").init(), require("./models/PortMapping").init()]);
     // Initialize job queue
     try {
       const jobQueueService = require('./services/jobQueueService');

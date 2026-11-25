@@ -1,7 +1,8 @@
 const PortMapping = require('../models/PortMapping');
 
 class PortManagementService {
-    constructor() {
+    constructor(mappings = PortMapping) {
+        this.mappings = mappings;
         // FIX: read from env vars, not hardcoded
         this.portRangeStart = parseInt(process.env.PORT_RANGE_START || '4000', 10);
         this.portRangeEnd   = parseInt(process.env.PORT_RANGE_END   || '5000', 10);
@@ -27,47 +28,33 @@ class PortManagementService {
      * Allocate a port for a new deployment
      */
     async allocatePort(deploymentId, options = {}) {
-        try {
-            const preferredPort = options.preferredPort;
-            const subdomain = options.subdomain || null;
-            
-            // Find an available port
-            let port = null;
-
-            if (preferredPort && !this.usedPorts.has(preferredPort) && 
-                preferredPort >= this.portRangeStart && preferredPort <= this.portRangeEnd) {
-                port = preferredPort;
-            } else {
-                // Find next available port
-                for (let p = this.portRangeStart; p <= this.portRangeEnd; p++) {
-                    if (!this.usedPorts.has(p)) {
-                        port = p;
-                        break;
-                    }
+        const existing = await this.mappings.findOne({ deploymentId, status: 'active' });
+        if (existing) {
+            if (existing.nodeId !== options.nodeId) throw new Error('Deployment is reserved on another worker');
+            return existing;
+        }
+        if (!options.nodeId) throw new Error('A claimed worker node is required');
+        const candidates = [];
+        const preferred = Number(options.preferredPort);
+        if (Number.isInteger(preferred) && preferred >= this.portRangeStart && preferred <= this.portRangeEnd) candidates.push(preferred);
+        for (let port = this.portRangeStart; port <= this.portRangeEnd; port++) if (port !== preferred) candidates.push(port);
+        for (const port of candidates) {
+            if ([3000, 3001, 4000, 8080].includes(port)) continue;
+            const data = { deploymentId, containerPort: port, nodeId: options.nodeId, status: 'active', allocatedAt: new Date(), releasedAt: null };
+            try {
+                // Existing released records from older versions may still own a unique port.
+                const reused = await this.mappings.findOneAndUpdate({ containerPort: port, status: { $in: ['released', 'failed'] } }, { $set: data, $unset: { subdomain: 1 } }, { new: true, runValidators: true });
+                return reused || await this.mappings.create(data);
+            } catch (error) {
+                if (error.code !== 11000) throw error;
+                const raced = await this.mappings.findOne({ deploymentId, status: 'active' });
+                if (raced) {
+                    if (raced.nodeId !== options.nodeId) throw new Error('Deployment is reserved on another worker');
+                    return raced;
                 }
             }
-
-            if (!port) {
-                throw new Error('No available ports in range');
-            }
-
-            // Create mapping in database
-            const mapping = await PortMapping.create({
-                deploymentId,
-                containerPort: port,
-                subdomain: subdomain || undefined,
-                status: 'active',
-                allocatedAt: new Date()
-            });
-
-            this.usedPorts.add(port);
-
-            console.log(`[v0] Allocated port ${port} for deployment ${deploymentId}`);
-            return mapping;
-        } catch (error) {
-            console.error('[v0] Error allocating port:', error);
-            throw error;
         }
+        throw Object.assign(new Error('No available ports in range'), { status: 503 });
     }
 
     /**
@@ -86,24 +73,9 @@ class PortManagementService {
      * Release a port from a deployment
      */
     async releasePort(deploymentId) {
-        try {
-            const mapping = await PortMapping.findOne({ deploymentId, status: 'active' });
-            
-            if (mapping) {
-                this.usedPorts.delete(mapping.containerPort);
-                mapping.status = 'released';
-                mapping.releasedAt = new Date();
-                await mapping.save();
-
-                console.log(`[v0] Released port ${mapping.containerPort} from deployment ${deploymentId}`);
-                return mapping;
-            }
-
-            return null;
-        } catch (error) {
-            console.error('[v0] Error releasing port:', error);
-            throw error;
-        }
+        // Live reservations are not historical audit records. Removing one releases
+        // the unique index only after the worker confirms its runtime is gone.
+        return this.mappings.findOneAndDelete({ deploymentId });
     }
 
     /**
@@ -238,3 +210,4 @@ server {
 }
 
 module.exports = new PortManagementService();
+module.exports.PortManagementService = PortManagementService;

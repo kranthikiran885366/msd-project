@@ -82,10 +82,9 @@ class ProjectService {
   }
 
   async deleteProject(id) {
-    await Deployment.deleteMany({ projectId: id })
-    await Function.deleteMany({ projectId: id })
-    await Environment.deleteMany({ projectId: id })
-    return await Project.findByIdAndDelete(id)
+    // Preserve deployment/claim records until explicit runtime termination and
+    // retention workflows complete. Hard deletion would orphan charged resources.
+    return Project.findByIdAndUpdate(id, { $set: { status: 'archived' } }, { new: true, runValidators: true })
   }
 
   async getProjectStats(projectId) {

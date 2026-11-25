@@ -78,7 +78,7 @@ class ProjectController {
     try {
       const { id } = req.params
       await projectService.deleteProject(id)
-      res.json({ message: "Project deleted successfully" })
+      res.json({ message: "Project archived; deployment records and runtimes are retained until explicitly stopped" })
     } catch (error) {
       next(error)
     }
