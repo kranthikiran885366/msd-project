@@ -53,25 +53,7 @@ class EmailService {
       });
     }
 
-    // Return mock transporter for development
-    return this._createMockTransporter();
-  }
-
-  /**
-   * Create a mock transporter for development
-   */
-  _createMockTransporter() {
-    logger.warn('Email service not configured. Using mock transporter.');
-    return {
-      sendMail: async (options) => {
-        logger.info('Mock email sent', {
-          to: options.to,
-          subject: options.subject,
-          from: options.from || process.env.EMAIL_FROM || 'noreply@app.com',
-        });
-        return { messageId: `mock-${Date.now()}@app.com` };
-      },
-    };
+    return { sendMail: async () => { throw Object.assign(new Error("Email delivery is not configured"), { status: 503 }); } };
   }
 
   /**
@@ -120,7 +102,7 @@ class EmailService {
    * Send password reset email
    */
   async sendPasswordResetEmail(user, resetToken) {
-    const resetUrl = `${process.env.APP_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${process.env.CLIENT_URL || process.env.APP_URL || "http://localhost:5000"}/reset-password?token=${resetToken}`;
     const html = `
       <h1>Password Reset Request</h1>
       <p>Hi ${user.name || user.email},</p>

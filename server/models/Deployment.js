@@ -11,7 +11,7 @@ const deploymentSchema = new mongoose.Schema(
     version: String,
     status: {
       type: String,
-      enum: ["pending", "building", "deploying", "running", "failed", "rolled-back"],
+      enum: ["pending", "building", "deploying", "running", "failed", "rolled-back", "cancelled"],
       default: "pending",
     },
     buildTime: Number,
@@ -23,6 +23,9 @@ const deploymentSchema = new mongoose.Schema(
     productionUrl: String,
     stagingUrl: String,
     localUrl: String,
+    runtimeUrl: String,
+    workerClaimedAt: Date,
+    workerNodeId: String,
     // Optional custom domain assigned to this deployment (e.g. example.com)
     customDomain: String,
     gitCommit: String,
@@ -81,6 +84,7 @@ const deploymentSchema = new mongoose.Schema(
       additionalData: mongoose.Schema.Types.Mixed,
     },
     providerConfig: {
+      noCache: Boolean,
       buildCommand: String,
       outputDirectory: String,
       framework: String,

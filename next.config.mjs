@@ -1,17 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
   images: {
     unoptimized: true,
   },
   async rewrites() {
-    const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.API_URL || process.env.BACKEND_URL || 'http://backend:3001'
+    const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.API_URL || process.env.BACKEND_URL || 'http://127.0.0.1:3001'
     const baseBackendUrl = backendUrl.replace(/\/api$/, '')
     return {
       // Keep local Next API routes active; only proxy unresolved API/auth paths.

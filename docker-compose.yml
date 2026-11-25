@@ -1,7 +1,7 @@
 version: "3.9"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CloudDeck — Full-stack Docker Compose
+# CloudDeck — trusted development only; shared Docker is not a tenant sandbox.
 # Usage:
 #   docker compose --env-file .env.docker up -d mongodb redis backend worker
 #   docker compose --env-file .env.docker up -d   (all services incl. frontend)
@@ -25,7 +25,7 @@ services:
     networks:
       - clouddeck-net
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: "${MONGO_INITDB_ROOT_USERNAME}"
       MONGO_INITDB_ROOT_PASSWORD: "${MONGO_INITDB_ROOT_PASSWORD}"
@@ -47,15 +47,15 @@ services:
     networks:
       - clouddeck-net
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     command: >
       redis-server
-      --save 60 1
+      --appendonly yes
       --loglevel warning
       --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -69,12 +69,14 @@ services:
       context: ./server
       dockerfile: Dockerfile
     image: clouddeck-backend:latest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     container_name: clouddeck-backend
     restart: unless-stopped
     networks:
       - clouddeck-net
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -94,6 +96,7 @@ services:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
       REDIS_URL: "${REDIS_URL}"
       JWT_SECRET: "${JWT_SECRET}"
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY:-}"
       WORKER_SECRET: "${WORKER_SECRET}"
       GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID}"
       GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET}"
@@ -111,8 +114,14 @@ services:
       METRICS_USERNAME: "${METRICS_USERNAME}"
       METRICS_PASSWORD: "${METRICS_PASSWORD}"
       LOG_LEVEL: "${LOG_LEVEL}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_SECURE: "${SMTP_SECURE:-false}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      EMAIL_FROM: "${EMAIL_FROM:-}"
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health/ready',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -124,17 +133,20 @@ services:
       context: ./runner-agent
       dockerfile: Dockerfile
     image: clouddeck-worker:latest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     container_name: clouddeck-worker
     restart: unless-stopped
     networks:
       - clouddeck-net
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     depends_on:
       backend:
         condition: service_healthy
     environment:
-      NODE_ENV: "production"
+      NODE_ENV: "${NODE_ENV}"
+      APPS_BASE_DOMAIN: "${APPS_BASE_DOMAIN:-}"
       BACKEND_URL: "${BACKEND_URL}"
       WORKER_SECRET: "${WORKER_SECRET}"
       NODE_ID: "${NODE_ID}"
@@ -145,6 +157,10 @@ services:
       MAX_CONCURRENT_JOBS: "${MAX_CONCURRENT_JOBS}"
       PORT_RANGE_START: "${PORT_RANGE_START}"
       PORT_RANGE_END: "${PORT_RANGE_END}"
+      REDIS_URL: "${REDIS_URL}"
+      BACKEND_PUBLIC_URL: "${BACKEND_PUBLIC_URL}"
+      RUNTIME_HOST: "host.docker.internal"
+      GATEWAY_INTERNAL_URL: "http://gateway:8080"
       WORKER_AGENT_PORT: "${WORKER_AGENT_PORT}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -172,7 +188,7 @@ services:
     networks:
       - clouddeck-net
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       backend:
         condition: service_healthy
@@ -189,3 +205,30 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+
+  # Separate origin for customer applications. Terminate TLS in front of this service in production.
+  gateway:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    command: node gateway.js
+    restart: unless-stopped
+    networks:
+      - clouddeck-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://backend:3001
+      WORKER_SECRET: "${WORKER_SECRET}"
+      APPS_BASE_DOMAIN: "${APPS_BASE_DOMAIN:-localhost}"
+      GATEWAY_PORT: 8080
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8080/_clouddeck/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

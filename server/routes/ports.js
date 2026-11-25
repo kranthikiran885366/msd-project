@@ -3,6 +3,8 @@ const router = express.Router();
 const portManagementService = require('../services/portManagementService');
 const { validateRequest } = require('../middleware/validation');
 
+router.use(require('../middleware/internalAuth'));
+
 /**
  * POST /api/ports/allocate
  * Allocate a port for a deployment

@@ -1,39 +1,3 @@
-const notificationService = require('../services/notificationService')
-
-class NotificationController {
-  async getPreferences(req, res) {
-    try {
-      const { userId } = req
-      const prefs = await notificationService.getPreferences(userId)
-      res.json(prefs || {})
-    } catch (err) {
-      res.status(500).json({ error: err.message })
-    }
-  }
-
-  async updatePreferences(req, res) {
-    try {
-      const { userId } = req
-      const prefs = await notificationService.updatePreferences(userId, req.body)
-      res.json(prefs)
-    } catch (err) {
-      res.status(500).json({ error: err.message })
-    }
-  }
-
-  async sendTest(req, res) {
-    try {
-      const { userId } = req
-      const { type = 'alert_triggered' } = req.body
-      await notificationService.sendNotification(userId, type, { alertName: 'Test Alert', resource: 'Test' })
-      res.json({ message: 'Test notification queued' })
-    } catch (err) {
-      res.status(500).json({ error: err.message })
-    }
-  }
-}
-
-module.exports = new NotificationController()
 const BaseController = require('./BaseController');
 const notificationService = require('../services/notificationService');
 const NotificationPreference = require('../models/NotificationPreference');

@@ -30,6 +30,7 @@ class DeploymentController extends BaseController {
     try {
       const { limit = 50, status, environment } = req.query
       const filters = {}
+      filters.userId = req.userId
       if (status) filters.status = status
       if (environment) filters.environment = environment
 

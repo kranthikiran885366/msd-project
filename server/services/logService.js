@@ -109,7 +109,9 @@ class LogService {
    */
   async addDeploymentLog(deploymentId, message, level = 'info') {
     try {
+      const deployment = await require('../models/Deployment').findById(deploymentId).select('projectId').lean();
       await Log.create({
+        projectId: deployment?.projectId,
         deploymentId,
         message,
         level,

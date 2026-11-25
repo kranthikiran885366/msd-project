@@ -1,0 +1,6 @@
+PASS HTTP + SSR + stylesheet: /
+PASS HTTP + SSR + stylesheet: /docs
+PASS HTTP + SSR + stylesheet: /login
+PASS HTTP + SSR + stylesheet: /signup
+PASS HTTP + SSR + stylesheet: /verify-email
+Browser interaction and visual layout were not exercised by this HTTP check.

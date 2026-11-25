@@ -1,190 +1,44 @@
+'use strict';
+const mongoose = require('mongoose');
 const Project = require('../models/Project');
 const Deployment = require('../models/Deployment');
 const Database = require('../models/Database');
-const Function = require('../models/Function');
+const FunctionModel = require('../models/Function');
 const CronJob = require('../models/CronJob');
-const Metric = require('../models/Metric');
-const monitoringService = require('./monitoringService');
 
 class DashboardService {
-  async getDashboardData(userId) {
-    try {
-      const projects = await Project.find({ userId }).lean();
-      const projectIds = projects.map(p => p._id);
-
-      const [deployments, databases, functions, cronjobs] = await Promise.all([
-        Deployment.find({ projectId: { $in: projectIds } })
-          .sort({ createdAt: -1 }).limit(50)
-          .populate('projectId', 'name').lean(),
-        Database.find({ userId }).lean(),
-        Function.find({ userId }).lean(),
-        CronJob.find({ userId }).lean()
-      ]);
-
-      // Calculate project statistics with business logic
-      const projectStats = this.calculateProjectStats(projects, deployments, functions);
-      
-      // Get system health metrics
-      const systemHealth = await this.getSystemHealth(deployments);
-      
-      // Format recent activity
-      const recentActivity = this.formatRecentActivity(deployments);
-      
-      // Get performance metrics
-      const metrics = await this.getPerformanceMetrics(projects[0]?._id);
-
-      return {
-        projects,
-        deployments,
-        databases,
-        functions,
-        cronjobs,
-        projectStats,
-        systemHealth,
-        recentActivity,
-        metrics
-      };
-    } catch (error) {
-      console.error('Dashboard service error:', error);
-      throw error;
-    }
-  }
-
   calculateProjectStats(projects, deployments, functions) {
-    const successfulDeployments = deployments.filter(d => 
-      d.status === 'success' || d.status === 'Running'
-    );
-    const activeFunctions = functions.filter(f => f.enabled);
-    
+    const successful = deployments.filter(d => d.status === 'running').length;
+    const measured = deployments.filter(d => Number.isFinite(d.buildTime) && d.buildTime > 0);
     return {
-      totalProjects: projects.length,
-      totalDeployments: deployments.length,
-      successRate: deployments.length > 0 
-        ? Math.round((successfulDeployments.length / deployments.length) * 100) 
-        : 100,
-      activeFunctions: activeFunctions.length,
-      uptime: 99.9, // This would come from monitoring service
-      avgDeployTime: '2m 34s' // This would be calculated from actual deployment times
+      totalProjects: projects.length, totalDeployments: deployments.length,
+      successfulDeployments: successful,
+      successRate: deployments.length ? Math.round(successful / deployments.length * 100) : null,
+      activeFunctions: functions.filter(f => f.enabled).length,
+      uptime: null,
+      avgBuildTimeSeconds: measured.length ? Math.round(measured.reduce((sum, d) => sum + d.buildTime, 0) / measured.length) : null,
     };
   }
-
-  async getSystemHealth(deployments) {
-    const buildingDeployments = deployments.filter(d => d.status === 'Building').length;
-    
-    return [
-      {
-        label: 'API Response',
-        status: 'good',
-        value: '< 200ms'
-      },
-      {
-        label: 'Database',
-        status: 'good',
-        value: 'Connected'
-      },
-      {
-        label: 'CDN Status',
-        status: 'good',
-        value: 'Healthy'
-      },
-      {
-        label: 'Build Queue',
-        status: buildingDeployments > 5 ? 'warning' : 'good',
-        value: `${buildingDeployments} pending`
-      }
-    ];
-  }
-
-  formatRecentActivity(deployments) {
-    return deployments.slice(0, 10).map(d => ({
-      id: d._id,
-      message: `${d.projectId?.name || 'Project'} deployment ${d.status === 'Failed' || d.status === 'failed' ? 'failed' : 'completed'}`,
-      when: d.createdAt ? new Date(d.createdAt).toLocaleString() : 'Recently',
-      status: d.status
-    }));
-  }
-
-  async getPerformanceMetrics(projectId) {
-    if (!projectId) {
-      return {
-        buildTime: { value: '2m 34s', change: '-12%', positive: true },
-        cacheHitRate: { value: '78%', change: '+5%', positive: true },
-        deploySuccess: { value: '94%', change: '+2.1%', positive: true }
-      };
-    }
-
-    try {
-      const metrics = await monitoringService.getProjectMetricsSummary(projectId, 7);
-      return {
-        buildTime: {
-          value: metrics.responseTime?.avg ? `${Math.round(metrics.responseTime.avg / 1000)}s` : '2m 34s',
-          change: '-12%',
-          positive: true
-        },
-        cacheHitRate: {
-          value: '78%',
-          change: '+5%',
-          positive: true
-        },
-        deploySuccess: {
-          value: '94%',
-          change: '+2.1%',
-          positive: true
-        }
-      };
-    } catch (error) {
-      console.warn('Failed to get performance metrics:', error);
-      return {
-        buildTime: { value: '2m 34s', change: '-12%', positive: true },
-        cacheHitRate: { value: '78%', change: '+5%', positive: true },
-        deploySuccess: { value: '94%', change: '+2.1%', positive: true }
-      };
-    }
-  }
-
-  async getStats(userId) {
-    const projects = await Project.find({ userId }).lean();
-    const projectIds = projects.map(p => p._id);
-
-    const [deploymentCount, databaseCount, functionCount] = await Promise.all([
-      Deployment.countDocuments({ projectId: { $in: projectIds } }),
-      Database.countDocuments({ userId }),
-      Function.countDocuments({ userId })
+  async getDashboardData(userId) {
+    const projects = await Project.find({ userId }).select('name slug framework status repository.owner repository.name repository.branch updatedAt createdAt').lean();
+    const scope = { projectId: { $in: projects.map(p => p._id) } };
+    const [deployments, databases, functions, cronjobs] = await Promise.all([
+      Deployment.find(scope).sort({ createdAt: -1 }).limit(50).select('-providerConfig -logs').populate('projectId', 'name').lean(),
+      Database.find(scope).select('name type status projectId').lean(),
+      FunctionModel.find(scope).select('name enabled projectId').lean(),
+      CronJob.find(scope).select('name enabled projectId').lean(),
     ]);
-
-    const successfulDeployments = await Deployment.countDocuments({
-      projectId: { $in: projectIds },
-      status: { $in: ['running', 'success'] }
-    });
-
-    const activeFunctions = await Function.countDocuments({ userId, enabled: true });
-
-    return {
-      totalProjects: projects.length,
-      totalDeployments: deploymentCount,
-      totalDatabases: databaseCount,
-      successfulDeployments,
-      successRate: deploymentCount > 0
-        ? Math.round((successfulDeployments / deploymentCount) * 100)
-        : 100,
-      activeFunctions,
-      uptime: 99.9
-    };
+    return { projects, deployments, databases, functions, cronjobs,
+      projectStats: this.calculateProjectStats(projects, deployments, functions),
+      systemHealth: [
+        { label: 'Database', status: mongoose.connection.readyState === 1 ? 'good' : 'error', value: mongoose.connection.readyState === 1 ? 'Connected' : 'Unavailable' },
+        { label: 'Build queue', status: require('./jobQueueService').isConnected ? 'good' : 'error', value: require('./jobQueueService').isConnected ? 'Connected' : 'Unavailable' },
+      ], recentActivity: this.formatRecentActivity(deployments), metrics: null, observedAt: new Date().toISOString() };
   }
-
-  async getRecentActivity(userId) {
-    const projects = await Project.find({ userId }).lean();
-    const projectIds = projects.map(p => p._id);
-    const deployments = await Deployment.find({ projectId: { $in: projectIds } })
-      .sort({ createdAt: -1 }).limit(20)
-      .populate('projectId', 'name').lean();
-    return deployments.map(d => ({
-      id: d._id,
-      message: `${d.projectId?.name || 'Project'} deployment ${d.status === 'failed' ? 'failed' : 'completed'}`,
-      when: d.createdAt ? new Date(d.createdAt).toLocaleString() : 'Recently',
-      status: d.status
-    }));
+  formatRecentActivity(deployments) {
+    return deployments.slice(0, 10).map(d => ({ id: d._id, message: `${d.projectId?.name || 'Project'} deployment ${d.status}`, when: d.createdAt, status: d.status }));
   }
+  async getStats(userId) { return (await this.getDashboardData(userId)).projectStats; }
+  async getRecentActivity(userId) { return (await this.getDashboardData(userId)).recentActivity; }
 }
-
 module.exports = new DashboardService();

@@ -7,6 +7,7 @@ const axios = require('axios');
 const { spawn } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
+const { assertDevelopmentExecutor } = require('./executionPolicy');
 
 class JobExecutor {
     constructor(nodeId, backendUrl) {
@@ -25,13 +26,14 @@ class JobExecutor {
     }
 
     async executeJob(job) {
+        assertDevelopmentExecutor();
         const deploymentId    = job.deploymentId || job.data?.deploymentId || job.id;
         this.currentJobData = job.data || {};
         const repoUrl         = job.data?.repositoryUrl || job.data?.gitUrl || job.repositoryUrl;
         const branch          = job.data?.branch || job.branch || 'main';
         const accessToken     = job.data?.accessToken || process.env.GITHUB_TOKEN;
         const noCache         = job.data?.noCache || job.noCache || false;
-        const installCommand  = job.data?.installCommand || 'npm install';
+        const installCommand  = job.data?.installCommand || '';
         const buildCommand    = job.data?.buildCommand   || '';
         const startCommand    = job.data?.startCommand   || '';
         const outputDirectory = job.data?.outputDirectory|| '';
@@ -50,11 +52,12 @@ class JobExecutor {
             await this.updateStatus(deploymentId, 'building');
             await this.log(deploymentId, `==> Cloning ${repoUrl}@${branch}`, 'info');
 
-            workspaceDir = await this.cloneRepo(deploymentId, repoUrl, branch, accessToken);
+            workspaceDir = await this.cloneRepo(deploymentId, repoUrl, branch, accessToken, job.data?.gitCommit);
+            const buildDir = await this.resolveRoot(workspaceDir, rootDirectory);
 
             // ── Step 2: Dockerfile ─────────────────────────────────────────
             await this.log(deploymentId, '==> Detecting project type', 'info');
-            await this.ensureDockerfile(deploymentId, workspaceDir, {
+            await this.ensureDockerfile(deploymentId, buildDir, {
                 installCommand, buildCommand, startCommand, outputDirectory
             });
 
@@ -62,7 +65,9 @@ class JobExecutor {
             await this.log(deploymentId, '==> Building Docker image', 'info');
             imageTag = `msd-${String(deploymentId).slice(-12)}:latest`;
             if (noCache) await this.log(deploymentId, '==> Cache disabled (--no-cache)', 'info');
-            await this.buildImage(deploymentId, workspaceDir, imageTag, noCache);
+            const buildStarted = Date.now();
+            await this.buildImage(deploymentId, buildDir, imageTag, noCache);
+            const buildTime = (Date.now() - buildStarted) / 1000;
 
             // ── Step 4: Allocate port ──────────────────────────────────────
             port = await this.allocatePort(deploymentId);
@@ -71,18 +76,16 @@ class JobExecutor {
             // ── Step 5: Run container (detached, persistent) ───────────────
             await this.updateStatus(deploymentId, 'deploying');
             await this.log(deploymentId, `==> Starting container on port ${port}`, 'info');
-            await this.runContainer(deploymentId, imageTag, containerName, port, workspaceDir);
+            await this.runContainer(deploymentId, imageTag, containerName, port, buildDir, envVariables, job.data?.appPort);
 
             // ── Step 6: Health check ───────────────────────────────────────
-            await new Promise(r => setTimeout(r, 3000));
-            const alive = await this.isRunning(containerName);
-            if (!alive) throw new Error('Container exited immediately — check build logs');
+            await this.waitForHealthy(containerName, port, 60000, deploymentId);
 
             const nodeIp = process.env.NODE_PUBLIC_IP || process.env.NODE_IP || 'localhost';
             // Use localhost if running inside Docker (internal hostnames not reachable from browser)
             const INTERNAL = ['worker', 'backend', 'frontend', 'mongodb', 'redis'];
             const publicIp = INTERNAL.includes(nodeIp) ? 'localhost' : nodeIp;
-            const rawUrl = `http://${publicIp}:${port}`;
+            const rawUrl = `http://${process.env.RUNTIME_HOST || publicIp}:${port}`;
 
             // Build a Heroku/Render-style proxy URL through the backend
             // so the browser always gets a stable, reachable URL
@@ -90,8 +93,10 @@ class JobExecutor {
                 .replace(/\/api$/, '');
             // Generate Heroku/Render-style subdomain URL
             // Format: {project-slug}-{short-id}.clouddeck.local → proxied via backend
-            const appUrl = `${backendPublic}/app/${deploymentId}`;
-            const domain = `${String(deploymentId).slice(-8)}.clouddeck.local`;
+            const appDomain = process.env.APPS_BASE_DOMAIN || 'localhost';
+            if (process.env.NODE_ENV === 'production' && !appDomain) throw new Error('APPS_BASE_DOMAIN is required for isolated production application origins');
+            const appUrl = appDomain === 'localhost' ? `http://${deploymentId}.localhost:${process.env.GATEWAY_PUBLIC_PORT || 8080}` : `https://${deploymentId}.${appDomain}`;
+            const domain = null;
 
             await this.log(deploymentId, `==> Container running on port ${port}`, 'info');
             await this.log(deploymentId, `==> App URL: ${appUrl}`, 'info');
@@ -99,11 +104,15 @@ class JobExecutor {
             const customDomain = job.data?.customDomain || null;
             const publicUrl = customDomain ? `https://${customDomain}` : appUrl;
             if (customDomain) await this.log(deploymentId, `==> Assigned custom domain: ${customDomain}`, 'info');
+            await this.updateStatus(deploymentId, 'deploying', { rawUrl, localUrl: rawUrl, port, nodeId: this.nodeId });
+            await this.verifyIngress(deploymentId, publicUrl);
             await this.updateStatus(deploymentId, 'running', {
                 url: publicUrl,
-                rawUrl: `http://127.0.0.1:${port}`,
+                rawUrl,
+                localUrl: rawUrl,
+                port, nodeId: this.nodeId,
                 domain: customDomain || domain,
-                imageTag
+                imageTag, gitCommit: this.resolvedCommit, buildTime
             });
 
             this.runningContainers.set(containerName, { deploymentId, port });
@@ -115,8 +124,9 @@ class JobExecutor {
         } catch (err) {
             console.error(`[executor] ✗ Job ${deploymentId} failed: ${err.message}`);
             await this.log(deploymentId, `==> ✗ ${err.message}`, 'error');
-            await this.updateStatus(deploymentId, 'failed', { error: err.message });
+            await this.updateStatus(deploymentId, 'failed', { error: err.message }).catch(() => {});
 
+            await this.exec(null, 'docker', ['rm', '-f', containerName]).catch(() => {});
             if (port) {
                 await this.client.post(`/api/ports/${deploymentId}/release`).catch(() => {});
             }
@@ -127,21 +137,32 @@ class JobExecutor {
     }
 
     // ── Clone ──────────────────────────────────────────────────────────────────
-    async cloneRepo(deploymentId, repoUrl, branch, accessToken) {
+    async cloneRepo(deploymentId, repoUrl, branch, accessToken, commit = null) {
         if (!repoUrl) throw new Error('No repository URL in job data');
 
-        let cloneUrl = repoUrl;
-        if (accessToken && repoUrl.includes('github.com')) {
-            cloneUrl = repoUrl.replace('https://github.com/', `https://${accessToken}@github.com/`);
-        }
-
+        const url = new URL(repoUrl);
+        if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.username || url.password || url.search || url.hash || !/^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/.test(url.pathname)) throw new Error('Use an HTTPS GitHub repository URL without credentials');
+        if (!/^[a-f\d]{24}$/i.test(String(deploymentId))) throw new Error('Invalid deployment ID');
         const dir = path.join('/tmp', 'msd-builds', String(deploymentId));
         await fs.rm(dir, { recursive: true, force: true });
         await fs.mkdir(dir, { recursive: true });
+        const askpass = path.join('/tmp', `msd-askpass-${deploymentId}`);
+        try {
+            await fs.writeFile(askpass, '#!/bin/sh\ncase "$1" in *Username*) echo x-access-token;; *) printf "%s\n" "$CLOUDDECK_GIT_TOKEN";; esac\n', { mode: 0o700 });
+            await this.exec(deploymentId, 'git', ['clone', '--depth', '1', `--branch=${branch}`, '--', repoUrl, dir], {
+                env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: askpass, CLOUDDECK_GIT_TOKEN: accessToken || '' }
+            });
+            if (commit) {
+                if (!/^[a-f\d]{40}$/i.test(commit)) throw new Error('A rollback requires a full Git commit SHA');
+                await this.exec(deploymentId, 'git', ['-C', dir, 'fetch', '--depth', '1', 'origin', commit], { env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: askpass, CLOUDDECK_GIT_TOKEN: accessToken || '' } });
+                await this.exec(deploymentId, 'git', ['-C', dir, 'checkout', '--detach', commit]);
+            }
+            const { stdout } = await require('util').promisify(require('child_process').execFile)('git', ['-C', dir, 'rev-parse', 'HEAD']);
+            this.resolvedCommit = stdout.trim();
+            // Never copy Git credential helpers, history or config into build images.
+            await fs.rm(path.join(dir, '.git'), { recursive: true, force: true });
+        } finally { await fs.rm(askpass, { force: true }); }
 
-        await this.exec(deploymentId, 'git', [
-            'clone', '--depth', '1', '--branch', branch, cloneUrl, dir
-        ]);
         return dir;
     }
 
@@ -183,16 +204,30 @@ class JobExecutor {
             );
         }
 
-        // Fallback landing page for repos with no detectable entry
-        if (runtime.type === 'static-safe') {
-            try { await fs.access(path.join(dir, 'index.html')); } catch (_) {
-                await fs.writeFile(path.join(dir, 'index.html'),
-                    `<!doctype html><html><head><meta charset="utf-8"><title>Deployed</title></head>` +
-                    `<body style="font-family:sans-serif;max-width:600px;margin:60px auto;padding:0 20px">` +
-                    `<h1>Deployment Ready</h1><p>No entry point detected. Push your app files and redeploy.</p></body></html>`
-                );
-            }
+        if (runtime.type === 'static-safe') throw new Error('No supported runtime or index.html detected. Add a Dockerfile or configure a supported application.');
+    }
+
+    async resolveRoot(workspace, rootDirectory) {
+        const root = await fs.realpath(workspace);
+        const requested = String(rootDirectory || '/').replace(/^\/+/, '');
+        const target = await fs.realpath(path.resolve(root, requested));
+        if (target !== root && !target.startsWith(root + path.sep)) throw new Error('Root directory must remain inside the repository');
+        if (!(await fs.stat(target)).isDirectory()) throw new Error('Root directory is not a directory');
+        return target;
+    }
+
+    async waitForHealthy(containerName, port, timeout = 60000, deploymentId = null) {
+        const start = Date.now();
+        while (Date.now() - start < timeout) {
+            if (deploymentId) await this.assertActive(deploymentId);
+            if (!await this.isRunning(containerName)) throw new Error('Application container exited before becoming ready');
+            try {
+                const response = await axios.get(`http://${process.env.RUNTIME_HOST || '127.0.0.1'}:${port}/`, { timeout: 2000, maxRedirects: 0, validateStatus: status => status >= 200 && status < 400 });
+                if (response) return;
+            } catch (_) {}
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
+        throw new Error('Application did not become HTTP-ready within 60 seconds');
     }
 
     _runtimeLabel(r) {
@@ -229,7 +264,7 @@ class JobExecutor {
             if (r.packageManager === 'pnpm') return 'pnpm start';
             return 'npm start';
         }
-        if (r.type === 'node') return 'node index.js';
+        if (r.type === 'node') return r.hasStartScript ? (r.packageManager === 'pnpm' ? 'pnpm start' : r.packageManager === 'yarn' ? 'yarn start' : 'npm start') : `node ${r.mainFile || 'index.js'}`;
         if (r.type === 'python') return 'python app.py';
         if (r.type === 'go')     return './app';
         if (r.type === 'ruby')   return 'bundle exec ruby app.rb';
@@ -238,7 +273,7 @@ class JobExecutor {
     }
 
     _defaultOutput(r) {
-        if (r.type === 'react')  return 'build';
+        if (r.type === 'react')  return r.isVite ? 'dist' : 'build';
         if (r.type === 'vue')    return 'dist';
         if (r.type === 'svelte') return 'public';
         if (r.type === 'astro')  return 'dist';
@@ -288,6 +323,9 @@ class JobExecutor {
             }
 
             // Framework detection
+            result.isVite = Boolean(deps.vite);
+            result.hasStartScript = Boolean(pkg.scripts?.start);
+            result.mainFile = typeof pkg.main === 'string' && /^[a-zA-Z0-9_./-]+$/.test(pkg.main) ? pkg.main : 'index.js';
             if (deps.next)         { result.type = 'nextjs';  result.framework = 'Next.js'; }
             else if (deps.nuxt)    { result.type = 'nuxt';    result.framework = 'Nuxt'; }
             else if (deps.react)   { result.type = 'react';   result.framework = 'React'; }
@@ -359,8 +397,8 @@ class JobExecutor {
             nextjs: `FROM node:${node}-alpine AS builder
 WORKDIR /app
 COPY . .
-${installPkg} --legacy-peer-deps 2>/dev/null || ${install}
-${build ? `RUN ${build} 2>/dev/null || echo 'build skipped'` : ''}
+${installPkg}
+${build ? `RUN ${build}` : ''}
 FROM node:${node}-alpine
 WORKDIR /app
 COPY --from=builder /app .
@@ -370,7 +408,7 @@ CMD ["sh","-c","${start}"]`,
             react: `FROM node:${node}-alpine AS builder
 WORKDIR /app
 COPY . .
-${installPkg} --legacy-peer-deps 2>/dev/null || ${install}
+${installPkg}
 RUN ${build}
 FROM nginx:alpine
 COPY --from=builder /app/${output || 'build'} /usr/share/nginx/html
@@ -381,7 +419,7 @@ CMD ["nginx","-g","daemon off;"]`,
             vue: `FROM node:${node}-alpine AS builder
 WORKDIR /app
 COPY . .
-${installPkg} --legacy-peer-deps 2>/dev/null || ${install}
+${installPkg}
 RUN ${build}
 FROM nginx:alpine
 COPY --from=builder /app/${output || 'dist'} /usr/share/nginx/html
@@ -392,7 +430,7 @@ CMD ["nginx","-g","daemon off;"]`,
             svelte: `FROM node:${node}-alpine AS builder
 WORKDIR /app
 COPY . .
-${installPkg} --legacy-peer-deps 2>/dev/null || ${install}
+${installPkg}
 RUN ${build}
 FROM nginx:alpine
 COPY --from=builder /app/${output || 'public'} /usr/share/nginx/html
@@ -403,7 +441,7 @@ CMD ["nginx","-g","daemon off;"]`,
             astro: `FROM node:${node}-alpine AS builder
 WORKDIR /app
 COPY . .
-${installPkg} --legacy-peer-deps 2>/dev/null || ${install}
+${installPkg}
 RUN ${build}
 FROM nginx:alpine
 COPY --from=builder /app/${output || 'dist'} /usr/share/nginx/html
@@ -414,7 +452,7 @@ CMD ["nginx","-g","daemon off;"]`,
             nuxt: `FROM node:${node}-alpine AS builder
 WORKDIR /app
 COPY . .
-${installPkg} --legacy-peer-deps 2>/dev/null || ${install}
+${installPkg}
 RUN ${build}
 FROM node:${node}-alpine
 WORKDIR /app
@@ -425,8 +463,8 @@ CMD ["node",".output/server/index.mjs"]`,
             node: `FROM node:${node}-alpine
 WORKDIR /app
 COPY . .
-RUN if [ -f package.json ]; then ${install} --legacy-peer-deps 2>/dev/null || ${install}; fi
-${build ? `RUN ${build} 2>/dev/null || true` : ''}
+RUN if [ -f package.json ]; then ${install}; fi
+${build ? `RUN ${build}` : ''}
 EXPOSE 3000
 CMD ["sh","-c","${start || 'node $(node -e \'const p=require(\"./package.json\");console.log(p.main||\"index.js\")\')' }"]`,
 
@@ -437,12 +475,12 @@ RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.
 RUN if [ -f Pipfile ]; then pip install pipenv && pipenv install --system --deploy; fi
 RUN if [ -f pyproject.toml ]; then pip install --no-cache-dir .; fi
 EXPOSE 8000
-CMD ["sh","-c","${start || 'if [ -f manage.py ]; then python manage.py runserver 0.0.0.0:8000; elif [ -f app.py ]; then python app.py; elif [ -f main.py ]; then python main.py; else gunicorn app:app 2>/dev/null || python -m http.server 8000; fi'}"]`,
+CMD ["sh","-c","${start || 'if [ -f manage.py ]; then python manage.py runserver 0.0.0.0:8000; elif [ -f app.py ]; then python app.py; elif [ -f main.py ]; then python main.py; else gunicorn app:app; fi'}"]`,
 
             go: `FROM golang:${goVer}-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN go mod download 2>/dev/null || true
+RUN go mod download
 RUN ${build || 'go build -o app .'}
 FROM alpine:latest
 WORKDIR /app
@@ -456,7 +494,7 @@ RUN apk add --no-cache build-base
 COPY . .
 RUN bundle install
 EXPOSE 3000
-CMD ["sh","-c","${start || 'bundle exec rails server -b 0.0.0.0 2>/dev/null || bundle exec ruby app.rb'}"]`,
+CMD ["sh","-c","${start || 'bundle exec rails server -b 0.0.0.0'}"]`,
 
             php: `FROM php:${php}-apache
 WORKDIR /var/www/html
@@ -489,7 +527,7 @@ CMD ["nginx","-g","daemon off;"]`,
     }
 
     // ── Run container — DETACHED so it stays alive ─────────────────────────────
-    async runContainer(deploymentId, imageTag, containerName, port, workspaceDir) {
+    async runContainer(deploymentId, imageTag, containerName, port, workspaceDir, envVariables = {}, configuredPort) {
         // Detect internal port from Dockerfile EXPOSE directive
         let internalPort = 3000;
         try {
@@ -499,8 +537,17 @@ CMD ["nginx","-g","daemon off;"]`,
             if (match) internalPort = parseInt(match[1], 10);
         } catch (_) {}
 
-        await this.exec(deploymentId, 'docker', [
+        if (configuredPort) internalPort = Number(configuredPort);
+        if (!Number.isInteger(internalPort) || internalPort < 1 || internalPort > 65535) throw new Error('Invalid application port');
+        const envFile = path.join('/tmp', `msd-env-${deploymentId}`);
+        const entries = Object.entries(envVariables);
+        for (const [key, value] of entries) if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || /[\r\n\0]/.test(String(value))) throw new Error('Invalid environment variable');
+        await fs.writeFile(envFile, entries.map(([key, value]) => `${key}=${value}`).join('\n'), { mode: 0o600 });
+        try { await this.exec(deploymentId, 'docker', [
             'run',
+            '--security-opt=no-new-privileges',
+            '--pids-limit=256',
+            '--env-file', envFile,
             '--detach',                        // FIX: was --rm which killed container on exit
             '--name', containerName,
             '--memory=256m',
@@ -508,10 +555,11 @@ CMD ["nginx","-g","daemon off;"]`,
             '--restart=unless-stopped',        // auto-restart on crash like Render
             '-p', `${port}:${internalPort}`,
             '-e', 'NODE_ENV=production',
+            '-e', `PORT=${internalPort}`,
             '--label', `deployment=${deploymentId}`,
             '--label', 'managed-by=clouddeck',
             imageTag
-        ]);
+        ]); } finally { await fs.rm(envFile, { force: true }); }
     }
 
     async isRunning(containerName) {
@@ -538,34 +586,21 @@ CMD ["nginx","-g","daemon off;"]`,
             }
         } catch (_) {}
 
-        // Safe fallback range excludes common service ports used by platform containers.
-        const start = parseInt(process.env.PORT_RANGE_START || '4100', 10);
-        const end   = parseInt(process.env.PORT_RANGE_END   || '5999', 10);
-
-        for (let i = 0; i < 20; i += 1) {
-            const candidate = start + Math.floor(Math.random() * Math.max(1, (end - start)));
-            if (!reservedPorts.has(candidate)) {
-                return candidate;
-            }
-        }
-
-        return 4100;
+        throw new Error('Port allocation failed; refusing an unreserved port');
     }
 
     // ── Status update — tries PATCH first (correct route), falls back to POST ──
     async updateStatus(deploymentId, status, extras = {}) {
         const body = { status, ...extras };
-        // Try PATCH /:id/status (authenticated route)
-        let res = await this.client.patch(`/api/deployments/${deploymentId}/status`, body);
-        if (res.status >= 400) {
-            // Fall back to worker POST route (no auth required)
-            await this.client.post(`/api/deployments/${deploymentId}/status`, body);
-        }
+        const res = await this.client.post(`/api/deployments/${deploymentId}/status`, body);
+        if (res.status >= 400) throw new Error(`Status callback rejected (${res.status})`);
     }
 
     // ── Log append ─────────────────────────────────────────────────────────────
     async log(deploymentId, message, level = 'info') {
-        const trimmed = String(message).trim();
+        let trimmed = String(message).trim();
+        const values = [process.env.WORKER_SECRET, this.currentJobData?.accessToken, ...Object.values(this.currentJobData?.envVariables || {})].filter(v => typeof v === 'string' && v.length > 3);
+        for (const value of values) trimmed = trimmed.split(value).join('[REDACTED]');
         if (!trimmed) return;
         console.log(`[executor][${level}] ${trimmed}`);
         await this.client.post(`/api/deployments/${deploymentId}/logs`, {
@@ -575,8 +610,23 @@ CMD ["nginx","-g","daemon off;"]`,
         }).catch(() => {}); // non-fatal
     }
 
+    async verifyIngress(deploymentId, publicUrl) {
+        const url = new URL(publicUrl);
+        const internal = process.env.NODE_ENV !== 'production' && process.env.GATEWAY_INTERNAL_URL;
+        const target = internal || url.href;
+        const response = await axios.get(target, { timeout: 10000, maxRedirects: 0, headers: internal ? { Host: url.host } : {}, validateStatus: status => status >= 200 && status < 400 });
+        if (response.headers['x-clouddeck-deployment'] !== String(deploymentId)) throw new Error('Public ingress did not confirm this deployment identity');
+    }
+
+    async assertActive(deploymentId) {
+        const response = await this.client.get(`/api/deployments/${deploymentId}/worker-state`, { timeout: 5000 });
+        if (response.status !== 200) throw new Error('Could not verify deployment authorization');
+        if (!['pending', 'building', 'deploying'].includes(response.data.status)) throw new Error('Deployment is no longer active');
+    }
+
     // ── Generic exec with live log streaming ──────────────────────────────────
     async exec(deploymentId, cmd, args, opts = {}) {
+        if (deploymentId) await this.assertActive(deploymentId);
         return new Promise((resolve, reject) => {
             const proc = spawn(cmd, args, {
                 stdio: ['pipe', 'pipe', 'pipe'],
@@ -584,6 +634,15 @@ CMD ["nginx","-g","daemon off;"]`,
             });
 
             let stderr = '';
+            let cancellation = null;
+            let checking = false;
+            const guard = deploymentId ? setInterval(async () => {
+                if (checking) return;
+                checking = true;
+                try { await this.assertActive(deploymentId); } catch (error) { cancellation = error; proc.kill('SIGTERM'); } finally { checking = false; }
+            }, 3000) : null;
+            const timeout = setTimeout(() => { cancellation = new Error('Build command timed out'); proc.kill('SIGKILL'); }, 600000);
+            const finish = () => { if (guard) clearInterval(guard); clearTimeout(timeout); };
 
             proc.stdout.on('data', d => {
                 const msg = d.toString().trim();
@@ -592,16 +651,18 @@ CMD ["nginx","-g","daemon off;"]`,
 
             proc.stderr.on('data', d => {
                 const msg = d.toString().trim();
-                stderr += msg + '\n';
+                stderr = (stderr + msg + '\n').slice(-16384);
                 if (msg && deploymentId) this.log(deploymentId, msg, 'warn');
             });
 
             proc.on('close', code => {
-                if (code === 0) resolve();
+                finish();
+                if (cancellation) reject(cancellation);
+                else if (code === 0) resolve();
                 else reject(new Error(`${cmd} ${args[0]} exited ${code}: ${stderr.slice(-300)}`));
             });
 
-            proc.on('error', reject);
+            proc.on('error', error => { finish(); reject(error); });
         });
     }
 

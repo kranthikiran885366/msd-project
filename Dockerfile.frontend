@@ -1,29 +1,27 @@
 # ── Frontend Dockerfile (Next.js) ────────────────────────────────────────────
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm@10
 
 # Copy manifests first for layer caching
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # Copy source and build
 COPY . .
 
 # Build args injected at build time so Next.js bakes them in
-ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS=false
 ENV NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS=$NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS
 ARG INTERNAL_BACKEND_URL=http://backend:3001
 ENV INTERNAL_BACKEND_URL=$INTERNAL_BACKEND_URL
 
-RUN pnpm build
+RUN npm run build
 
 # ── Runtime image ─────────────────────────────────────────────────────────────
-FROM node:18-alpine
+FROM node:22-alpine
 WORKDIR /app
 
 RUN addgroup -S clouddeck && adduser -S clouddeck -G clouddeck

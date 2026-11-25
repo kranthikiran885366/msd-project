@@ -3,7 +3,6 @@ node_modules
 out
 .env
 .env.*
-!.env.docker
 server/
 runner-agent/
 npm-debug.log*
@@ -16,3 +15,5 @@ Dockerfile*
 k8s/
 *.md
 npm-cache/
+
+.next-dev/

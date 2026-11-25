@@ -65,11 +65,11 @@ app.use(
         return callback(null, true)
       }
       // Allow any localhost/127.0.0.1 origin in development
-      if (/localhost|127\.0\.0\.1/.test(origin)) {
+      if (config.nodeEnv !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
         return callback(null, true)
       }
       // Allow Replit proxy domains (*.replit.dev, *.repl.co, *.replit.app)
-      if (/\.replit\.dev$|\.repl\.co$|\.replit\.app$/.test(origin)) {
+      if (config.nodeEnv !== 'production' && /\.replit\.dev$|\.repl\.co$|\.replit\.app$/.test(origin)) {
         return callback(null, true)
       }
       callback(new Error('Not allowed by CORS'))
@@ -77,16 +77,19 @@ app.use(
     credentials: true,
   }),
 )
-app.use(express.json())
+app.disable("x-powered-by")
+app.set("trust proxy", 1)
+app.use(express.json({ limit: "256kb" }))
 app.use(express.urlencoded({ extended: true }))
 
 // Session middleware for OAuth
 app.use(
   session({
-    secret: process.env.JWT_SECRET || "your-secret-key",
+    secret: config.jwtSecret,
+    ...(config.nodeEnv === "production" ? { store: require("connect-mongo").create({ mongoUrl: config.mongodbUri, ttl: 86400 }) } : {}),
     resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 },
+    saveUninitialized: false,
+    cookie: { httpOnly: true, sameSite: "lax", secure: config.nodeEnv === "production", maxAge: 1000 * 60 * 60 * 24 },
   })
 )
 
@@ -98,6 +101,18 @@ app.use(passport.session())
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })
 })
+
+app.get('/health/ready', (req, res) => {
+  const database = require('mongoose').connection.readyState === 1;
+  const queue = require('./services/jobQueueService').isConnected;
+  res.status(database && queue ? 200 : 503).json({ status: database && queue ? 'ready' : 'unavailable', database, queue });
+});
+
+app.get('/api/platform/health', require('./middleware/auth'), (req, res) => {
+  const database = require('mongoose').connection.readyState === 1;
+  const queue = require('./services/jobQueueService').isConnected;
+  res.json({ observedAt: new Date().toISOString(), status: database && queue ? 'ready' : 'unavailable', database, queue });
+});
 
 // Version endpoint
 app.get("/version", (req, res) => {
@@ -161,46 +176,7 @@ app.use("/api/ports", portsRoutes)
 // ── Deployed app reverse proxy ────────────────────────────────────────────────
 // Proxies browser requests to the actual container running on the worker.
 // URL pattern: /app/:deploymentId  or  /app/:deploymentId/*
-app.use('/app/:deploymentId', async (req, res) => {
-  try {
-    const Deployment = require('./models/Deployment');
-    const dep = await Deployment.findById(req.params.deploymentId).lean();
-    if (!dep) return res.status(404).send('<h2>App not found</h2>');
-
-    // previewUrl stores the raw container URL (http://localhost:PORT)
-    // productionUrl stores the proxy URL (http://localhost:3000/app/ID)
-    const rawUrl = dep.previewUrl || dep.productionUrl;
-    if (!rawUrl) return res.status(404).send('<h2>App not yet deployed</h2>');
-
-    // Resolve any Docker-internal hostname to 127.0.0.1 (force IPv4)
-    let targetBase = rawUrl
-        .replace(/http:\/\/localhost/, 'http://127.0.0.1')
-        .replace(/http:\/\/[a-z_-]+:(\d+)/, 'http://127.0.0.1:$1');
-
-    const subPath = req.params[0] || '/';
-    const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-    const targetUrl = `${targetBase}${subPath}${qs}`;
-
-    const axios = require('axios');
-    const response = await axios({
-      method: req.method,
-      url: targetUrl,
-      headers: { ...req.headers, host: new URL(targetBase).host },
-      data: ['GET','HEAD'].includes(req.method) ? undefined : req.body,
-      responseType: 'arraybuffer',
-      timeout: 30000,
-      validateStatus: () => true,
-    });
-
-    res.status(response.status);
-    Object.entries(response.headers).forEach(([k, v]) => {
-      if (!['transfer-encoding','connection'].includes(k.toLowerCase())) res.setHeader(k, v);
-    });
-    res.send(Buffer.from(response.data));
-  } catch (err) {
-    res.status(502).send(`<h2>Bad Gateway</h2><p>The app may still be starting up. Try again in a moment.</p><pre>${err.message}</pre>`);
-  }
-});
+app.use('/app/:deploymentId', (req, res) => res.status(410).send('Application traffic must use its isolated gateway origin.'));
 
 // Error handling
 app.use(errorHandler)
@@ -233,7 +209,9 @@ app.get('/metrics', (req, res, next) => {
 ErrorMonitoringService.init();
 
 // Connect to database and start server
-connectDB()
+async function start() {
+  require("./config/validateEnvironment")();
+  return connectDB()
   .then(async () => {
     // Initialize job queue
     try {
@@ -242,9 +220,7 @@ connectDB()
       console.log('[startup] Job queue initialized');
 
       // Start job scheduler after queue is ready
-      const jobSchedulerService = require('./services/jobSchedulerService');
-      await jobSchedulerService.startScheduler();
-      console.log('[startup] Job scheduler started');
+      // BullMQ workers own dispatch and locking. Do not run the legacy HTTP scheduler concurrently.
 
       // Initialize port management
       const portManagementService = require('./services/portManagementService');
@@ -260,24 +236,22 @@ connectDB()
       databaseService.startHealthMonitor(30000)
       console.log("[startup] Database health monitor started")
     } catch (initErr) {
-      console.warn('[startup] Infrastructure services init warning (non-fatal):', initErr.message);
+      throw initErr;
     }
 
-    app.listen(config.port, () => {
+    return app.listen(config.port, () => {
       console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`)
       console.log(`Public URL:  ${config.publicUrl}`)
       console.log(`Private IP:  ${config.privateIp}`)
       console.log(`Prometheus metrics available at http://localhost:${config.port}/metrics`)
     })
   })
-  .catch((error) => {
-    ErrorMonitoringService.handleError(error);
-    // Don't exit immediately in production, give time for reconnection
-    if (process.env.NODE_ENV === 'production') {
-      console.log('Attempting to continue in degraded mode...');
-    } else {
-      process.exit(1);
-    }
-  })
+}
+
+if (require.main === module) start().catch(error => {
+  ErrorMonitoringService.handleError(error);
+  process.exit(1);
+});
+app.start = start;
 
 module.exports = app

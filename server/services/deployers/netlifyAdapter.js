@@ -182,13 +182,7 @@ class NetlifyAdapter extends DeployerAdapter {
    * Cancel a deployment
    */
   async cancelDeployment(providerDeploymentId) {
-    try {
-      // Netlify doesn't have a direct cancel endpoint
-      // Deployments automatically complete or fail
-      return { success: true, message: "Deployment cancellation not supported by Netlify" }
-    } catch (error) {
-      throw new Error(`Failed to cancel Netlify deployment: ${error.message}`)
-    }
+    throw Object.assign(new Error('Cancellation is not supported by this Netlify adapter'), { status: 501 });
   }
 
   /**

@@ -14,7 +14,8 @@ const IV_HEX_LEN = IV_LENGTH * 2; // 24 hex chars
 
 // Derive key once at module load — avoids repeated hashing per call
 const _key = (() => {
-    const secret = process.env.JWT_SECRET || 'change-this-secret-min-32-chars!!';
+    const secret = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET or ENCRYPTION_KEY is required for persistent secret encryption');
     return crypto.createHash('sha256').update(secret).digest();
 })();
 

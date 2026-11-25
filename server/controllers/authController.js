@@ -5,13 +5,38 @@ const AuthService = require("../services/authService")
 const crypto = require("crypto")
 const emailService = require("../utils/emailService")
 
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "7d" })
+const generateToken = (userId, version = 0) => {
+  return jwt.sign({ userId, type: "access", version }, require("../config/env").jwtSecret, { expiresIn: "7d" })
 }
 
-const generateRefreshToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "30d" })
+const generateRefreshToken = (userId, version = 0) => {
+  return jwt.sign({ userId, type: "refresh", version }, require("../config/env").jwtSecret, { expiresIn: "30d" })
 }
+
+async function finishOAuth(req, res, user, provider, isNewUser, isLinked) {
+  const code = await require('../services/oauthExchange').issue(user, req.sessionID);
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5000';
+  const target = new URL('/login/auth-callback', clientUrl);
+  target.searchParams.set('provider', provider);
+  target.searchParams.set('isNew', String(Boolean(isNewUser)));
+  target.searchParams.set('isLinked', String(Boolean(isLinked)));
+  target.searchParams.set('returnUrl', require('../utils/authRedirect').safeReturnPath(req.session?.githubReturnUrl, clientUrl));
+  if (req.session) delete req.session.githubReturnUrl;
+  // Only a session-bound, short-lived, single-use grant goes to the browser.
+  target.hash = new URLSearchParams({ code }).toString();
+  req.session.save(error => error ? res.status(503).json({ error: 'OAuth session could not be saved' }) : res.redirect(target.toString()));
+}
+exports.exchangeOAuth = async (req, res, next) => {
+  try {
+    const expected = new URL(process.env.CLIENT_URL || 'http://localhost:5000').origin;
+    if (req.get('origin') !== expected) return res.status(403).json({ error: 'OAuth exchange origin is not allowed' });
+    const grant = await require('../services/oauthExchange').consume(req.body.code, req.sessionID);
+    if (!grant) return res.status(401).json({ error: 'OAuth login expired or was already used. Please sign in again.' });
+    const user = await User.findById(grant.userId);
+    if (!user?.isActive || (user.tokenVersion || 0) !== grant.version) return res.status(401).json({ error: 'OAuth session is no longer valid' });
+    res.json({ token: generateToken(user._id, user.tokenVersion || 0), refreshToken: generateRefreshToken(user._id, user.tokenVersion || 0) });
+  } catch (error) { next(error); }
+};
 
 // Local Authentication - Signup
 exports.signup = async (req, res) => {
@@ -19,7 +44,7 @@ exports.signup = async (req, res) => {
     const { email, password, confirmPassword, name } = req.body
 
     // Validation
-    if (!email || !password || !name) {
+    if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || typeof name !== "string" || !name.trim() || name.length > 100 || !password) {
       return res.status(400).json({ error: "Email, password, and name are required" })
     }
 
@@ -27,8 +52,8 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ error: "Passwords do not match" })
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" })
+    if (!require("../utils/passwordPolicy").validPassword(password)) {
+      return res.status(400).json({ error: "Use at least 12 characters and at most 72 UTF-8 bytes" })
     }
 
     // Check if user already exists (case-insensitive)
@@ -58,8 +83,8 @@ exports.signup = async (req, res) => {
     await user.save()
 
     // Generate tokens
-    const token = generateToken(user._id)
-    const refreshToken = generateRefreshToken(user._id)
+    const token = generateToken(user._id, user.tokenVersion || 0)
+    const refreshToken = generateRefreshToken(user._id, user.tokenVersion || 0)
 
     // Audit log
     await AuditLog.create({
@@ -79,6 +104,7 @@ exports.signup = async (req, res) => {
         email: user.email,
         name: user.name,
         avatar: user.avatar,
+        emailVerified: user.emailVerified,
         plan: user.plan,
         dbLimit: user.dbLimit,
         dbProvider: user.dbProvider,
@@ -94,7 +120,7 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body
 
-    if (!email || !password) {
+    if (typeof email !== "string" || typeof password !== "string" || !email || !password || Buffer.byteLength(password) > 72) {
       return res.status(400).json({ error: "Email and password are required" })
     }
 
@@ -131,8 +157,8 @@ exports.login = async (req, res) => {
     await user.save()
 
     // Generate tokens
-    const token = generateToken(user._id)
-    const refreshToken = generateRefreshToken(user._id)
+    const token = generateToken(user._id, user.tokenVersion || 0)
+    const refreshToken = generateRefreshToken(user._id, user.tokenVersion || 0)
 
     // Audit log
     await AuditLog.create({
@@ -152,6 +178,7 @@ exports.login = async (req, res) => {
         email: user.email,
         name: user.name,
         avatar: user.avatar,
+        emailVerified: user.emailVerified,
         plan: user.plan,
         dbLimit: user.dbLimit,
         dbProvider: user.dbProvider,
@@ -167,6 +194,7 @@ exports.logout = async (req, res) => {
   try {
     const { userId } = req
 
+    await User.updateOne({ _id: userId }, { $inc: { tokenVersion: 1 } });
     await AuditLog.create({
       userId,
       action: "USER_LOGGED_OUT",
@@ -190,14 +218,15 @@ exports.refreshToken = async (req, res) => {
       return res.status(400).json({ error: "Refresh token is required" })
     }
 
-    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET)
+    const decoded = jwt.verify(refreshToken, require("../config/env").jwtSecret)
+    if (decoded.type !== "refresh") return res.status(401).json({ error: "Invalid refresh token" });
     const user = await User.findById(decoded.userId)
 
-    if (!user) {
-      return res.status(401).json({ error: "User not found" })
+    if (!user || !user.isActive || (decoded.version || 0) !== (user.tokenVersion || 0)) {
+      return res.status(401).json({ error: "Invalid refresh token" })
     }
 
-    const newToken = generateToken(user._id)
+    const newToken = generateToken(user._id, user.tokenVersion || 0)
 
     res.json({ token: newToken })
   } catch (error) {
@@ -213,6 +242,7 @@ exports.googleCallback = async (req, res) => {
     const { id, displayName, emails, photos } = profile
 
     const googleEmail = emails?.[0]?.value
+    if (profile._json?.email_verified !== true && emails?.[0]?.verified !== true) throw new Error('A verified Google email address is required')
     if (!googleEmail) throw new Error("Google account does not have an email address")
 
     const { user, isNewUser, isLinked } = await AuthService.findOrCreateUser(
@@ -224,25 +254,14 @@ exports.googleCallback = async (req, res) => {
         picture: photos?.[0]?.value,
         name: displayName,
         refreshToken: googleRefreshToken,
+        emailVerified: true,
       }
     )
 
     const action = isNewUser ? "USER_SIGNED_UP_GOOGLE" : isLinked ? "USER_LINKED_GOOGLE" : "USER_LOGGED_IN_GOOGLE"
     await AuthService.createAuthAuditLog(user._id, action, { email: googleEmail })
 
-    const token = generateToken(user._id)
-    const refreshToken = generateRefreshToken(user._id)
-
-    const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
-    redirectUrl.searchParams.append("token", token)
-    redirectUrl.searchParams.append("refreshToken", refreshToken)
-    redirectUrl.searchParams.append("userId", user._id)
-    redirectUrl.searchParams.append("email", user.email)
-    redirectUrl.searchParams.append("name", user.name)
-    redirectUrl.searchParams.append("avatar", user.avatar || "")
-    redirectUrl.searchParams.append("isNew", isNewUser ? "true" : "false")
-    redirectUrl.searchParams.append("isLinked", isLinked ? "true" : "false")
-    res.redirect(redirectUrl.toString())
+    return await finishOAuth(req, res, user, 'google', isNewUser, isLinked);
   } catch (error) {
     console.error("[auth] Google callback error:", error)
     res.redirect(`${clientUrl}/login/error?message=${encodeURIComponent(error.message)}`)
@@ -256,10 +275,15 @@ exports.githubCallback = async (req, res) => {
     const { profile, accessToken } = req.user
     const { id, displayName, username, photos, emails } = profile
 
-    const githubEmail = emails?.[0]?.value
+    const verifiedResponse = await require('axios').get('https://api.github.com/user/emails', {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/vnd.github+json' }, timeout: 10000,
+    });
+    const verifiedEmails = verifiedResponse.data.filter(item => item.verified === true);
+    const githubEmail = (verifiedEmails.find(item => item.primary) || verifiedEmails[0])?.email;
+    if (!githubEmail) throw new Error('A verified GitHub email address is required');
 
     const { user, isNewUser, isLinked } = await AuthService.findOrCreateUser(
-      githubEmail || `${username}@github.local`,
+      githubEmail,
       "github",
       {
         id,
@@ -267,7 +291,7 @@ exports.githubCallback = async (req, res) => {
         avatar_url: photos?.[0]?.value,
         name: displayName || username,
         accessToken,
-        emailVerified: !!githubEmail,
+        emailVerified: true,
       }
     )
 
@@ -282,48 +306,7 @@ exports.githubCallback = async (req, res) => {
       { upsert: true, new: true }
     )
 
-    const token = generateToken(user._id)
-    const refreshToken = generateRefreshToken(user._id)
-
-    // Honour returnUrl from session (set in route handler)
-    let returnUrl = req.session?.githubReturnUrl
-    if (returnUrl) delete req.session.githubReturnUrl
-
-    // Fallback: recover returnUrl from OAuth state when session is unavailable.
-    if (!returnUrl && req.query?.state) {
-      try {
-        const decodedState = JSON.parse(Buffer.from(String(req.query.state), 'base64').toString('utf8'))
-        if (decodedState?.returnUrl && typeof decodedState.returnUrl === 'string') {
-          returnUrl = decodedState.returnUrl
-        }
-      } catch (_) {
-        // Ignore invalid state and continue with default callback route.
-      }
-    }
-
-    if (returnUrl) {
-      try {
-        const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
-        redirectUrl.searchParams.append("token", token)
-        redirectUrl.searchParams.append("refreshToken", refreshToken)
-        redirectUrl.searchParams.append("github-connected", "true")
-        redirectUrl.searchParams.append("provider", "github")
-        redirectUrl.searchParams.append("returnUrl", returnUrl)
-        return res.redirect(redirectUrl.toString())
-      } catch (_) { /* fall through */ }
-    }
-
-    const redirectUrl = new URL(`${clientUrl}/login/auth-callback`)
-    redirectUrl.searchParams.append("token", token)
-    redirectUrl.searchParams.append("refreshToken", refreshToken)
-    redirectUrl.searchParams.append("userId", user._id)
-    redirectUrl.searchParams.append("email", user.email)
-    redirectUrl.searchParams.append("name", user.name)
-    redirectUrl.searchParams.append("avatar", user.avatar || "")
-    redirectUrl.searchParams.append("isNew", isNewUser ? "true" : "false")
-    redirectUrl.searchParams.append("isLinked", isLinked ? "true" : "false")
-    redirectUrl.searchParams.append("provider", "github")
-    res.redirect(redirectUrl.toString())
+    return await finishOAuth(req, res, user, 'github', isNewUser, isLinked);
   } catch (error) {
     console.error("[auth] GitHub callback error:", error)
     res.redirect(`${clientUrl}/login/error?message=${encodeURIComponent(error.message)}`)
@@ -413,8 +396,8 @@ exports.changePassword = async (req, res) => {
       return res.status(400).json({ error: "New passwords do not match" })
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" })
+    if (!require("../utils/passwordPolicy").validPassword(newPassword)) {
+      return res.status(400).json({ error: "Use at least 12 characters and at most 72 UTF-8 bytes" })
     }
 
     const user = await User.findById(userId).select("+password")
@@ -430,7 +413,8 @@ exports.changePassword = async (req, res) => {
       return res.status(401).json({ error: "Current password is incorrect" })
     }
 
-    // Update password
+    // Changing a password revokes existing access and refresh tokens.
+    user.tokenVersion = (user.tokenVersion || 0) + 1
     user.password = newPassword
     await user.save()
 
@@ -500,6 +484,7 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ error: "Passwords do not match" })
     }
 
+    if (!require("../utils/passwordPolicy").validPassword(newPassword) || typeof resetToken !== "string" || !/^[a-f\d]{40}$/i.test(resetToken)) return res.status(400).json({ error: "A valid reset token and a 12–72 byte password are required" });
     const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex")
 
     const user = await User.findOne({
@@ -511,6 +496,7 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ error: "Invalid or expired reset token" })
     }
 
+    user.tokenVersion = (user.tokenVersion || 0) + 1
     user.password = newPassword
     user.verificationToken = undefined
     user.verificationTokenExpires = undefined
@@ -529,3 +515,27 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
+exports.requestEmailVerification = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (user.emailVerified) return res.json({ message: 'Email is already verified' });
+    const token = crypto.randomBytes(32).toString('hex');
+    user.emailVerificationToken = crypto.createHash('sha256').update(token).digest('hex');
+    user.emailVerificationExpires = new Date(Date.now() + 86400000);
+    await user.save();
+    const client = process.env.CLIENT_URL || 'http://localhost:5000';
+    const url = new URL('/verify-email', client); url.hash = new URLSearchParams({ token }).toString();
+    await emailService.sendEmail({ to: user.email, subject: 'Verify your CloudDeck email', text: `Verify your email by opening ${url}. This link expires in 24 hours. If you did not request this, ignore this email.` });
+    res.json({ message: 'Verification email sent. Open the latest link within 24 hours.' });
+  } catch (error) { next(error); }
+};
+exports.verifyEmail = async (req, res, next) => {
+  try {
+    const token = req.body.token;
+    if (typeof token !== 'string' || !/^[a-f\d]{64}$/i.test(token)) return res.status(400).json({ error: 'Invalid verification link' });
+    const user = await User.findOneAndUpdate({ emailVerificationToken: crypto.createHash('sha256').update(token).digest('hex'), emailVerificationExpires: { $gt: new Date() } }, { $set: { emailVerified: true }, $unset: { emailVerificationToken: 1, emailVerificationExpires: 1 } }, { new: true });
+    if (!user) return res.status(400).json({ error: 'Verification link expired or was already used' });
+    res.json({ message: 'Your email is verified. You can open your workspace.' });
+  } catch (error) { next(error); }
+};

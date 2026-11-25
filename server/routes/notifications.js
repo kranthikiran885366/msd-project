@@ -1,43 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const NotificationController = require('../controllers/notificationController');
-const { authenticate } = require('../middleware/auth');
-
-const controller = new NotificationController();
-
-// Get user notification preferences
-router.get('/preferences', authenticate, controller.getPreferences);
-
-// Update user notification preferences
-router.patch('/preferences', authenticate, controller.updatePreferences);
-
-// Send test notification
-router.post('/test', authenticate, controller.sendTest);
-
-// Update email address for notifications
-router.patch('/email', authenticate, controller.updateEmail);
-
-// Update phone number for SMS notifications
-router.patch('/phone', authenticate, controller.updatePhone);
-
-// Unsubscribe from email notifications (public)
-router.post('/unsubscribe', controller.unsubscribe);
-
-// Update quiet hours
-router.patch('/quiet-hours', authenticate, controller.updateQuietHours);
-
-// Get notification history (admin)
-router.get('/history', authenticate, controller.getHistory);
-
-// Send batch notifications (admin)
-router.post('/batch', authenticate, controller.sendBatch);
-
-// Get team notification preferences (project lead)
-router.get('/team/:projectId', authenticate, controller.getTeamPreferences);
-
-module.exports = router;
-const express = require('express');
-const router = express.Router();
 const notificationController = require('../controllers/notificationController');
 const authMiddleware = require('../middleware/auth');
 

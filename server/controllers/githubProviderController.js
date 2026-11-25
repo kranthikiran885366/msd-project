@@ -21,8 +21,6 @@ class GitHubProviderController {
       }
 
       console.log('GitHub username:', integration.githubUsername);
-      console.log('Access token length:', integration.accessToken?.length);
-      console.log('Token starts with:', integration.accessToken?.substring(0, 10));
       
       // Fetch repositories with affiliation parameter to get:
       // - owner: repositories owned by the user

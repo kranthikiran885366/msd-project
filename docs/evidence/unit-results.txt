@@ -1,0 +1,44 @@
+Observed local run: 25 November 2026
+Node 24.22.3 / npm 11.19.1
+These are unit/transport checks, not cloud E2E.
+
+✔ failed deployment POSTs are not retried automatically (13.317368ms)
+✔ a lost POST response is treated as uncertain, not submitted again (2.866551ms)
+✔ read-only GET requests retain bounded retry behavior (10.49041ms)
+✔ refresh tokens cannot authorize an API call (5.094819ms)
+✔ disabled users cannot use an otherwise valid access token (1.169557ms)
+✔ revoked session versions cannot access the API (1.107332ms)
+✔ current active sessions carry the verified owner identity (1.003327ms)
+✔ worker endpoints fail closed even in development without credentials (0.595373ms)
+✔ worker credentials must match the whole secret (0.287598ms)
+✔ OAuth return paths reject external origins and scheme-relative URLs (0.388737ms)
+✔ password policy prevents bcrypt truncation and accepts strong Unicode within the byte limit (0.195104ms)
+✔ local configuration uses private, independent secrets and never overwrites existing keys (188.87094ms)
+✔ shared host Docker cannot be enabled for production, including with legacy override flags (1.88772ms)
+✔ application gateway streams paths, bodies and deployment identity on a separate host (36.288822ms)
+✔ unknown, malformed and control-plane hosts never resolve an application (7.289153ms)
+✔ routing lookup failures are explicit and do not produce a successful application page (2.891568ms)
+✔ gateway forwards a real WebSocket upgrade and echo stream (20.490634ms)
+✔ production refuses default secrets and missing persistent services (2.462405ms)
+✔ cancelled/failed deployments cannot be resurrected by a late worker (0.373899ms)
+✔ statistics use canonical running state; empty history is unknown (0.389098ms)
+✔ project endpoint hides another tenant’s resource (0.639256ms)
+✔ deployment access checks the owning project rather than the deployment author (0.754441ms)
+✔ malformed IDs never reach the database (0.383488ms)
+✔ root directory resolution rejects traversal and symlink escape (16.051479ms)
+✔ unknown repositories fail instead of receiving a fabricated deployed page (7.485441ms)
+✔ generated build recipes preserve failures instead of bypassing commands (1.347502ms)
+✔ runtime detection distinguishes Vite output from Create React App (4.34712ms)
+✔ HTTP readiness refuses an exited container (0.666115ms)
+✔ port allocation never fabricates an unreserved port (0.581498ms)
+✔ runtime secrets use a private temporary env file and are removed afterwards (3.253005ms)
+✔ environment values cannot inject additional env-file entries (0.961027ms)
+✔ worker honors cancellation reported by the control plane (0.555159ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 464.621457

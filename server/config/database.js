@@ -19,10 +19,7 @@ const connectDB = async () => {
     console.log(`MongoDB connected: ${conn.connection.host}`)
     return conn
   } catch (error) {
-    console.warn(`MongoDB connection warning: ${error.message}`)
-    console.warn("Running in mock mode - database operations will use in-memory storage")
-    // Don't exit, continue in mock mode
-    return null
+    throw new Error('MongoDB is unavailable; refusing to start without persistent storage', { cause: error })
   }
 }
 

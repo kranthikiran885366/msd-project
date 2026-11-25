@@ -89,7 +89,7 @@ const projectSchema = new mongoose.Schema(
                 default: 'auto',
             },
             // Port the app listens on inside the container
-            port: { type: Number, default: 3000 },
+            port: { type: Number, default: null, min: 1, max: 65535 },
             // Environment variables (values encrypted at rest for secrets)
             envVariables: [envVarSchema],
         },

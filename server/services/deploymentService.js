@@ -29,6 +29,8 @@ class DeploymentService {
 
         const project = await Project.findById(projectId);
         if (!project) throw new Error('Project not found');
+        if (userId && String(project.userId) !== String(userId)) throw Object.assign(new Error('Project not found'), { status: 404 });
+        if (project.status !== 'active' || project.deployLock?.enabled) throw Object.assign(new Error('Deployments are paused for this project'), { status: 409 });
 
         const resolvedBranch = await this.resolveDeploymentBranch(project, gitBranch);
 
@@ -51,9 +53,7 @@ class DeploymentService {
         });
 
         // Fire-and-forget — caller gets the pending deployment immediately
-        this.processDeployment(deployment._id).catch(error => {
-            console.error(`[deploy] Deployment ${deployment._id} failed:`, error);
-        });
+        await this.processDeployment(deployment._id);
 
         return deployment;
     }
@@ -123,9 +123,7 @@ class DeploymentService {
                 let deployConfig;
                 try {
                     deployConfig = await projectConfigService.resolveDeployConfig(project._id);
-                } catch (_) {
-                    deployConfig = { runtime: 'node', installCommand: 'npm install', buildCommand: 'npm run build', startCommand: 'node index.js', port: 3000 };
-                }
+                } catch (error) { throw new Error(`Project configuration is invalid: ${error.message}`); }
 
                 // Decrypt env variables
                 let mergedEnv = {};
@@ -133,13 +131,11 @@ class DeploymentService {
                     const envMap = await projectConfigService.getDecryptedEnvMap(project._id);
                     const databaseEnv = await databaseService.getProjectRuntimeDatabaseEnv(project._id);
                     mergedEnv = { ...envMap, ...databaseEnv };
-                } catch (_) {}
+                } catch (error) { throw new Error(`Environment configuration could not be decrypted: ${error.message}`); }
 
                 // Get GitHub access token — try by project owner, then repo owner username, then any available
                 const ghIntegration =
-                    await GitHubIntegration.findOne({ userId: project.userId }).lean() ||
-                    await GitHubIntegration.findOne({ githubUsername: project.repository?.owner }).lean() ||
-                    await GitHubIntegration.findOne().sort({ connectedAt: -1 }).lean();
+                    await GitHubIntegration.findOne({ userId: project.userId }).lean();
                 const accessToken = ghIntegration?.accessToken || project.repository?.accessToken;
 
                 await jobQueueService.queueDeployment(deploymentId.toString(), {
@@ -147,17 +143,18 @@ class DeploymentService {
                         (project.repository?.owner && project.repository?.name
                             ? `https://github.com/${project.repository.owner}/${project.repository.name}.git`
                             : null),
+                    gitCommit:       deployment.gitCommit,
                     branch:          deployment.gitBranch || project.repository?.branch || 'main',
                     environment:     deployment.environment || 'production',
                     noCache:         Boolean(deployment.providerConfig?.noCache || false),
                     // Build settings from project
                     runtime:         deployConfig.runtime,
-                    installCommand:  project.buildSettings?.installCommand || deployConfig.installCommand,
-                    buildCommand:    project.buildSettings?.buildCommand   || deployConfig.buildCommand,
-                    startCommand:    project.buildSettings?.startCommand   || deployConfig.startCommand,
+                    installCommand:  project.runtimeConfig?.installCommand || project.buildSettings?.installCommand || '',
+                    buildCommand:    project.runtimeConfig?.buildCommand || project.buildSettings?.buildCommand || '',
+                    startCommand:    project.runtimeConfig?.startCommand || project.buildSettings?.startCommand || '',
                     outputDirectory: project.buildSettings?.outputDirectory|| deployConfig.outputDirectory || '',
                     rootDirectory:   project.buildSettings?.rootDirectory  || '/',
-                    appPort:         deployConfig.port,
+                    appPort:         project.runtimeConfig?.port || null,
                     envVariables:    mergedEnv,
                     region:          project.deploymentSettings?.region || 'us-east-1',
                     accessToken,
@@ -197,9 +194,10 @@ class DeploymentService {
                 });
                 deployUrl = deployResult.url;
             } catch (adapterErr) {
-                console.warn(`[deploy] Provider adapter error (non-fatal): ${adapterErr.message}`);
+                throw adapterErr;
             }
 
+            if (!deployUrl) throw new Error('Provider did not return a deployment URL');
             const urlField = (deployment.environment === 'preview' || deployment.environment === 'staging') ? { previewUrl: deployUrl } : { productionUrl: deployUrl };
             await this.updateDeploymentStatus(deploymentId, 'running', {
                 ...urlField,
@@ -253,11 +251,14 @@ class DeploymentService {
     async getAllDeployments(limit = 50, filters = {}) {
         // Sanitize filters: only allow known safe string fields
         const safeFilters = {};
+        if (!filters.userId) throw Object.assign(new Error('Authentication required'), { status: 401 });
+        const owned = await Project.find({ userId: filters.userId }).select('_id').lean();
+        safeFilters.projectId = { $in: owned.map(project => project._id) };
         if (filters.status)      safeFilters.status      = String(filters.status);
         if (filters.environment) safeFilters.environment = String(filters.environment);
         return await Deployment.find(safeFilters)
             .sort({ createdAt: -1 })
-            .limit(limit)
+            .limit(Math.min(100, Math.max(1, Number(limit) || 50)))
             .populate('projectId', 'name')
             .lean();
     }
@@ -266,7 +267,7 @@ class DeploymentService {
         if (!mongoose.Types.ObjectId.isValid(projectId)) throw new Error('Invalid projectId');
         return await Deployment.find({ projectId: new mongoose.Types.ObjectId(projectId), ...filters })
             .sort({ createdAt: -1 })
-            .limit(limit)
+            .limit(Math.min(100, Math.max(1, Number(limit) || 50)))
             .lean();
     }
 
@@ -379,7 +380,7 @@ class DeploymentService {
             }
         }
 
-        await this.updateDeploymentStatus(deploymentId, 'rolled-back', { rollbackReason: 'Cancelled by user' });
+        await this.updateDeploymentStatus(deploymentId, 'cancelled', { rollbackReason: 'Cancelled by user' });
         try {
             await notificationService.sendDeploymentNotification(deployment, 'cancelled');
         } catch (_) {}

@@ -1,15 +1,7 @@
 node_modules
-npm-debug.log*
 .env
 .env.*
-logs/
 *.log
-coverage/
-.nyc_output
-pnpm-lock.yaml
-*.test.js
-tests/
-__tests__/
 .git
-.gitignore
-Dockerfile
+coverage
+tests

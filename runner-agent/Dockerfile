@@ -1,11 +1,11 @@
 # ── Worker / Runner-Agent Dockerfile ─────────────────────────────────────────
-FROM node:18-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
-COPY package.json ./
-RUN npm install --only=production --ignore-scripts
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 # ── Runtime image ─────────────────────────────────────────────────────────────
-FROM node:18-alpine
+FROM node:22-alpine
 
 # Install Docker CLI + git (needed for repo cloning)
 RUN apk add --no-cache docker-cli git

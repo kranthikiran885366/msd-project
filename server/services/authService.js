@@ -47,6 +47,8 @@ class AuthService {
     // 2. Provider ID not found — check by email
     user = await User.findByEmail(normalizedEmail);
 
+    if (user && !user.emailVerified) throw Object.assign(new Error('Verify the existing account email before linking a new sign-in provider'), { status: 409 });
+    if (user && providerData.emailVerified !== true) throw new Error('Verified provider email ownership is required to link an existing account');
     if (user) {
       // Email exists — link this provider to the existing account
       isLinked = true;

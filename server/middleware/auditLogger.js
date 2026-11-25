@@ -40,12 +40,12 @@ class AuditLoggerMiddleware {
 
       res.json = function(data) {
         responseData = data;
-        return originalJson.call(this, data);
+        return originalJson.call(res, data);
       };
 
       // Store original res.end to capture when response is sent
       const originalEnd = res.end;
-      res.end = async function(...args) {
+      res.end = async (...args) => {
         try {
           // Only log if user is authenticated
           if (req.user) {
@@ -87,8 +87,8 @@ class AuditLoggerMiddleware {
           // Don't fail the request if audit logging fails
         }
 
-        return originalEnd.apply(this, args);
-      }.bind(this);
+        return originalEnd.apply(res, args);
+      };
 
       next();
     };
@@ -163,7 +163,7 @@ class AuditLoggerMiddleware {
     return async (req, res, next) => {
       const originalJson = res.json;
       
-      res.json = async function(data) {
+      res.json = async (data) => {
         try {
           if (req.path.includes('/auth/') || req.path.includes('/login') || req.path.includes('/signup')) {
             const action = req.path.includes('/login') ? 'user_login' : 
@@ -192,11 +192,11 @@ class AuditLoggerMiddleware {
           console.error('Auth audit logging error:', error);
         }
 
-        return originalJson.call(this, data);
-      }.bind(this);
+        return originalJson.call(res, data);
+      };
 
       next();
-    }.bind(this);
+    };
   }
 }
 

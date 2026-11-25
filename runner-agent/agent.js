@@ -47,7 +47,7 @@ class Agent {
         this.isRegistered = true;
         this.isRunning = true;
         this.startHeartbeat();
-        this.startJobPolling();
+        if (process.env.QUEUE_MODE !== 'bullmq') this.startJobPolling();
         this.startMonitoring();
         console.log('[agent] Started successfully');
     }
@@ -102,7 +102,7 @@ class Agent {
         this.activeJobs.set(jobId, { startTime: Date.now(), job });
         console.log(`[agent] Executing job: ${jobId}`);
 
-        this.jobExecutor.executeJob(job)
+        new JobExecutor(this.nodeId, this.backendUrl).executeJob(job)
             .then(() => {
                 console.log(`[agent] Job ${jobId} done`);
                 this.activeJobs.delete(jobId);
@@ -132,7 +132,7 @@ class Agent {
     }
 
     startMonitoring() {
-        setInterval(() => {
+        this.monitoringInterval = setInterval(() => {
             const now        = Date.now();
             const jobTimeout = 600000;
             for (const [jobId, data] of this.activeJobs) {
@@ -148,6 +148,7 @@ class Agent {
         this.isRunning = false;
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         if (this.jobPollInterval)   clearInterval(this.jobPollInterval);
+        if (this.monitoringInterval) clearInterval(this.monitoringInterval);
 
         const deadline = Date.now() + 30000;
         while (this.activeJobs.size > 0 && Date.now() < deadline) {

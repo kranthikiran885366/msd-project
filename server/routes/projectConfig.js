@@ -31,8 +31,8 @@ function csrfGuard(req, res, next) {
     const source = origin || referer;
     // Allow same-origin and configured client URL
     if (
-        source.startsWith(clientUrl) ||
-        /localhost|127\.0\.0\.1/.test(source)
+        (clientUrl && (() => { try { return new URL(source).origin === new URL(clientUrl).origin; } catch { return false; } })()) ||
+        (process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(source))
     ) {
         return next();
     }
